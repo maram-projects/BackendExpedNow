@@ -2,13 +2,13 @@ package com.example.ExpedNow.controllers;
 
 import com.example.ExpedNow.models.Role;
 import com.example.ExpedNow.models.User;
-import com.example.ExpedNow.repositories.UserRepository;
 import com.example.ExpedNow.security.JwtUtil;
 import com.example.ExpedNow.services.UserService;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.HashMap;
@@ -18,18 +18,66 @@ import java.util.Set;
 
 @RestController
 @RequestMapping("/api/auth")
+@CrossOrigin(origins = "*") // Add appropriate CORS configuration
 public class AuthController {
     @Autowired
     private AuthenticationManager authenticationManager;
+
     @Autowired
     private UserService userService;
+
     @Autowired
     private JwtUtil jwtUtil;
-    @Autowired
-    private PasswordEncoder passwordEncoder;
 
     @PostMapping("/register")
-    public User register(@RequestBody User user, @RequestParam String userType) {
+    public ResponseEntity<?> register(@RequestBody User user, @RequestParam String userType) {
+        try {
+            Set<Role> roles = determineRoles(userType);
+            User registeredUser = userService.registerUser(user, roles);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Registration successful");
+            response.put("email", registeredUser.getEmail());
+            response.put("userType", userType);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody User user) {
+        try {
+            // Authenticate user
+            authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(user.getEmail(), user.getPassword())
+            );
+
+            // Get user details
+            User userDetails = userService.findByEmail(user.getEmail());
+
+            // Generate token
+            String token = jwtUtil.generateToken(user.getEmail());
+
+            // Create response
+            Map<String, Object> response = new HashMap<>();
+            response.put("token", token);
+            response.put("userType", determineUserType(userDetails.getRoles()));
+            response.put("email", userDetails.getEmail());
+
+            return ResponseEntity.ok(response);
+        } catch (AuthenticationException e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", "Invalid email or password"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    private Set<Role> determineRoles(String userType) {
         Set<Role> roles = new HashSet<>();
 
         switch (userType.toLowerCase()) {
@@ -59,22 +107,26 @@ public class AuthController {
                 roles.add(Role.ROLE_TEMPORARY);
                 break;
             default:
-                throw new RuntimeException("نوع المستخدم غير صالح!");
+                throw new IllegalArgumentException("Invalid user type: " + userType);
         }
 
-        user.setRoles(roles);
-        return userService.registerUser(user);
+        return roles;
     }
 
-
-    @PostMapping("/login")
-    public Map<String, String> login(@RequestBody User user) {
-        authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(user.getEmail(), user.getPassword())
-        );
-        String token = jwtUtil.generateToken(user.getEmail());
-        Map<String, String> response = new HashMap<>();
-        response.put("token", token);
-        return response;
+    private String determineUserType(Set<Role> roles) {
+        if (roles.contains(Role.ROLE_ADMIN)) {
+            return "admin";
+        } else if (roles.contains(Role.ROLE_ENTERPRISE)) {
+            return "enterprise";
+        } else if (roles.contains(Role.ROLE_INDIVIDUAL)) {
+            return "individual";
+        } else if (roles.contains(Role.ROLE_PROFESSIONAL)) {
+            return "professional";
+        } else if (roles.contains(Role.ROLE_TEMPORARY)) {
+            return "temporary";
+        } else if (roles.contains(Role.ROLE_CLIENT)) {
+            return "client";
+        }
+        return "client"; // default fallback
     }
 }

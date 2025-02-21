@@ -21,7 +21,6 @@ public class User {
     private String address;
     private Date dateOfRegistration;
 
-    // كل مستخدم ينجم يكون عنده أكثر من Role
     private Set<Role> roles;
 }
 
