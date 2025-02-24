@@ -9,6 +9,7 @@ import java.util.Set;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Builder
 @Document(collection = "users")
 public class User {
     @Id
@@ -20,8 +21,6 @@ public class User {
     private String phone;
     private String address;
     private Date dateOfRegistration;
-
+    private boolean verified; // New field to track email verification
     private Set<Role> roles;
 }
-
-
