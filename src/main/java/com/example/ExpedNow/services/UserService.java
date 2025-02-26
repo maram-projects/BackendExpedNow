@@ -8,8 +8,6 @@ import com.example.ExpedNow.repositories.VerificationTokenRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
-import org.springframework.security.core.userdetails.UserDetails;
-import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
@@ -145,5 +143,17 @@ public class UserService {
             logger.info("New OAuth2 user registered: {}", email);
             return savedUser;
         }
+    }
+
+    public User updateProfile(String email, User updatedUser) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        user.setFirstName(updatedUser.getFirstName());
+        user.setLastName(updatedUser.getLastName());
+        user.setPhone(updatedUser.getPhone());
+        user.setAddress(updatedUser.getAddress());
+
+        return userRepository.save(user);
     }
 }

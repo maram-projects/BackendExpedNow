@@ -3,7 +3,9 @@ package com.example.ExpedNow.models;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+
 import java.util.Date;
+import java.util.HashSet;
 import java.util.Set;
 
 @Data
@@ -21,6 +23,8 @@ public class User {
     private String phone;
     private String address;
     private Date dateOfRegistration;
-    private boolean verified; // New field to track email verification
-    private Set<Role> roles;
+    private boolean verified;
+
+    // Ensure default value is not null
+    private Set<Role> roles = new HashSet<>();
 }

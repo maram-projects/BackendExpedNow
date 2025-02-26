@@ -92,7 +92,7 @@ public class AdminService {
         dto.setPhone(user.getPhone());
         dto.setAddress(user.getAddress());
         dto.setDateOfRegistration(user.getDateOfRegistration());
-        dto.setRoles(user.getRoles());
+        dto.setRoles(user.getRoles().stream().map(Role::name).collect(Collectors.toSet()));
         return dto;
     }
 }

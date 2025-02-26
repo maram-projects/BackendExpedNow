@@ -14,5 +14,5 @@ public class UserDTO {
     private String phone;
     private String address;
     private Date dateOfRegistration;
-    private Set<Role> roles;
+    private Set<String> roles;
 }

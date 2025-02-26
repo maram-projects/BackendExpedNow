@@ -14,6 +14,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
 
+import java.security.Principal;
 import java.util.*;
 
 @RestController
@@ -206,5 +207,16 @@ public class AuthController {
             return "client";
         }
         return "client"; // default fallback
+    }
+
+    @PutMapping("/profile")
+    public ResponseEntity<?> updateProfile(@RequestBody User updatedUser, Principal principal) {
+        try {
+            String email = principal.getName(); // Get the current user's email from the security context
+            User user = userService.updateProfile(email, updatedUser);
+            return ResponseEntity.ok(user);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 }
