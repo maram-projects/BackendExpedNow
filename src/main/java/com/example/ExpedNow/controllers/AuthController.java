@@ -2,8 +2,15 @@ package com.example.ExpedNow.controllers;
 
 import com.example.ExpedNow.models.Role;
 import com.example.ExpedNow.models.User;
+import com.example.ExpedNow.repositories.UserRepository;
+import com.example.ExpedNow.security.CustomUserDetailsService;
 import com.example.ExpedNow.security.JwtUtil;
 import com.example.ExpedNow.services.UserService;
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
+import lombok.Data;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -11,26 +18,34 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.AuthenticationException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
 
+import javax.security.auth.login.AccountLockedException;
 import java.security.Principal;
+import java.time.LocalDateTime;
 import java.util.*;
 
 @RestController
 @RequestMapping("/api/auth")
 @CrossOrigin(origins = "http://localhost:4200")
 public class AuthController {
+    private static final int MAX_FAILED_ATTEMPTS = 5;
+    private static final int LOCK_TIME_MINUTES = 30;
+
     private final AuthenticationManager authenticationManager;
     private final UserService userService;
+    private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
 
-    // Constructor injection
     public AuthController(AuthenticationManager authenticationManager,
                           UserService userService,
+                          UserRepository userRepository,
                           JwtUtil jwtUtil) {
         this.authenticationManager = authenticationManager;
         this.userService = userService;
+        this.userRepository = userRepository;
         this.jwtUtil = jwtUtil;
     }
 
@@ -70,7 +85,7 @@ public class AuthController {
                     roles.add(Role.ROLE_TEMPORARY);
                     break;
                 case "admin":
-                    roles.add(Role.ROLE_ADMIN);
+                    roles.add(Role.ADMIN);
                     break;
                 default:
                     roles.add(Role.ROLE_CLIENT);
@@ -118,59 +133,104 @@ public class AuthController {
     }
 
     @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody Map<String, String> credentials) {
+    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
         try {
-            // Extract email and password from the request
-            String email = credentials.get("email");
-            String password = credentials.get("password");
+            Authentication authentication = authenticationManager.authenticate(
+                    new UsernamePasswordAuthenticationToken(
+                            loginRequest.getEmail(),
+                            loginRequest.getPassword()
+                    )
+            );
 
-            if (email == null || password == null) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "Email and password are required"));
-            }
+            CustomUserDetailsService.CustomUserDetails userDetails =
+                    (CustomUserDetailsService.CustomUserDetails) authentication.getPrincipal();
 
-            // Create authentication token
-            UsernamePasswordAuthenticationToken authToken =
-                    new UsernamePasswordAuthenticationToken(email, password);
+            User user = userRepository.findById(userDetails.getUserId())
+                    .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
-            try {
-                Authentication authentication = authenticationManager.authenticate(authToken);
+            // Reset failed attempts on success
+            user.resetFailedAttempts();
+            userRepository.save(user);
 
-                if (authentication.isAuthenticated()) {
-                    User userDetails = userService.findByEmail(email);
+            String token = jwtUtil.generateToken(user.getEmail());
+            String userType = determineUserType(user.getRoles());
 
-                    if (!userDetails.isVerified()) {
-                        return ResponseEntity.badRequest()
-                                .body(Map.of("error", "Email not verified. Please check your inbox."));
-                    }
+            return ResponseEntity.ok(Map.of(
+                    "token", token,
+                    "userId", user.getId(),
+                    "userType", userType,
+                    "email", user.getEmail(),
+                    "firstName", user.getFirstName(),
+                    "lastName", user.getLastName(),
+                    "verified", user.isVerified()
+            ));
 
-                    String token = jwtUtil.generateToken(email);
-
-                    Map<String, Object> response = new HashMap<>();
-                    response.put("token", token);
-                    response.put("userType", determineUserType(userDetails.getRoles()));
-                    response.put("email", userDetails.getEmail());
-                    response.put("firstName", userDetails.getFirstName());
-                    response.put("lastName", userDetails.getLastName());
-
-                    return ResponseEntity.ok(response);
-                } else {
-                    return ResponseEntity.badRequest()
-                            .body(Map.of("error", "Invalid email or password"));
-                }
-            } catch (BadCredentialsException e) {
-                return ResponseEntity.status(401)
-                        .body(Map.of("error", "Invalid email or password"));
-            } catch (AuthenticationException e) {
-                return ResponseEntity.badRequest()
-                        .body(Map.of("error", "Authentication failed: " + e.getMessage()));
-            }
+        } catch (BadCredentialsException e) {
+            handleFailedLoginAttempt(loginRequest.getEmail());
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                    .body(Map.of("error", "Invalid email or password"));
+        } catch (CustomUserDetailsService.AccountNotVerifiedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("error", e.getMessage()));
+        } catch (CustomUserDetailsService.AccountLockedException e) {
+            return ResponseEntity.status(HttpStatus.LOCKED)
+                    .body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.badRequest()
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Login failed: " + e.getMessage()));
         }
     }
+
+    private void handleFailedLoginAttempt(String email) {
+        userRepository.findByEmail(email).ifPresent(user -> {
+            user.incrementFailedAttempts();
+            if (user.getFailedLoginAttempts() >= MAX_FAILED_ATTEMPTS) {
+                user.setLockTime(LocalDateTime.now());
+            }
+            userRepository.save(user);
+        });
+    }
+
+    private String determineUserType(Set<Role> roles) {
+        if (roles.contains(Role.ADMIN)) {
+            return "admin";
+        }
+        if (roles.contains(Role.ROLE_ENTERPRISE)) {
+            return "enterprise";
+        }
+        if (roles.contains(Role.ROLE_INDIVIDUAL)) {
+            return "individual";
+        }
+        if (roles.contains(Role.ROLE_PROFESSIONAL)) {
+            return "professional";
+        }
+        if (roles.contains(Role.ROLE_TEMPORARY)) {
+            return "temporary";
+        }
+        if (roles.contains(Role.ROLE_CLIENT)) {
+            return "client";
+        }
+        return "unknown";
+    }
+
+    // Other methods remain the same...
+
+    @Data
+    static class LoginRequest {
+        @NotBlank
+        @Email
+        private String email;
+
+        @NotBlank
+        @Size(min = 8)
+        private String password;
+    }
+
+
+
+
+    // Other methods remain the same...
+
 
     @GetMapping("/oauth2-success")
     public ResponseEntity<?> oauthLoginSuccess(@AuthenticationPrincipal OAuth2User principal) {
@@ -192,22 +252,7 @@ public class AuthController {
         return ResponseEntity.badRequest().body(Map.of("error", "Failed to retrieve user information"));
     }
 
-    private String determineUserType(Set<Role> roles) {
-        if (roles.contains(Role.ROLE_ADMIN)) {
-            return "admin";
-        } else if (roles.contains(Role.ROLE_ENTERPRISE)) {
-            return "enterprise";
-        } else if (roles.contains(Role.ROLE_INDIVIDUAL)) {
-            return "individual";
-        } else if (roles.contains(Role.ROLE_PROFESSIONAL)) {
-            return "professional";
-        } else if (roles.contains(Role.ROLE_TEMPORARY)) {
-            return "temporary";
-        } else if (roles.contains(Role.ROLE_CLIENT)) {
-            return "client";
-        }
-        return "client"; // default fallback
-    }
+
 
     @PutMapping("/profile")
     public ResponseEntity<?> updateProfile(@RequestBody User updatedUser, Principal principal) {

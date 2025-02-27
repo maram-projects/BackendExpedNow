@@ -12,4 +12,6 @@ public class VehicleDTO {
     private String licensePlate;
     private VehicleType vehicleType;
     private String photoPath;
+    private boolean available;
+    private double maxLoad; // Added field
 }

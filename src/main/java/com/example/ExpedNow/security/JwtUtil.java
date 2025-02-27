@@ -9,7 +9,9 @@ import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import java.security.Key;
+import java.util.ArrayList;
 import java.util.Date;
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Component
@@ -26,15 +28,31 @@ public class JwtUtil {
         this.userRepository = userRepository;
     }
 
+    // In your JwtUtils class, modify the generateToken method:
     public String generateToken(String email) {
-        // Instead of using UserService, use UserRepository directly
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
 
         Claims claims = Jwts.claims().setSubject(email);
-        claims.put("roles", user.getRoles().stream()
-                .map(Role::name)
-                .collect(Collectors.toList()));
+
+        // Add both the original roles and mapped roles for Spring Security
+        List<String> roleNames = new ArrayList<>();
+
+        for (Role role : user.getRoles()) {
+            roleNames.add(role.name());
+
+            // For INDIVIDUAL, ENTERPRISE roles, also add CLIENT role for Spring Security
+            if (role == Role.ROLE_INDIVIDUAL || role == Role.ROLE_ENTERPRISE) {
+                roleNames.add("CLIENT");
+            }
+            // For TEMPORARY, PROFESSIONAL roles, also add DELIVERY role
+            else if (role == Role.ROLE_TEMPORARY || role == Role.ROLE_PROFESSIONAL) {
+                roleNames.add("DELIVERY");
+            }
+            // No mapping needed for ADMIN - keep as is
+        }
+
+        claims.put("roles", roleNames);
 
         return Jwts.builder()
                 .setClaims(claims)

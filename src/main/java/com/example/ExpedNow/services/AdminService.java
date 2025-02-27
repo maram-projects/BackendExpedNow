@@ -70,9 +70,9 @@ public class AdminService {
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         // Prevent removing ADMIN role from the last admin
-        if (user.getRoles().contains(Role.ROLE_ADMIN) && !roles.contains(Role.ROLE_ADMIN)) {
+        if (user.getRoles().contains(Role.ADMIN) && !roles.contains(Role.ADMIN)) {
             long adminCount = userRepository.findAll().stream()
-                    .filter(u -> u.getRoles().contains(Role.ROLE_ADMIN))
+                    .filter(u -> u.getRoles().contains(Role.ADMIN))
                     .count();
             if (adminCount <= 1) {
                 throw new AccessDeniedException("Cannot remove ADMIN role from the last admin user");
