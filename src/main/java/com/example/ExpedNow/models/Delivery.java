@@ -4,6 +4,7 @@ import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.LocalDateTime;
+import java.util.Date;
 
 @Data
 @Document(collection = "deliveries")
@@ -15,10 +16,10 @@ public class Delivery {
     private String packageDescription;
     private double packageWeight;
     private String vehicleId;
-    private LocalDateTime scheduledDate;
+    private Date scheduledDate;      // Changed to java.util.Date
     private String additionalInstructions;
     private DeliveryStatus status = DeliveryStatus.PENDING;
-    private LocalDateTime createdAt = LocalDateTime.now();
+    private Date createdAt = new Date(); // Changed to java.util.Date
     private String clientId;
 
     public enum DeliveryStatus {

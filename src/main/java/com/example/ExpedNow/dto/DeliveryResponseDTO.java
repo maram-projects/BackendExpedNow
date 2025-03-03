@@ -1,6 +1,7 @@
 package com.example.ExpedNow.dto;
 
-import java.time.LocalDateTime;
+import com.fasterxml.jackson.annotation.JsonFormat;
+import java.util.Date;
 
 public record DeliveryResponseDTO(
         String id,
@@ -9,9 +10,11 @@ public record DeliveryResponseDTO(
         String packageDescription,
         double packageWeight,
         String vehicleId,
-        LocalDateTime scheduledDate,
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
+        Date scheduledDate,
         String additionalInstructions,
         String status,
-        LocalDateTime createdAt,
+        @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
+        Date createdAt,
         String clientId
 ) {}

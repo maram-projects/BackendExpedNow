@@ -10,7 +10,9 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -36,15 +38,20 @@ public class DeliveryController {
         delivery.setPackageDescription(requestDTO.packageDescription());
         delivery.setPackageWeight(requestDTO.packageWeight());
         delivery.setVehicleId(requestDTO.vehicleId());
+
+        // Simply set the scheduled date, it's already a java.util.Date
         delivery.setScheduledDate(requestDTO.scheduledDate());
+
         delivery.setAdditionalInstructions(requestDTO.additionalInstructions());
         delivery.setClientId(clientId);
         delivery.setStatus(Delivery.DeliveryStatus.PENDING);
+        delivery.setCreatedAt(new Date()); // Set current date
 
         Delivery savedDelivery = deliveryService.createDelivery(delivery);
 
         return new ResponseEntity<>(mapToDTO(savedDelivery), HttpStatus.CREATED);
     }
+
 
     @GetMapping
     @PreAuthorize("hasRole('CLIENT') or hasRole('INDIVIDUAL') or hasRole('ENTERPRISE') or hasRole('ADMIN')")
@@ -70,6 +77,7 @@ public class DeliveryController {
     @GetMapping("/pending")
     @PreAuthorize("hasRole('DELIVERY_PERSON') or hasRole('ADMIN')")
     public ResponseEntity<List<DeliveryResponseDTO>> getPendingDeliveries() {
+
         List<Delivery> pendingDeliveries = deliveryService.getPendingDeliveries();
 
         List<DeliveryResponseDTO> responseDTOs = pendingDeliveries.stream()
