@@ -8,15 +8,21 @@ import java.util.List;
 @Service
 public class DeliveryService {
     private final DeliveryRepository deliveryRepository;
+    private final VehicleService vehicleService; // Add this
 
-    public DeliveryService(DeliveryRepository deliveryRepository) {
+    // Update constructor to include VehicleService
+    public DeliveryService(DeliveryRepository deliveryRepository, VehicleService vehicleService) {
         this.deliveryRepository = deliveryRepository;
+        this.vehicleService = vehicleService; // Initialize
     }
 
     public Delivery createDelivery(Delivery delivery) {
-        return deliveryRepository.save(delivery);
+        // Save the delivery first
+        Delivery savedDelivery = deliveryRepository.save(delivery);
+        // Update vehicle availability
+        vehicleService.setVehicleUnavailable(savedDelivery.getVehicleId()); // Add this
+        return savedDelivery;
     }
-
     public List<Delivery> getAllDeliveries() {
         return deliveryRepository.findAll();
     }

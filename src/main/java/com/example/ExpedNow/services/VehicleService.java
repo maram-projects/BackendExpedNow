@@ -12,5 +12,7 @@ public interface VehicleService {
     VehicleDTO createVehicle(VehicleDTO vehicleDTO, MultipartFile photo);
     VehicleDTO updateVehicle(String id, VehicleDTO vehicleDTO, MultipartFile photo);
     void deleteVehicle(String id);
-    List<VehicleDTO> getAvailableVehicles(); // Keep as DTO
+    List<VehicleDTO> getAvailableVehicles();
+    VehicleDTO setVehicleUnavailable(String id);
+
 }

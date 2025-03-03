@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/vehicles")
@@ -21,6 +22,10 @@ public class VehicleController {
 
     public VehicleController(VehicleService vehicleService) {
         this.vehicleService = vehicleService;
+    }
+    @PatchMapping("/{id}/set-unavailable")
+    public ResponseEntity<VehicleDTO> setVehicleUnavailable(@PathVariable String id) {
+        return ResponseEntity.ok(vehicleService.setVehicleUnavailable(id));
     }
 
     @GetMapping

@@ -134,8 +134,8 @@ public class VehicleServiceImpl implements VehicleService {
     private Vehicle convertToEntity(VehicleDTO dto) {
         Vehicle vehicle = new Vehicle();
         BeanUtils.copyProperties(dto, vehicle);
-        vehicle.setAvailable(dto.isAvailable());
-        vehicle.setMaxLoad(dto.getMaxLoad()); // Add this
+        vehicle.setAvailable(true); // Force available to true for new vehicles
+        vehicle.setMaxLoad(dto.getMaxLoad());
         return vehicle;
     }
     @Override
@@ -144,6 +144,15 @@ public class VehicleServiceImpl implements VehicleService {
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
+    @Override
+    public VehicleDTO setVehicleUnavailable(String id) {
+        Vehicle vehicle = vehicleRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found with id: " + id));
+
+        vehicle.setAvailable(false); // تحديث حالة المركبة إلى غير متاحة
+        return convertToDTO(vehicleRepository.save(vehicle));
+    }
+
 
 
 }

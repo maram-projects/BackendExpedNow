@@ -13,5 +13,5 @@ public class VehicleDTO {
     private VehicleType vehicleType;
     private String photoPath;
     private boolean available;
-    private double maxLoad; // Added field
+    private double maxLoad;
 }

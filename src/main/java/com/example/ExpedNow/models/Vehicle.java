@@ -21,7 +21,7 @@ public class Vehicle {
     private VehicleType vehicleType;
     private boolean available = true;
     private String photoPath;
-    private double maxLoad; // Added field
+    private double maxLoad;
     public boolean isAvailable() {
         return available;
     }
