@@ -25,8 +25,7 @@ public class VehicleServiceImpl implements VehicleService {
     private final VehicleRepository vehicleRepository;
     private final String uploadDir;
 
-    public VehicleServiceImpl(VehicleRepository vehicleRepository,
-                              @Value("${file.upload-dir}") String uploadDir) {
+    public VehicleServiceImpl(VehicleRepository vehicleRepository, @Value("${file.upload-dir}") String uploadDir) {
         this.vehicleRepository = vehicleRepository;
         this.uploadDir = uploadDir;
         createUploadDirectory();
@@ -148,8 +147,7 @@ public class VehicleServiceImpl implements VehicleService {
     public VehicleDTO setVehicleUnavailable(String id) {
         Vehicle vehicle = vehicleRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found with id: " + id));
-
-        vehicle.setAvailable(false); // تحديث حالة المركبة إلى غير متاحة
+        vehicle.setAvailable(false);
         return convertToDTO(vehicleRepository.save(vehicle));
     }
 
