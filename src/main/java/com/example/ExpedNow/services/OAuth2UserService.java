@@ -1,21 +1,21 @@
-package com.example.ExpedNow.security;
+// 1. First, modify OAuth2UserService to break the circular dependency
+package com.example.ExpedNow.services;
 
-import com.example.ExpedNow.models.User;
-import com.example.ExpedNow.services.UserService;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.stereotype.Service;
+import org.springframework.context.ApplicationContext;
 
 @Service
 public class OAuth2UserService extends DefaultOAuth2UserService {
-    private final UserService userService;
+    // Use ApplicationContext instead of direct UserService dependency
+    private final ApplicationContext applicationContext;
 
-    public OAuth2UserService(UserService userService) {
-        this.userService = userService;
+    public OAuth2UserService(ApplicationContext applicationContext) {
+        this.applicationContext = applicationContext;
     }
-
 
     @Override
     public OAuth2User loadUser(OAuth2UserRequest userRequest) throws OAuth2AuthenticationException {
@@ -34,8 +34,9 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
         }
 
         if (email != null) {
-            // Process OAuth2 user data
-            User user = userService.processOAuth2User(email, name);
+            // Get UserService from application context when needed (lazy loading)
+            UserService userService = applicationContext.getBean(UserService.class);
+            userService.processOAuth2User(email, name);
         }
 
         return oauth2User;

@@ -2,27 +2,47 @@ package com.example.ExpedNow.services;
 
 import com.example.ExpedNow.models.Delivery;
 import com.example.ExpedNow.repositories.DeliveryRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import java.util.List;
 
 @Service
 public class DeliveryService {
-    private final DeliveryRepository deliveryRepository;
-    private final VehicleService vehicleService; // Add this
+    private static final Logger logger = LoggerFactory.getLogger(DeliveryService.class);
 
-    // Update constructor to include VehicleService
+    private final DeliveryRepository deliveryRepository;
+    private final VehicleService vehicleService;
+
+    @Autowired
+    private DeliveryAssignmentService deliveryAssignmentService;
+
     public DeliveryService(DeliveryRepository deliveryRepository, VehicleService vehicleService) {
         this.deliveryRepository = deliveryRepository;
-        this.vehicleService = vehicleService; // Initialize
+        this.vehicleService = vehicleService;
     }
 
     public Delivery createDelivery(Delivery delivery) {
         // Save the delivery first
         Delivery savedDelivery = deliveryRepository.save(delivery);
         // Update vehicle availability
-        vehicleService.setVehicleUnavailable(savedDelivery.getVehicleId()); // Add this
+        vehicleService.setVehicleUnavailable(savedDelivery.getVehicleId());
+
+        // Try to assign the delivery immediately if possible
+        try {
+            deliveryAssignmentService.assignDelivery(savedDelivery.getId());
+            logger.info("Delivery {} automatically assigned upon creation", savedDelivery.getId());
+        } catch (Exception e) {
+            // If immediate assignment fails (e.g., no available delivery persons),
+            // the scheduled task will handle it later
+            logger.info("Immediate assignment failed for delivery {}. Will be picked up by scheduled assignment.",
+                    savedDelivery.getId());
+        }
+
         return savedDelivery;
     }
+
     public List<Delivery> getAllDeliveries() {
         return deliveryRepository.findAll();
     }
@@ -53,6 +73,4 @@ public class DeliveryService {
         return deliveryRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Delivery not found"));
     }
-
-
 }

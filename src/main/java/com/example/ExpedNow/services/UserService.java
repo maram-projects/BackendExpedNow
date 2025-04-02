@@ -5,7 +5,11 @@ import com.example.ExpedNow.models.User;
 import com.example.ExpedNow.models.VerificationToken;
 import com.example.ExpedNow.repositories.UserRepository;
 import com.example.ExpedNow.repositories.VerificationTokenRepository;
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
@@ -28,6 +32,15 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final JavaMailSender mailSender;
 
+    @Value("${app.jwt.secret:G7ZPaRwhmVa8yQ+NjJv5rjMczdbNLCCHsVt0k36bH+4=}")
+    private String jwtSecret;
+
+    @PostConstruct
+    public void init() {
+        logger.debug("JWT Secret: {}", jwtSecret);
+    }
+
+    // The PasswordEncoder is injected directly from PasswordEncoderConfig, not from SecurityConfig
     public UserService(UserRepository userRepository,
                        VerificationTokenRepository verificationTokenRepository,
                        PasswordEncoder passwordEncoder,
@@ -52,6 +65,7 @@ public class UserService {
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         user.setRoles(roles);
         user.setVerified(false); // Set user as unverified by default
+        user.setDateOfRegistration(new Date()); // Set registration date
 
         User registeredUser = userRepository.save(user);
 
@@ -153,6 +167,29 @@ public class UserService {
         user.setLastName(updatedUser.getLastName());
         user.setPhone(updatedUser.getPhone());
         user.setAddress(updatedUser.getAddress());
+
+        return userRepository.save(user);
+    }
+
+    public String getUserIdFromToken(String authHeader) {
+        // Extract token from Authorization header
+        String token = authHeader.replace("Bearer ", "");
+
+        // Parse the token and get user id from claims
+        Claims claims = Jwts.parser()
+                .setSigningKey(jwtSecret)
+                .parseClaimsJws(token)
+                .getBody();
+
+        return claims.getSubject(); // Assuming subject is the user ID
+    }
+
+    public User updateAvailability(String userId, boolean available) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        user.setAvailable(available);
+        user.setLastActive(new Date());
 
         return userRepository.save(user);
     }
