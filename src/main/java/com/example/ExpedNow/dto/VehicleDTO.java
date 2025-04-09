@@ -1,6 +1,6 @@
 package com.example.ExpedNow.dto;
 
-import com.example.ExpedNow.models.VehicleType;
+import com.example.ExpedNow.models.enums.VehicleType;
 import lombok.Data;
 
 @Data

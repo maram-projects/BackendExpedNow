@@ -1,11 +1,15 @@
-package com.example.ExpedNow.services;
+package com.example.ExpedNow.services.core.impl;
 
 import com.example.ExpedNow.models.Delivery;
 import com.example.ExpedNow.models.Notification;
 import com.example.ExpedNow.repositories.NotificationRepository;
+import com.example.ExpedNow.services.core.NotificationServiceInterface;
+import com.example.ExpedNow.services.core.impl.NotificationServiceImpl;
+import com.example.ExpedNow.exception.ResourceNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Primary;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
@@ -13,19 +17,25 @@ import java.util.Date;
 import java.util.List;
 
 @Service
-public class NotificationService {
+@Primary
+public class NotificationServiceImpl implements NotificationServiceInterface {
 
-    private static final Logger logger = LoggerFactory.getLogger(NotificationService.class);
+    private static final Logger logger = LoggerFactory.getLogger(NotificationServiceImpl.class);
+
+    private final NotificationRepository notificationRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @Autowired
-    private NotificationRepository notificationRepository;
-
-    @Autowired
-    private SimpMessagingTemplate messagingTemplate;
+    public NotificationServiceImpl(NotificationRepository notificationRepository,
+                                   SimpMessagingTemplate messagingTemplate) {
+        this.notificationRepository = notificationRepository;
+        this.messagingTemplate = messagingTemplate;
+    }
 
     /**
      * Sends a notification about a new delivery assignment
      */
+    @Override
     public void sendDeliveryAssignmentNotification(String userId, Delivery delivery) {
         Notification notification = new Notification();
         notification.setUserId(userId);
@@ -48,6 +58,7 @@ public class NotificationService {
     /**
      * Gets all unread notifications for a user
      */
+    @Override
     public List<Notification> getUnreadNotifications(String userId) {
         return notificationRepository.findByUserIdAndReadOrderByCreatedAtDesc(userId, false);
     }
@@ -55,9 +66,10 @@ public class NotificationService {
     /**
      * Marks a notification as read
      */
+    @Override
     public Notification markAsRead(String notificationId, String userId) {
         Notification notification = notificationRepository.findById(notificationId)
-                .orElseThrow(() -> new RuntimeException("Notification not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Notification not found with id: " + notificationId));
 
         if (!notification.getUserId().equals(userId)) {
             throw new IllegalArgumentException("This notification doesn't belong to the specified user");

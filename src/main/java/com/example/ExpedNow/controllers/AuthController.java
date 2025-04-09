@@ -1,11 +1,11 @@
 package com.example.ExpedNow.controllers;
 
-import com.example.ExpedNow.models.Role;
+import com.example.ExpedNow.models.enums.Role;
 import com.example.ExpedNow.models.User;
 import com.example.ExpedNow.repositories.UserRepository;
 import com.example.ExpedNow.security.CustomUserDetailsService;
 import com.example.ExpedNow.security.JwtUtil;
-import com.example.ExpedNow.services.UserService;
+import com.example.ExpedNow.services.core.impl.UserServiceImpl;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
@@ -33,13 +33,13 @@ public class AuthController {
     private static final int LOCK_TIME_MINUTES = 30;
 
     private final AuthenticationManager authenticationManager;
-    private final UserService userService;
+    private final UserServiceImpl userService;
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
 
     // Inject authentication manager directly instead of through SecurityConfig
     public AuthController(AuthenticationManager authenticationManager,
-                          UserService userService,
+                          UserServiceImpl userService,
                           UserRepository userRepository,
                           JwtUtil jwtUtil) {
         this.authenticationManager = authenticationManager;

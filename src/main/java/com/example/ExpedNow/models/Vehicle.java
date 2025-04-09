@@ -1,5 +1,6 @@
 package com.example.ExpedNow.models;
 
+import com.example.ExpedNow.models.enums.VehicleType;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import lombok.AllArgsConstructor;
@@ -14,14 +15,24 @@ public class Vehicle {
 
     @Id
     private String id;
+
     private String make;
+
     private String model;
+
     private Integer year;
+
     private String licensePlate;
+
     private VehicleType vehicleType;
+
     private boolean available = true;
+
     private String photoPath;
+
     private double maxLoad;
+
+
     public boolean isAvailable() {
         return available;
     }
@@ -31,5 +42,6 @@ public class Vehicle {
     }
 
     public double getMaxLoad() { return maxLoad; }
+
     public void setMaxLoad(double maxLoad) { this.maxLoad = maxLoad; }
 }

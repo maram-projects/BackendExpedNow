@@ -1,5 +1,6 @@
 package com.example.ExpedNow.models;
 
+import com.example.ExpedNow.models.enums.Role;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -17,12 +18,19 @@ import java.util.Set;
 public class User {
     @Id
     private String id;
+
     private String firstName;
+
     private String lastName;
+
     private String email;
+
     private String password;
+
     private String phone;
+
     private String address;
+
     private Date dateOfRegistration;
 
     @Builder.Default
@@ -41,8 +49,11 @@ public class User {
 
     // For delivery persons
     private String vehicleType;
+
     private double rating;
+
     private int completedDeliveries;
+
     private Date lastActive;
 
     @Builder.Default
@@ -62,9 +73,6 @@ public class User {
         return this.enabled && this.available;
     }
 
-    // Since @Data includes getters and setters, we only need to define custom methods
-    // or override existing ones. The following are examples of methods you might
-    // want to customize beyond what @Data provides.
 
     public void addRole(Role role) {
         this.roles.add(role);
@@ -95,6 +103,7 @@ public class User {
     public void markActive() {
         this.lastActive = new Date();
     }
+
     private double successScore = 0.0;
     private int totalDeliveries = 0;
     private double averageDeliveryTime = 0.0;

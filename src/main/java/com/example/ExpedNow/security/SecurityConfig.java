@@ -1,6 +1,6 @@
 package com.example.ExpedNow.security;
 
-import com.example.ExpedNow.services.OAuth2UserService;
+import com.example.ExpedNow.services.auth2.OAuth2UserService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;

@@ -11,8 +11,12 @@ import java.util.Date;
 public class UserLocation {
     @Id
     private String id;
+
     private String userId;
+
     private double latitude;
+
     private double longitude;
+
     private Date lastUpdated;
 }

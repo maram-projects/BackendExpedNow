@@ -1,12 +1,14 @@
-package com.example.ExpedNow.services;
+package com.example.ExpedNow.services.core.impl;
 
 
 import com.example.ExpedNow.dto.VehicleDTO;
 import com.example.ExpedNow.exception.ResourceNotFoundException;
 import com.example.ExpedNow.models.Vehicle;
 import com.example.ExpedNow.repositories.VehicleRepository;
+import com.example.ExpedNow.services.core.VehicleServiceInterface;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -20,7 +22,8 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
-public class VehicleServiceImpl implements VehicleService {
+@Primary
+public class VehicleServiceImpl implements VehicleServiceInterface {
 
     private final VehicleRepository vehicleRepository;
     private final String uploadDir;
@@ -84,7 +87,16 @@ public class VehicleServiceImpl implements VehicleService {
 
     @Override
     public void deleteVehicle(String id) {
+        Vehicle vehicle = vehicleRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found with id: " + id));
 
+        // Delete associated photo if exists
+        if (vehicle.getPhotoPath() != null && !vehicle.getPhotoPath().isEmpty()) {
+            deletePhoto(vehicle.getPhotoPath());
+        }
+
+        // Delete the vehicle from the repository
+        vehicleRepository.deleteById(id);
     }
 
     private void updateVehicleFields(Vehicle vehicle, VehicleDTO dto) {

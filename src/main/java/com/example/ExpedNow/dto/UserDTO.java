@@ -1,7 +1,7 @@
 package com.example.ExpedNow.dto;
 
 import lombok.Data;
-import com.example.ExpedNow.models.Role;
+
 import java.util.Date;
 import java.util.Set;
 

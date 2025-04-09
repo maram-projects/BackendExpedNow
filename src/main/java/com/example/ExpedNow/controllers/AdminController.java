@@ -2,15 +2,12 @@ package com.example.ExpedNow.controllers;
 
 import com.example.ExpedNow.dto.DashboardStatsDTO;
 import com.example.ExpedNow.dto.UserDTO;
-import com.example.ExpedNow.models.Role;
-import com.example.ExpedNow.models.User;
-import com.example.ExpedNow.services.AdminService;
-import com.example.ExpedNow.services.UserService;
+import com.example.ExpedNow.models.enums.Role;
+import com.example.ExpedNow.services.core.impl.AdminServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 import java.util.Map;
@@ -23,7 +20,7 @@ import java.util.Set;
 public class AdminController {
 
     @Autowired
-    private AdminService adminService;
+    private AdminServiceImpl adminService;
 
     @GetMapping("/dashboard-stats")
     public ResponseEntity<DashboardStatsDTO> getDashboardStats() {

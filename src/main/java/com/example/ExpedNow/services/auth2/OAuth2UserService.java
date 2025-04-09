@@ -1,6 +1,7 @@
 // 1. First, modify OAuth2UserService to break the circular dependency
-package com.example.ExpedNow.services;
+package com.example.ExpedNow.services.auth2;
 
+import com.example.ExpedNow.services.core.impl.UserServiceImpl;
 import org.springframework.security.oauth2.client.userinfo.DefaultOAuth2UserService;
 import org.springframework.security.oauth2.client.userinfo.OAuth2UserRequest;
 import org.springframework.security.oauth2.core.OAuth2AuthenticationException;
@@ -35,7 +36,7 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
 
         if (email != null) {
             // Get UserService from application context when needed (lazy loading)
-            UserService userService = applicationContext.getBean(UserService.class);
+            UserServiceImpl userService = applicationContext.getBean(UserServiceImpl.class);
             userService.processOAuth2User(email, name);
         }
 

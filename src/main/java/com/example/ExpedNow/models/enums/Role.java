@@ -1,4 +1,4 @@
-package com.example.ExpedNow.models;
+package com.example.ExpedNow.models.enums;
 
 public enum Role {
     ADMIN,

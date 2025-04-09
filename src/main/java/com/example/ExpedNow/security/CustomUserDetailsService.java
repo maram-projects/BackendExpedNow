@@ -1,6 +1,6 @@
 package com.example.ExpedNow.security;
 
-import com.example.ExpedNow.models.Role;
+import com.example.ExpedNow.models.enums.Role;
 import com.example.ExpedNow.models.User;
 import com.example.ExpedNow.repositories.UserRepository;
 import org.springframework.security.core.GrantedAuthority;

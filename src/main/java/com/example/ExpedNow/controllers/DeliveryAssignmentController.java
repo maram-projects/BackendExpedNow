@@ -1,14 +1,13 @@
 package com.example.ExpedNow.controllers;
 
-import com.example.ExpedNow.dto.DeliveryAssignmentDTO;
 import com.example.ExpedNow.dto.LocationDTO;
 import com.example.ExpedNow.models.Delivery;
 import com.example.ExpedNow.models.User;
-import com.example.ExpedNow.services.AutomatedDeliveryAssignmentService;
-import com.example.ExpedNow.services.DeliveryAssignmentService;
-import com.example.ExpedNow.services.DeliveryService;
-import com.example.ExpedNow.services.LocationService;
-import com.example.ExpedNow.services.UserService;
+import com.example.ExpedNow.services.core.impl.AutomatedDeliveryAssignmentServiceImpl;
+import com.example.ExpedNow.services.core.impl.DeliveryAssignmentServiceImpl;
+import com.example.ExpedNow.services.core.impl.LocationServiceImpl;
+import com.example.ExpedNow.services.core.impl.UserServiceImpl;
+import com.example.ExpedNow.services.core.impl.DeliveryServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -22,19 +21,19 @@ import java.util.Map;
 public class DeliveryAssignmentController {
 
     @Autowired
-    private DeliveryAssignmentService deliveryAssignmentService;
+    private DeliveryAssignmentServiceImpl deliveryAssignmentService;
 
     @Autowired
-    private AutomatedDeliveryAssignmentService automatedDeliveryAssignmentService;
+    private AutomatedDeliveryAssignmentServiceImpl automatedDeliveryAssignmentService;
 
     @Autowired
-    private DeliveryService deliveryService;
+    private DeliveryServiceImpl deliveryService;
 
     @Autowired
-    private LocationService locationService;
+    private LocationServiceImpl locationService;
 
     @Autowired
-    private UserService userService;
+    private UserServiceImpl userService;
 
     // This endpoint is kept for manual assignment if needed
     @PostMapping("/assign/{deliveryId}")

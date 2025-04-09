@@ -1,31 +1,34 @@
-package com.example.ExpedNow.services;
+package com.example.ExpedNow.services.core.impl;
 
-import com.example.ExpedNow.models.Role;
 import com.example.ExpedNow.models.User;
 import com.example.ExpedNow.models.VerificationToken;
+import com.example.ExpedNow.models.enums.Role;
 import com.example.ExpedNow.repositories.UserRepository;
 import com.example.ExpedNow.repositories.VerificationTokenRepository;
+import com.example.ExpedNow.services.core.UserServiceInterface;
+import com.example.ExpedNow.exception.ResourceNotFoundException;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import jakarta.annotation.PostConstruct;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.context.annotation.Primary;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
-import java.util.Date;
-import java.util.Optional;
-import java.util.Set;
-import java.util.UUID;
+import java.util.*;
 
 @Service
-public class UserService {
-    private static final Logger logger = LoggerFactory.getLogger(UserService.class);
+@Primary
+public class UserServiceImpl implements UserServiceInterface {
+    private static final Logger logger = LoggerFactory.getLogger(UserServiceImpl.class);
 
     private final UserRepository userRepository;
     private final VerificationTokenRepository verificationTokenRepository;
@@ -40,23 +43,40 @@ public class UserService {
         logger.debug("JWT Secret: {}", jwtSecret);
     }
 
-    // The PasswordEncoder is injected directly from PasswordEncoderConfig, not from SecurityConfig
-    public UserService(UserRepository userRepository,
-                       VerificationTokenRepository verificationTokenRepository,
-                       PasswordEncoder passwordEncoder,
-                       @Autowired(required = false) JavaMailSender mailSender) {
+    public UserServiceImpl(UserRepository userRepository,
+                           VerificationTokenRepository verificationTokenRepository,
+                           PasswordEncoder passwordEncoder,
+                           @Autowired(required = false) JavaMailSender mailSender) {
         this.userRepository = userRepository;
         this.verificationTokenRepository = verificationTokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.mailSender = mailSender;
     }
 
-
+    @Override
     public User findByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
     }
 
+    @Override
+    public Collection<GrantedAuthority> getUserAuthorities(String userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
+
+        Collection<GrantedAuthority> authorities = new ArrayList<>();
+
+        // Convert user roles to Spring Security authorities
+        if (user.getRoles() != null) {
+            for (Role role : user.getRoles()) {
+                authorities.add(new SimpleGrantedAuthority(role.name()));
+            }
+        }
+
+        return authorities;
+    }
+
+    @Override
     public User registerUser(User user, Set<Role> roles) {
         if (userRepository.existsByEmail(user.getEmail())) {
             throw new RuntimeException("Email already exists");
@@ -92,10 +112,12 @@ public class UserService {
         return registeredUser;
     }
 
+    @Override
     public boolean isEmailTaken(String email) {
         return userRepository.existsByEmail(email);
     }
 
+    @Override
     public void sendVerificationEmail(User user, String token) {
         if (mailSender == null) {
             throw new RuntimeException("JavaMailSender is not configured");
@@ -115,6 +137,7 @@ public class UserService {
         }
     }
 
+    @Override
     public User confirmUser(String token) {
         Optional<VerificationToken> verificationTokenOptional = verificationTokenRepository.findByToken(token);
         if (verificationTokenOptional.isEmpty()) {
@@ -127,7 +150,7 @@ public class UserService {
         }
 
         User user = userRepository.findById(verificationToken.getUserId())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         user.setVerified(true); // Mark user as verified
         userRepository.save(user);
@@ -138,6 +161,7 @@ public class UserService {
         return user;
     }
 
+    @Override
     public User processOAuth2User(String email, String name) {
         Optional<User> userOptional = userRepository.findByEmail(email);
         if (userOptional.isPresent()) {
@@ -159,9 +183,10 @@ public class UserService {
         }
     }
 
+    @Override
     public User updateProfile(String email, User updatedUser) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         user.setFirstName(updatedUser.getFirstName());
         user.setLastName(updatedUser.getLastName());
@@ -171,6 +196,7 @@ public class UserService {
         return userRepository.save(user);
     }
 
+    @Override
     public String getUserIdFromToken(String authHeader) {
         // Extract token from Authorization header
         String token = authHeader.replace("Bearer ", "");
@@ -184,9 +210,10 @@ public class UserService {
         return claims.getSubject(); // Assuming subject is the user ID
     }
 
+    @Override
     public User updateAvailability(String userId, boolean available) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
         user.setAvailable(available);
         user.setLastActive(new Date());

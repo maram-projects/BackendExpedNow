@@ -1,25 +1,35 @@
-package com.example.ExpedNow.services;
+package com.example.ExpedNow.services.core.impl;
 
 import com.example.ExpedNow.dto.DashboardStatsDTO;
 import com.example.ExpedNow.dto.UserDTO;
-import com.example.ExpedNow.models.Role;
 import com.example.ExpedNow.models.User;
+import com.example.ExpedNow.models.enums.Role;
 import com.example.ExpedNow.repositories.UserRepository;
+import com.example.ExpedNow.services.core.AdminServiceInterface;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
-public class AdminService {
+@Primary
+public class AdminServiceImpl implements AdminServiceInterface {
+
+    private final UserRepository userRepository;
 
     @Autowired
-    private UserRepository userRepository;
+    public AdminServiceImpl(UserRepository userRepository) {
+        this.userRepository = userRepository;
+    }
 
+    @Override
     public DashboardStatsDTO getDashboardStats() {
         DashboardStatsDTO stats = new DashboardStatsDTO();
 
@@ -50,6 +60,7 @@ public class AdminService {
         return stats;
     }
 
+    @Override
     public List<UserDTO> getAllUsers() {
         return userRepository.findAll(Sort.by(Sort.Direction.DESC, "dateOfRegistration"))
                 .stream()
@@ -57,6 +68,7 @@ public class AdminService {
                 .collect(Collectors.toList());
     }
 
+    @Override
     public void updateUserStatus(String userId, String status) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));
@@ -65,6 +77,7 @@ public class AdminService {
         userRepository.save(user);
     }
 
+    @Override
     public void updateUserRoles(String userId, Set<Role> roles) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found"));

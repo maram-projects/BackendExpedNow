@@ -1,48 +1,55 @@
-package com.example.ExpedNow.services;
+package com.example.ExpedNow.services.core.impl;
 
 import com.example.ExpedNow.dto.LocationDTO;
 import com.example.ExpedNow.exception.ResourceNotFoundException;
 import com.example.ExpedNow.models.Delivery;
-import com.example.ExpedNow.models.Role;
 import com.example.ExpedNow.models.User;
+import com.example.ExpedNow.models.enums.Role;
 import com.example.ExpedNow.repositories.DeliveryRepository;
 import com.example.ExpedNow.repositories.UserRepository;
-import com.example.ExpedNow.dto.DeliveryAssignmentDTO;
+import com.example.ExpedNow.services.core.DeliveryAssignmentServiceInterface;
+import com.example.ExpedNow.services.core.LocationServiceInterface;
+import com.example.ExpedNow.services.core.NotificationServiceInterface;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
 import java.util.List;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
-public class DeliveryAssignmentService {
+@Primary
+public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceInterface {
 
-    private static final Logger logger = LoggerFactory.getLogger(DeliveryAssignmentService.class);
+    private static final Logger logger = LoggerFactory.getLogger(DeliveryAssignmentServiceImpl.class);
 
-    @Autowired
-    private DeliveryRepository deliveryRepository;
+    private final DeliveryRepository deliveryRepository;
+    private final UserRepository userRepository;
+    private final NotificationServiceInterface notificationService;
+    private final LocationServiceInterface locationService;
 
-    @Autowired
-    private UserRepository userRepository;
-
-    @Autowired
-    private NotificationService notificationService;
-
-    @Autowired
-    private LocationService locationService;
+    public DeliveryAssignmentServiceImpl(
+            DeliveryRepository deliveryRepository,
+            UserRepository userRepository,
+            NotificationServiceInterface notificationService,
+            LocationServiceInterface locationService) {
+        this.deliveryRepository = deliveryRepository;
+        this.userRepository = userRepository;
+        this.notificationService = notificationService;
+        this.locationService = locationService;
+    }
 
     /**
      * Assigns a delivery to the closest available delivery person
      * @param deliveryId the delivery to assign
      * @return the updated delivery with assignment information
      */
+    @Override
     public Delivery assignDelivery(String deliveryId) {
         Delivery delivery = deliveryRepository.findById(deliveryId)
-                .orElseThrow(() -> new RuntimeException("Delivery not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Delivery not found with id: " + deliveryId));
 
         if (delivery.getStatus() != Delivery.DeliveryStatus.PENDING) {
             throw new IllegalStateException("Only pending deliveries can be assigned");
@@ -86,7 +93,7 @@ public class DeliveryAssignmentService {
                         List.of(Role.ROLE_PROFESSIONAL, Role.ROLE_TEMPORARY),
                         true
                 ).stream()
-                .filter(user -> user.isAvailable()) // Assuming User has an isAvailable field
+                .filter(User::isAvailable) // Using method reference instead of lambda
                 .collect(Collectors.toList());
     }
 
@@ -130,6 +137,7 @@ public class DeliveryAssignmentService {
     /**
      * Updates the status of a delivery
      */
+    @Override
     public Delivery updateDeliveryStatus(String deliveryId, Delivery.DeliveryStatus newStatus, String deliveryPersonId) {
         Delivery delivery = deliveryRepository.findById(deliveryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery not found with id: " + deliveryId));
@@ -176,6 +184,7 @@ public class DeliveryAssignmentService {
     /**
      * Gets all deliveries assigned to a specific delivery person
      */
+    @Override
     public List<Delivery> getDeliveriesForPerson(String deliveryPersonId) {
         return deliveryRepository.findByDeliveryPersonId(deliveryPersonId);
     }
@@ -183,6 +192,7 @@ public class DeliveryAssignmentService {
     /**
      * Gets all pending deliveries that need assignment
      */
+    @Override
     public List<Delivery> getPendingDeliveries() {
         return deliveryRepository.findByStatus(Delivery.DeliveryStatus.PENDING);
     }

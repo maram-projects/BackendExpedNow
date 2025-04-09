@@ -1,28 +1,35 @@
-package com.example.ExpedNow.services;
+package com.example.ExpedNow.services.core.impl;
 
 import com.example.ExpedNow.models.Delivery;
 import com.example.ExpedNow.repositories.DeliveryRepository;
+import com.example.ExpedNow.services.core.DeliveryServiceInterface;
+import com.example.ExpedNow.services.core.VehicleServiceInterface;
+import com.example.ExpedNow.exception.ResourceNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
+
 import java.util.List;
 
 @Service
-public class DeliveryService {
-    private static final Logger logger = LoggerFactory.getLogger(DeliveryService.class);
+@Primary
+public class DeliveryServiceImpl implements DeliveryServiceInterface {
+    private static final Logger logger = LoggerFactory.getLogger(DeliveryServiceImpl.class);
 
     private final DeliveryRepository deliveryRepository;
-    private final VehicleService vehicleService;
+    private final VehicleServiceInterface vehicleService;
 
     @Autowired
-    private DeliveryAssignmentService deliveryAssignmentService;
+    private DeliveryAssignmentServiceImpl deliveryAssignmentService;
 
-    public DeliveryService(DeliveryRepository deliveryRepository, VehicleService vehicleService) {
+    public DeliveryServiceImpl(DeliveryRepository deliveryRepository, VehicleServiceInterface vehicleService) {
         this.deliveryRepository = deliveryRepository;
         this.vehicleService = vehicleService;
     }
 
+    @Override
     public Delivery createDelivery(Delivery delivery) {
         // Save the delivery first
         Delivery savedDelivery = deliveryRepository.save(delivery);
@@ -43,34 +50,40 @@ public class DeliveryService {
         return savedDelivery;
     }
 
+    @Override
     public List<Delivery> getAllDeliveries() {
         return deliveryRepository.findAll();
     }
 
+    @Override
     public List<Delivery> getClientDeliveries(String clientId) {
         return deliveryRepository.findByClientId(clientId);
     }
 
+    @Override
     public List<Delivery> getPendingDeliveries() {
         return deliveryRepository.findByStatus(Delivery.DeliveryStatus.PENDING);
     }
 
+    @Override
     public Delivery updateDeliveryStatus(String id, Delivery.DeliveryStatus status) {
         Delivery delivery = deliveryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Delivery not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Delivery not found with id: " + id));
         delivery.setStatus(status);
         return deliveryRepository.save(delivery);
     }
 
+    @Override
     public void cancelDelivery(String id) {
         Delivery delivery = deliveryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Delivery not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Delivery not found with id: " + id));
         delivery.setStatus(Delivery.DeliveryStatus.CANCELLED);
         deliveryRepository.save(delivery);
     }
 
+    @Override
     public Delivery getDeliveryById(String id) {
         return deliveryRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Delivery not found"));
+                .orElseThrow(() -> new ResourceNotFoundException("Delivery not found with id: " + id));
     }
 }

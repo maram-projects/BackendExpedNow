@@ -1,8 +1,8 @@
 package com.example.ExpedNow.controllers;
 
 import com.example.ExpedNow.models.Notification;
-import com.example.ExpedNow.services.NotificationService;
-import com.example.ExpedNow.services.UserService;
+import com.example.ExpedNow.services.core.impl.NotificationServiceImpl;
+import com.example.ExpedNow.services.core.impl.UserServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -15,10 +15,10 @@ import java.util.List;
 public class NotificationController {
 
     @Autowired
-    private NotificationService notificationService;
+    private NotificationServiceImpl notificationService;
 
     @Autowired
-    private UserService userService;
+    private UserServiceImpl userService;
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")

@@ -1,6 +1,6 @@
 package com.example.ExpedNow.controllers;
 
-import com.example.ExpedNow.services.GoogleMapsService;
+import com.example.ExpedNow.services.googleMaps.GoogleMapsService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;

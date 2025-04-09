@@ -2,8 +2,7 @@ package com.example.ExpedNow.controllers;
 
 
 import com.example.ExpedNow.dto.VehicleDTO;
-import com.example.ExpedNow.models.Vehicle;
-import com.example.ExpedNow.services.VehicleService;
+import com.example.ExpedNow.services.core.VehicleServiceInterface;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -11,18 +10,18 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
-import java.util.Map;
 
 @RestController
 @RequestMapping("/api/vehicles")
 @CrossOrigin(origins = "http://localhost:4200")
 public class VehicleController {
 
-    private final VehicleService vehicleService;
+    private final VehicleServiceInterface vehicleService;
 
-    public VehicleController(VehicleService vehicleService) {
+    public VehicleController(VehicleServiceInterface vehicleService) {
         this.vehicleService = vehicleService;
     }
+
     @PatchMapping("/{id}/set-unavailable")
     public ResponseEntity<VehicleDTO> setVehicleUnavailable(@PathVariable String id) {
         return ResponseEntity.ok(vehicleService.setVehicleUnavailable(id));

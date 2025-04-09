@@ -1,6 +1,6 @@
 package com.example.ExpedNow.security;
 
-import com.example.ExpedNow.models.Role;
+import com.example.ExpedNow.models.enums.Role;
 import com.example.ExpedNow.models.User;
 import com.example.ExpedNow.repositories.UserRepository;
 import io.jsonwebtoken.*;
@@ -12,7 +12,6 @@ import java.security.Key;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
-import java.util.stream.Collectors;
 
 @Component
 public class JwtUtil {

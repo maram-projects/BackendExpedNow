@@ -1,23 +1,29 @@
-package com.example.ExpedNow.services;
+package com.example.ExpedNow.services.core.impl;
 
 import com.example.ExpedNow.dto.LocationDTO;
 import com.example.ExpedNow.models.UserLocation;
 import com.example.ExpedNow.repositories.UserLocationRepository;
-import org.springframework.beans.factory.annotation.Autowired;
+import com.example.ExpedNow.services.core.LocationServiceInterface;
+import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
 import java.util.Date;
 import java.util.Optional;
 
 @Service
-public class LocationService {
+@Primary
+public class LocationServiceImpl implements LocationServiceInterface {
 
-    @Autowired
-    private UserLocationRepository userLocationRepository;
+    private final UserLocationRepository userLocationRepository;
+
+    public LocationServiceImpl(UserLocationRepository userLocationRepository) {
+        this.userLocationRepository = userLocationRepository;
+    }
 
     /**
      * Updates a user's location in the system
      */
+    @Override
     public UserLocation updateUserLocation(String userId, double latitude, double longitude) {
         Optional<UserLocation> existingLocation = userLocationRepository.findByUserId(userId);
 
@@ -41,6 +47,7 @@ public class LocationService {
     /**
      * Gets the last known location for a user
      */
+    @Override
     public LocationDTO getLastKnownLocation(String userId) {
         Optional<UserLocation> userLocation = userLocationRepository.findByUserId(userId);
 
@@ -55,6 +62,7 @@ public class LocationService {
     /**
      * Gets coordinates for an address (simplified - in a real app, this would call a geocoding API)
      */
+    @Override
     public LocationDTO getCoordinates(String address) {
         // Simplified implementation - in a real app, this would call a geocoding service
         // like Google Maps, Mapbox, etc.

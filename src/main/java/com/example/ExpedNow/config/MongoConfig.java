@@ -1,6 +1,6 @@
 package com.example.ExpedNow.config;
 
-import com.example.ExpedNow.models.Role;
+import com.example.ExpedNow.models.enums.Role;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.core.convert.converter.Converter;
@@ -17,7 +17,6 @@ import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Set;
 
 @Configuration

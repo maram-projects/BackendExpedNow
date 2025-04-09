@@ -9,8 +9,11 @@ import java.util.Date;
 public class VerificationToken {
     @Id
     private String id;
+
     private String token;
+
     private String userId;
+
     private Date expiryDate;
 
     // Getters and Setters

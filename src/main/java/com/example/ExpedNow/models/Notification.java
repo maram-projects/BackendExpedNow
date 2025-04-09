@@ -11,11 +11,18 @@ import java.util.Date;
 public class Notification {
     @Id
     private String id;
+
     private String userId;
+
     private String type;
+
     private String title;
+
     private String message;
+
     private String referenceId;
+
     private Date createdAt;
+
     private boolean read;
 }

@@ -3,15 +3,13 @@ package com.example.ExpedNow.controllers;
 import com.example.ExpedNow.dto.DeliveryRequestDTO;
 import com.example.ExpedNow.dto.DeliveryResponseDTO;
 import com.example.ExpedNow.models.Delivery;
-import com.example.ExpedNow.services.DeliveryService;
+import com.example.ExpedNow.services.core.impl.DeliveryServiceImpl;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -20,9 +18,9 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/deliveries")
 public class DeliveryController {
 
-    private final DeliveryService deliveryService;
+    private final DeliveryServiceImpl deliveryService;
 
-    public DeliveryController(DeliveryService deliveryService) {
+    public DeliveryController(DeliveryServiceImpl deliveryService) {
         this.deliveryService = deliveryService;
     }
 

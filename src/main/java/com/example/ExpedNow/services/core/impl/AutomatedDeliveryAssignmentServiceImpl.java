@@ -1,30 +1,35 @@
-package com.example.ExpedNow.services;
+package com.example.ExpedNow.services.core.impl;
 
 import com.example.ExpedNow.models.Delivery;
 import com.example.ExpedNow.repositories.DeliveryRepository;
+import com.example.ExpedNow.services.core.AutomatedDeliveryAssignmentServiceInterface;
+import com.example.ExpedNow.services.core.DeliveryAssignmentServiceInterface;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.context.annotation.Primary;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
 
 @Service
-public class AutomatedDeliveryAssignmentService {
+@Primary
+public class AutomatedDeliveryAssignmentServiceImpl implements AutomatedDeliveryAssignmentServiceInterface {
 
-    private static final Logger logger = LoggerFactory.getLogger(AutomatedDeliveryAssignmentService.class);
+    private static final Logger logger = LoggerFactory.getLogger(AutomatedDeliveryAssignmentServiceImpl.class);
 
     @Autowired
     private DeliveryRepository deliveryRepository;
 
     @Autowired
-    private DeliveryAssignmentService deliveryAssignmentService;
+    private DeliveryAssignmentServiceInterface deliveryAssignmentService;
 
     /**
      * Automatically assigns pending deliveries to available delivery persons
      * This method runs every 5 minutes
      */
+    @Override
     @Scheduled(fixedRate = 300000) // 5 minutes in milliseconds
     public void assignPendingDeliveries() {
         logger.info("Starting automated delivery assignment process");
@@ -51,5 +56,4 @@ public class AutomatedDeliveryAssignmentService {
         logger.info("Completed assignment process. Assigned {} out of {} deliveries",
                 assignedCount, pendingDeliveries.size());
     }
-
 }

@@ -1,0 +1,92 @@
+spring:
+  application:
+    name: ExpedNow
+  data:
+    mongodb:
+      uri: mongodb://localhost:27017/expednow
+  web:
+    cors:
+      allowed-origins: http://localhost:4200
+      allowed-methods: GET,POST,PUT,DELETE,OPTIONS
+      allowed-headers: '*'
+      allow-credentials: true
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: 382950926394-djonps75gpc1165601eqq237hs954ko4.apps.googleusercontent.com
+            client-secret: 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
+            scope: email,profile
+            redirect-uri: http://localhost:4200/oauth2/callback
+          facebook:
+            client-id: YOUR_FACEBOOK_CLIENT_ID
+            client-secret: YOUR_FACEBOOK_CLIENT_SECRET
+            scope: email,public_profile
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: lamiahaded99@gmail.com
+    password: mayd feqb ooup krqz
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+  jackson:
+    date-format: yyyy-MM-dd'T'HH:mm:ss.SSSZ
+    time-zone: UTC
+    serialization:
+      write-dates-as-timestamps: false
+  main:
+    allow-circular-references: true
+  profiles:
+    active: dev
+
+jwt:
+  secret: G7ZPaRwhmVa8yQ+NjJv5rjMczdbNLCCHsVt0k36bH+4=
+  expirationMs: 86400000
+
+file:
+  upload-dir: ./uploads/vehicle-photos
+
+google:
+  maps:
+    api:
+      key: AIzaSyDsywwThSj5QgW0PiooUwr_QCKW15Fm2PE
+    distance-matrix:
+      url: https://maps.googleapis.com/maps/api/distancematrix/json
+    geocoding:
+      url: https://maps.googleapis.com/maps/api/geocode/json
+
+logging:
+  level:
+    org:
+      springframework:
+        mail: DEBUG
+        data:
+          convert:
+            CustomConversions: ERROR
+        security:
+          config:
+            annotation:
+              authentication:
+                configuration:
+                  InitializeUserDetailsBeanManagerConfigurer: ERROR
+        web:
+          socket: DEBUG
+        messaging:
+          simp: DEBUG
+      eclipse:
+        angus:
+          mail: DEBUG
+
+mvn:
+  spring-boot:
+    run:
+      profiles: debug
