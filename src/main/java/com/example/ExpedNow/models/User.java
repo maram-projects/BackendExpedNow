@@ -1,6 +1,7 @@
 package com.example.ExpedNow.models;
 
 import com.example.ExpedNow.models.enums.Role;
+import com.example.ExpedNow.models.enums.VehicleType;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -48,7 +49,7 @@ public class User {
     private LocalDateTime lockTime;
 
     // For delivery persons
-    private String vehicleType;
+    private VehicleType vehicleType;
 
     private double rating;
 

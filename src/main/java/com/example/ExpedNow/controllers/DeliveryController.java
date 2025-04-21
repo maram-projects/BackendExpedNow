@@ -2,7 +2,7 @@ package com.example.ExpedNow.controllers;
 
 import com.example.ExpedNow.dto.DeliveryRequestDTO;
 import com.example.ExpedNow.dto.DeliveryResponseDTO;
-import com.example.ExpedNow.models.Delivery;
+import com.example.ExpedNow.models.DeliveryRequest;
 import com.example.ExpedNow.services.core.impl.DeliveryServiceImpl;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -30,7 +30,7 @@ public class DeliveryController {
             @Valid @RequestBody DeliveryRequestDTO requestDTO,
             @RequestParam(required = false) String clientId) {
 
-        Delivery delivery = new Delivery();
+        DeliveryRequest delivery = new DeliveryRequest();
         delivery.setPickupAddress(requestDTO.pickupAddress());
         delivery.setDeliveryAddress(requestDTO.deliveryAddress());
         delivery.setPackageDescription(requestDTO.packageDescription());
@@ -42,10 +42,10 @@ public class DeliveryController {
 
         delivery.setAdditionalInstructions(requestDTO.additionalInstructions());
         delivery.setClientId(clientId);
-        delivery.setStatus(Delivery.DeliveryStatus.PENDING);
+        delivery.setStatus(DeliveryRequest.DeliveryReqStatus.PENDING);
         delivery.setCreatedAt(new Date()); // Set current date
 
-        Delivery savedDelivery = deliveryService.createDelivery(delivery);
+        DeliveryRequest savedDelivery = deliveryService.createDelivery(delivery);
 
         return new ResponseEntity<>(mapToDTO(savedDelivery), HttpStatus.CREATED);
     }
@@ -56,7 +56,7 @@ public class DeliveryController {
     public ResponseEntity<List<DeliveryResponseDTO>> getDeliveries(
             @RequestParam(required = false) String clientId) {
 
-        List<Delivery> deliveries;
+        List<DeliveryRequest> deliveries;
 
         if (clientId != null && !clientId.isEmpty()) {
             deliveries = deliveryService.getClientDeliveries(clientId);
@@ -76,7 +76,7 @@ public class DeliveryController {
     @PreAuthorize("hasRole('DELIVERY_PERSON') or hasRole('ADMIN')")
     public ResponseEntity<List<DeliveryResponseDTO>> getPendingDeliveries() {
 
-        List<Delivery> pendingDeliveries = deliveryService.getPendingDeliveries();
+        List<DeliveryRequest> pendingDeliveries = deliveryService.getPendingDeliveries();
 
         List<DeliveryResponseDTO> responseDTOs = pendingDeliveries.stream()
                 .map(this::mapToDTO)
@@ -91,8 +91,8 @@ public class DeliveryController {
             @PathVariable String id,
             @RequestBody StatusUpdateRequest statusRequest) {
 
-        Delivery.DeliveryStatus newStatus = Delivery.DeliveryStatus.valueOf(statusRequest.status());
-        Delivery updatedDelivery = deliveryService.updateDeliveryStatus(id, newStatus);
+        DeliveryRequest.DeliveryReqStatus newStatus = DeliveryRequest.DeliveryReqStatus.valueOf(statusRequest.status());
+        DeliveryRequest updatedDelivery = deliveryService.updateDeliveryStatus(id, newStatus);
 
         return ResponseEntity.ok(mapToDTO(updatedDelivery));
     }
@@ -105,7 +105,7 @@ public class DeliveryController {
     }
 
     // Helper method to map Entity to DTO
-    private DeliveryResponseDTO mapToDTO(Delivery delivery) {
+    private DeliveryResponseDTO mapToDTO(DeliveryRequest delivery) {
         return new DeliveryResponseDTO(
                 delivery.getId(),
                 delivery.getPickupAddress(),

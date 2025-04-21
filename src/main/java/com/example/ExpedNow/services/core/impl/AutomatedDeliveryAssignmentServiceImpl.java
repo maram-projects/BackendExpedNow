@@ -1,7 +1,7 @@
 package com.example.ExpedNow.services.core.impl;
 
-import com.example.ExpedNow.models.Delivery;
-import com.example.ExpedNow.repositories.DeliveryRepository;
+import com.example.ExpedNow.models.DeliveryRequest;
+import com.example.ExpedNow.repositories.DeliveryReqRepository;
 import com.example.ExpedNow.services.core.AutomatedDeliveryAssignmentServiceInterface;
 import com.example.ExpedNow.services.core.DeliveryAssignmentServiceInterface;
 import org.slf4j.Logger;
@@ -20,7 +20,7 @@ public class AutomatedDeliveryAssignmentServiceImpl implements AutomatedDelivery
     private static final Logger logger = LoggerFactory.getLogger(AutomatedDeliveryAssignmentServiceImpl.class);
 
     @Autowired
-    private DeliveryRepository deliveryRepository;
+    private DeliveryReqRepository deliveryRepository;
 
     @Autowired
     private DeliveryAssignmentServiceInterface deliveryAssignmentService;
@@ -33,7 +33,7 @@ public class AutomatedDeliveryAssignmentServiceImpl implements AutomatedDelivery
     @Scheduled(fixedRate = 300000) // 5 minutes in milliseconds
     public void assignPendingDeliveries() {
         logger.info("Starting automated delivery assignment process");
-        List<Delivery> pendingDeliveries = deliveryRepository.findByStatus(Delivery.DeliveryStatus.PENDING);
+        List<DeliveryRequest> pendingDeliveries = deliveryRepository.findByStatus(DeliveryRequest.DeliveryReqStatus.PENDING);
 
         if (pendingDeliveries.isEmpty()) {
             logger.info("No pending deliveries found");
@@ -43,7 +43,7 @@ public class AutomatedDeliveryAssignmentServiceImpl implements AutomatedDelivery
         logger.info("Found {} pending deliveries to assign", pendingDeliveries.size());
         int assignedCount = 0;
 
-        for (Delivery delivery : pendingDeliveries) {
+        for (DeliveryRequest delivery : pendingDeliveries) {
             try {
                 deliveryAssignmentService.assignDelivery(delivery.getId());
                 assignedCount++;

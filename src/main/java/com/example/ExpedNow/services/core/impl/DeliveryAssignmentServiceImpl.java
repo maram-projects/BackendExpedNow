@@ -2,10 +2,10 @@ package com.example.ExpedNow.services.core.impl;
 
 import com.example.ExpedNow.dto.LocationDTO;
 import com.example.ExpedNow.exception.ResourceNotFoundException;
-import com.example.ExpedNow.models.Delivery;
+import com.example.ExpedNow.models.DeliveryRequest;
 import com.example.ExpedNow.models.User;
 import com.example.ExpedNow.models.enums.Role;
-import com.example.ExpedNow.repositories.DeliveryRepository;
+import com.example.ExpedNow.repositories.DeliveryReqRepository;
 import com.example.ExpedNow.repositories.UserRepository;
 import com.example.ExpedNow.services.core.DeliveryAssignmentServiceInterface;
 import com.example.ExpedNow.services.core.LocationServiceInterface;
@@ -25,13 +25,13 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
 
     private static final Logger logger = LoggerFactory.getLogger(DeliveryAssignmentServiceImpl.class);
 
-    private final DeliveryRepository deliveryRepository;
+    private final DeliveryReqRepository deliveryRepository;
     private final UserRepository userRepository;
     private final NotificationServiceInterface notificationService;
     private final LocationServiceInterface locationService;
 
     public DeliveryAssignmentServiceImpl(
-            DeliveryRepository deliveryRepository,
+            DeliveryReqRepository deliveryRepository,
             UserRepository userRepository,
             NotificationServiceInterface notificationService,
             LocationServiceInterface locationService) {
@@ -47,11 +47,11 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
      * @return the updated delivery with assignment information
      */
     @Override
-    public Delivery assignDelivery(String deliveryId) {
-        Delivery delivery = deliveryRepository.findById(deliveryId)
+    public DeliveryRequest assignDelivery(String deliveryId) {
+        DeliveryRequest delivery = deliveryRepository.findById(deliveryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery not found with id: " + deliveryId));
 
-        if (delivery.getStatus() != Delivery.DeliveryStatus.PENDING) {
+        if (delivery.getStatus() != DeliveryRequest.DeliveryReqStatus.PENDING) {
             throw new IllegalStateException("Only pending deliveries can be assigned");
         }
 
@@ -74,8 +74,8 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
 
         // Assign delivery person
         delivery.setDeliveryPersonId(deliveryPersonId);
-        delivery.setStatus(Delivery.DeliveryStatus.APPROVED);
-        Delivery savedDelivery = deliveryRepository.save(delivery);
+        delivery.setStatus(DeliveryRequest.DeliveryReqStatus.APPROVED);
+        DeliveryRequest savedDelivery = deliveryRepository.save(delivery);
 
         // Send notification - make sure this call is working
         try {
@@ -138,8 +138,8 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
      * Updates the status of a delivery
      */
     @Override
-    public Delivery updateDeliveryStatus(String deliveryId, Delivery.DeliveryStatus newStatus, String deliveryPersonId) {
-        Delivery delivery = deliveryRepository.findById(deliveryId)
+    public DeliveryRequest updateDeliveryStatus(String deliveryId, DeliveryRequest.DeliveryReqStatus newStatus, String deliveryPersonId) {
+        DeliveryRequest delivery = deliveryRepository.findById(deliveryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery not found with id: " + deliveryId));
 
         // Verify the delivery person is assigned to this delivery
@@ -157,20 +157,20 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
     /**
      * Validates if a status transition is allowed
      */
-    private void validateStatusTransition(Delivery.DeliveryStatus currentStatus, Delivery.DeliveryStatus newStatus) {
+    private void validateStatusTransition(DeliveryRequest.DeliveryReqStatus currentStatus, DeliveryRequest.DeliveryReqStatus newStatus) {
         switch (currentStatus) {
             case PENDING:
-                if (newStatus != Delivery.DeliveryStatus.APPROVED && newStatus != Delivery.DeliveryStatus.CANCELLED) {
+                if (newStatus != DeliveryRequest.DeliveryReqStatus.APPROVED && newStatus != DeliveryRequest.DeliveryReqStatus.CANCELLED) {
                     throw new IllegalStateException("Invalid status transition from PENDING to " + newStatus);
                 }
                 break;
             case APPROVED:
-                if (newStatus != Delivery.DeliveryStatus.IN_TRANSIT && newStatus != Delivery.DeliveryStatus.CANCELLED) {
+                if (newStatus != DeliveryRequest.DeliveryReqStatus.IN_TRANSIT && newStatus != DeliveryRequest.DeliveryReqStatus.CANCELLED) {
                     throw new IllegalStateException("Invalid status transition from APPROVED to " + newStatus);
                 }
                 break;
             case IN_TRANSIT:
-                if (newStatus != Delivery.DeliveryStatus.DELIVERED && newStatus != Delivery.DeliveryStatus.CANCELLED) {
+                if (newStatus != DeliveryRequest.DeliveryReqStatus.DELIVERED && newStatus != DeliveryRequest.DeliveryReqStatus.CANCELLED) {
                     throw new IllegalStateException("Invalid status transition from IN_TRANSIT to " + newStatus);
                 }
                 break;
@@ -185,7 +185,7 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
      * Gets all deliveries assigned to a specific delivery person
      */
     @Override
-    public List<Delivery> getDeliveriesForPerson(String deliveryPersonId) {
+    public List<DeliveryRequest> getDeliveriesForPerson(String deliveryPersonId) {
         return deliveryRepository.findByDeliveryPersonId(deliveryPersonId);
     }
 
@@ -193,7 +193,7 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
      * Gets all pending deliveries that need assignment
      */
     @Override
-    public List<Delivery> getPendingDeliveries() {
-        return deliveryRepository.findByStatus(Delivery.DeliveryStatus.PENDING);
+    public List<DeliveryRequest> getPendingDeliveries() {
+        return deliveryRepository.findByStatus(DeliveryRequest.DeliveryReqStatus.PENDING);
     }
 }

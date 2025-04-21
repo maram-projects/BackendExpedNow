@@ -1,6 +1,6 @@
 package com.example.ExpedNow.services.core;
 
-import com.example.ExpedNow.models.Delivery;
+import com.example.ExpedNow.models.DeliveryRequest;
 
 import java.util.List;
 
@@ -11,20 +11,20 @@ public interface DeliveryAssignmentServiceInterface {
      * @param deliveryId the delivery to assign
      * @return the updated delivery with assignment information
      */
-    Delivery assignDelivery(String deliveryId);
+    DeliveryRequest assignDelivery(String deliveryId);
 
     /**
      * Updates the status of a delivery
      */
-    Delivery updateDeliveryStatus(String deliveryId, Delivery.DeliveryStatus newStatus, String deliveryPersonId);
+    DeliveryRequest updateDeliveryStatus(String deliveryId, DeliveryRequest.DeliveryReqStatus newStatus, String deliveryPersonId);
 
     /**
      * Gets all deliveries assigned to a specific delivery person
      */
-    List<Delivery> getDeliveriesForPerson(String deliveryPersonId);
+    List<DeliveryRequest> getDeliveriesForPerson(String deliveryPersonId);
 
     /**
      * Gets all pending deliveries that need assignment
      */
-    List<Delivery> getPendingDeliveries();
+    List<DeliveryRequest> getPendingDeliveries();
 }

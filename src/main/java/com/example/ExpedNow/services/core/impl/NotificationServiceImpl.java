@@ -1,10 +1,9 @@
 package com.example.ExpedNow.services.core.impl;
 
-import com.example.ExpedNow.models.Delivery;
+import com.example.ExpedNow.models.DeliveryRequest;
 import com.example.ExpedNow.models.Notification;
 import com.example.ExpedNow.repositories.NotificationRepository;
 import com.example.ExpedNow.services.core.NotificationServiceInterface;
-import com.example.ExpedNow.services.core.impl.NotificationServiceImpl;
 import com.example.ExpedNow.exception.ResourceNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,7 +35,7 @@ public class NotificationServiceImpl implements NotificationServiceInterface {
      * Sends a notification about a new delivery assignment
      */
     @Override
-    public void sendDeliveryAssignmentNotification(String userId, Delivery delivery) {
+    public void sendDeliveryAssignmentNotification(String userId, DeliveryRequest delivery) {
         Notification notification = new Notification();
         notification.setUserId(userId);
         notification.setType("DELIVERY_ASSIGNMENT");

@@ -1,7 +1,7 @@
 package com.example.ExpedNow.controllers;
 
 import com.example.ExpedNow.dto.LocationDTO;
-import com.example.ExpedNow.models.Delivery;
+import com.example.ExpedNow.models.DeliveryRequest;
 import com.example.ExpedNow.models.User;
 import com.example.ExpedNow.services.core.impl.AutomatedDeliveryAssignmentServiceImpl;
 import com.example.ExpedNow.services.core.impl.DeliveryAssignmentServiceImpl;
@@ -38,8 +38,8 @@ public class DeliveryAssignmentController {
     // This endpoint is kept for manual assignment if needed
     @PostMapping("/assign/{deliveryId}")
     @PreAuthorize("hasRole('ADMIN')")
-    public ResponseEntity<Delivery> assignDelivery(@PathVariable String deliveryId) {
-        Delivery delivery = deliveryAssignmentService.assignDelivery(deliveryId);
+    public ResponseEntity<DeliveryRequest> assignDelivery(@PathVariable String deliveryId) {
+        DeliveryRequest delivery = deliveryAssignmentService.assignDelivery(deliveryId);
         return ResponseEntity.ok(delivery);
     }
 
@@ -55,22 +55,22 @@ public class DeliveryAssignmentController {
 
     @GetMapping("/my-deliveries")
     @PreAuthorize("hasAnyRole('ROLE_PROFESSIONAL', 'ROLE_TEMPORARY', 'DELIVERY_PERSON')")
-    public ResponseEntity<List<Delivery>> getMyDeliveries(@RequestHeader("Authorization") String token) {
+    public ResponseEntity<List<DeliveryRequest>> getMyDeliveries(@RequestHeader("Authorization") String token) {
         String userId = userService.getUserIdFromToken(token);
-        List<Delivery> deliveries = deliveryAssignmentService.getDeliveriesForPerson(userId);
+        List<DeliveryRequest> deliveries = deliveryAssignmentService.getDeliveriesForPerson(userId);
         return ResponseEntity.ok(deliveries);
     }
 
     @PutMapping("/{deliveryId}/status")
     @PreAuthorize("hasAnyRole('ROLE_PROFESSIONAL', 'ROLE_TEMPORARY', 'DELIVERY_PERSON')")
-    public ResponseEntity<Delivery> updateDeliveryStatus(
+    public ResponseEntity<DeliveryRequest> updateDeliveryStatus(
             @PathVariable String deliveryId,
             @RequestBody Map<String, String> statusUpdate,
             @RequestHeader("Authorization") String token) {
         String userId = userService.getUserIdFromToken(token);
-        Delivery.DeliveryStatus newStatus = Delivery.DeliveryStatus.valueOf(statusUpdate.get("status"));
+        DeliveryRequest.DeliveryReqStatus newStatus = DeliveryRequest.DeliveryReqStatus.valueOf(statusUpdate.get("status"));
 
-        Delivery delivery = deliveryAssignmentService.updateDeliveryStatus(deliveryId, newStatus, userId);
+        DeliveryRequest delivery = deliveryAssignmentService.updateDeliveryStatus(deliveryId, newStatus, userId);
         return ResponseEntity.ok(delivery);
     }
 

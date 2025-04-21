@@ -1,22 +1,23 @@
 package com.example.ExpedNow.services.core;
 
-import com.example.ExpedNow.models.Delivery;
+
+import com.example.ExpedNow.models.DeliveryRequest;
 
 import java.util.List;
 
 public interface DeliveryServiceInterface {
 
-    Delivery createDelivery(Delivery delivery);
+    DeliveryRequest createDelivery(DeliveryRequest delivery);
 
-    List<Delivery> getAllDeliveries();
+    List<DeliveryRequest> getAllDeliveries();
 
-    List<Delivery> getClientDeliveries(String clientId);
+    List<DeliveryRequest> getClientDeliveries(String clientId);
 
-    List<Delivery> getPendingDeliveries();
+    List<DeliveryRequest> getPendingDeliveries();
 
-    Delivery updateDeliveryStatus(String id, Delivery.DeliveryStatus status);
+    DeliveryRequest updateDeliveryStatus(String id, DeliveryRequest.DeliveryReqStatus status);
 
     void cancelDelivery(String id);
 
-    Delivery getDeliveryById(String id);
+    DeliveryRequest getDeliveryById(String id);
 }

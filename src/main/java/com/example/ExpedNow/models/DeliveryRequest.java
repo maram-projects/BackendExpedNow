@@ -7,10 +7,10 @@ import java.time.LocalDateTime;
 import java.util.Date;
 
 @Data
-@Document(collection = "deliveries")
+@Document(collection = "deliveriesRequest")
 
-    public class Delivery {
-        @Id
+    public class DeliveryRequest {
+    @Id
         private String id;
 
         private String pickupAddress;
@@ -27,7 +27,7 @@ import java.util.Date;
 
         private String additionalInstructions;
 
-        private DeliveryStatus status = DeliveryStatus.PENDING;
+        private DeliveryReqStatus status = DeliveryReqStatus.PENDING;
 
         private Date createdAt = new Date();
 
@@ -52,7 +52,7 @@ import java.util.Date;
 
         private double deliveryLongitude;
 
-        public enum DeliveryStatus {
-            PENDING, APPROVED, IN_TRANSIT, DELIVERED, CANCELLED
-        }
+    public enum DeliveryReqStatus {
+        PENDING, APPROVED, IN_TRANSIT, DELIVERED, CANCELLED
+    }
 }
