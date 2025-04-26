@@ -34,6 +34,9 @@ public class User {
 
     private Date dateOfRegistration;
 
+    private VehicleType vehicleType;
+    private String assignedVehicleId;
+
     @Builder.Default
     private boolean verified = false;
 
@@ -49,7 +52,6 @@ public class User {
     private LocalDateTime lockTime;
 
     // For delivery persons
-    private VehicleType vehicleType;
 
     private double rating;
 

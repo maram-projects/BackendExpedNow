@@ -6,10 +6,12 @@ import com.example.ExpedNow.repositories.UserRepository;
 import com.example.ExpedNow.security.CustomUserDetailsService;
 import com.example.ExpedNow.security.JwtUtil;
 import com.example.ExpedNow.services.core.impl.UserServiceImpl;
+import com.example.ExpedNow.services.core.impl.VehicleServiceImpl;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import lombok.Data;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -36,6 +38,9 @@ public class AuthController {
     private final UserServiceImpl userService;
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
+
+    @Autowired
+    private VehicleServiceImpl vehicleService;
 
     // Inject authentication manager directly instead of through SecurityConfig
     public AuthController(AuthenticationManager authenticationManager,
@@ -91,6 +96,14 @@ public class AuthController {
                     roles.add(Role.ROLE_INDIVIDUAL);
             }
 
+            // Handle vehicle assignment if the user is a delivery person
+            String assignedVehicleId = user.getAssignedVehicleId();
+            if (assignedVehicleId != null && !assignedVehicleId.isEmpty() &&
+                    (userType.equalsIgnoreCase("professional") || userType.equalsIgnoreCase("temporary"))) {
+                // Set the vehicle as unavailable if provided
+                vehicleService.setVehicleUnavailable(assignedVehicleId);
+            }
+
             try {
                 User registeredUser = userService.registerUser(user, roles);
                 String token = jwtUtil.generateToken(registeredUser.getEmail());
@@ -102,6 +115,7 @@ public class AuthController {
                 response.put("firstName", registeredUser.getFirstName());
                 response.put("lastName", registeredUser.getLastName());
                 response.put("userType", userType);
+                response.put("assignedVehicleId", registeredUser.getAssignedVehicleId());
 
                 return ResponseEntity.ok(response);
             } catch (Exception e) {
@@ -154,15 +168,22 @@ public class AuthController {
             String token = jwtUtil.generateToken(user.getEmail());
             String userType = determineUserType(user.getRoles());
 
-            return ResponseEntity.ok(Map.of(
-                    "token", token,
-                    "userId", user.getId(),
-                    "userType", userType,
-                    "email", user.getEmail(),
-                    "firstName", user.getFirstName(),
-                    "lastName", user.getLastName(),
-                    "verified", user.isVerified()
-            ));
+            Map<String, Object> responseMap = new HashMap<>();
+            responseMap.put("token", token);
+            responseMap.put("userId", user.getId());
+            responseMap.put("userType", userType);
+            responseMap.put("email", user.getEmail());
+            responseMap.put("firstName", user.getFirstName());
+            responseMap.put("lastName", user.getLastName());
+            responseMap.put("verified", user.isVerified());
+
+            // Include vehicle information for delivery persons
+            if (user.getRoles().contains(Role.ROLE_DELIVERY_PERSON)) {
+                responseMap.put("vehicleType", user.getVehicleType());
+                responseMap.put("assignedVehicleId", user.getAssignedVehicleId());
+            }
+
+            return ResponseEntity.ok(responseMap);
 
         } catch (BadCredentialsException e) {
             handleFailedLoginAttempt(loginRequest.getEmail());
@@ -212,25 +233,6 @@ public class AuthController {
         return "unknown";
     }
 
-    // Other methods remain the same...
-
-    @Data
-    static class LoginRequest {
-        @NotBlank
-        @Email
-        private String email;
-
-        @NotBlank
-        @Size(min = 8)
-        private String password;
-    }
-
-
-
-
-    // Other methods remain the same...
-
-
     @GetMapping("/oauth2-success")
     public ResponseEntity<?> oauthLoginSuccess(@AuthenticationPrincipal OAuth2User principal) {
         String email = principal.getAttribute("email");
@@ -251,8 +253,6 @@ public class AuthController {
         return ResponseEntity.badRequest().body(Map.of("error", "Failed to retrieve user information"));
     }
 
-
-
     @PutMapping("/profile")
     public ResponseEntity<?> updateProfile(@RequestBody User updatedUser, Principal principal) {
         try {
@@ -262,5 +262,16 @@ public class AuthController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
+    }
+
+    @Data
+    static class LoginRequest {
+        @NotBlank
+        @Email
+        private String email;
+
+        @NotBlank
+        @Size(min = 8)
+        private String password;
     }
 }
