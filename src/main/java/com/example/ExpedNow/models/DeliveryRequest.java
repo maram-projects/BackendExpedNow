@@ -1,5 +1,6 @@
 package com.example.ExpedNow.models;
 
+import com.example.ExpedNow.models.enums.PackageType;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -25,7 +26,10 @@ import java.util.Date;
 
         private Date scheduledDate;
 
-        private String additionalInstructions;
+    private PackageType packageType;
+
+
+    private String additionalInstructions;
 
         private DeliveryReqStatus status = DeliveryReqStatus.PENDING;
 
@@ -53,6 +57,11 @@ import java.util.Date;
         private double deliveryLongitude;
 
     public enum DeliveryReqStatus {
-        PENDING, APPROVED, IN_TRANSIT, DELIVERED, CANCELLED
+        PENDING,         // Initial state
+        ASSIGNED,        // Delivery person assigned but not accepted
+        APPROVED,        // Delivery person accepted
+        IN_TRANSIT,
+        DELIVERED,
+        CANCELLED
     }
 }

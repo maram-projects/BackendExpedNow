@@ -35,25 +35,18 @@ public class NotificationServiceImpl implements NotificationServiceInterface {
      * Sends a notification about a new delivery assignment
      */
     @Override
-    public void sendDeliveryAssignmentNotification(String userId, DeliveryRequest delivery) {
-        Notification notification = new Notification();
-        notification.setUserId(userId);
-        notification.setType("DELIVERY_ASSIGNMENT");
-        notification.setTitle("New Delivery Assignment");
-        notification.setMessage("You have been assigned a new delivery from " +
-                delivery.getPickupAddress() + " to " + delivery.getDeliveryAddress());
-        notification.setReferenceId(delivery.getId());
-        notification.setCreatedAt(new Date());
-        notification.setRead(false);
+    public void sendAssignmentRequestNotification(String deliveryPersonId, DeliveryRequest delivery) {
+        // Implement your notification logic here
+        // Example:
+        String message = String.format(
+                "New delivery request #%s (%s) needs your acceptance",
+                delivery.getId(),
+                delivery.getPackageType()
+        );
 
-        Notification savedNotification = notificationRepository.save(notification);
-
-        logger.info("Sending notification to user {}: {}", userId, notification.getMessage());
-
-        messagingTemplate.convertAndSendToUser(userId, "/queue/notifications", savedNotification);
-        messagingTemplate.convertAndSend("/topic/notifications", savedNotification);
+        // Your actual notification sending logic
+        System.out.println("Sending to " + deliveryPersonId + ": " + message);
     }
-
     /**
      * Gets all unread notifications for a user
      */

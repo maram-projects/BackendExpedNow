@@ -10,9 +10,14 @@ public record DeliveryRequestDTO(
         @NotBlank String deliveryAddress,
         @NotBlank String packageDescription,
         @Positive double packageWeight,
-        @NotBlank String vehicleId,
+        String vehicleId, // No validation since it's optional
         @FutureOrPresent
         @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
         Date scheduledDate,
-        String additionalInstructions
-) {}
+        String packageType,
+        String additionalInstructions,
+        Double pickupLatitude,
+        Double pickupLongitude,
+        Double deliveryLatitude,
+        Double deliveryLongitude
+){}

@@ -156,11 +156,15 @@ public class VehicleServiceImpl implements VehicleServiceInterface {
                 .collect(Collectors.toList());
     }
     @Override
-    public VehicleDTO setVehicleUnavailable(String id) {
-        Vehicle vehicle = vehicleRepository.findById(id)
-                .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found with id: " + id));
+    public void setVehicleUnavailable(String vehicleId) { // Return type must match interface
+        if (vehicleId == null || vehicleId.isEmpty()) {
+            return; // Handle missing vehicleId
+        }
+
+        Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found"));
         vehicle.setAvailable(false);
-        return convertToDTO(vehicleRepository.save(vehicle));
+        vehicleRepository.save(vehicle);
     }
 
 

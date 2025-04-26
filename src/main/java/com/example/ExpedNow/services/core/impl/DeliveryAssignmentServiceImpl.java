@@ -4,6 +4,7 @@ import com.example.ExpedNow.dto.LocationDTO;
 import com.example.ExpedNow.exception.ResourceNotFoundException;
 import com.example.ExpedNow.models.DeliveryRequest;
 import com.example.ExpedNow.models.User;
+import com.example.ExpedNow.models.enums.PackageType;
 import com.example.ExpedNow.models.enums.Role;
 import com.example.ExpedNow.repositories.DeliveryReqRepository;
 import com.example.ExpedNow.repositories.UserRepository;
@@ -16,6 +17,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
 import java.util.Comparator;
+import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -49,45 +51,76 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
     @Override
     public DeliveryRequest assignDelivery(String deliveryId) {
         DeliveryRequest delivery = deliveryRepository.findById(deliveryId)
-                .orElseThrow(() -> new ResourceNotFoundException("Delivery not found with id: " + deliveryId));
+                .orElseThrow(() -> new ResourceNotFoundException("Delivery not found"));
 
+        // Only assign pending deliveries
         if (delivery.getStatus() != DeliveryRequest.DeliveryReqStatus.PENDING) {
             throw new IllegalStateException("Only pending deliveries can be assigned");
         }
 
-        // Get available delivery persons
-        List<User> availablePersons = findAvailableDeliveryPersons();
+        // Get available delivery persons matching package requirements
+        List<User> suitablePersons = findAvailableDeliveryPersons(delivery);
 
-        if (availablePersons.isEmpty()) {
-            logger.warn("No available delivery persons found");
+        if (suitablePersons.isEmpty()) {
+            logger.warn("No suitable delivery persons found for package type: {}", delivery.getPackageType());
             return delivery;
         }
 
         // Get pickup location from delivery
-        LocationDTO pickupLocation = new LocationDTO();
-        pickupLocation.setLatitude(delivery.getPickupLatitude());
-        pickupLocation.setLongitude(delivery.getPickupLongitude());
+        LocationDTO pickupLocation = new LocationDTO(
+                delivery.getPickupLatitude(),
+                delivery.getPickupLongitude()
+        );
 
-        // Find closest delivery person
-        User closestPerson = findClosestDeliveryPerson(availablePersons, pickupLocation);
-        String deliveryPersonId = closestPerson.getId();
+        // Find closest suitable delivery person
+        User closestPerson = findClosestDeliveryPerson(suitablePersons, pickupLocation);
 
-        // Assign delivery person
-        delivery.setDeliveryPersonId(deliveryPersonId);
-        delivery.setStatus(DeliveryRequest.DeliveryReqStatus.APPROVED);
+        // Assign but keep status as PENDING until acceptance
+        delivery.setDeliveryPersonId(closestPerson.getId());
+        delivery.setAssignedAt(new Date());  // Track assignment time
         DeliveryRequest savedDelivery = deliveryRepository.save(delivery);
 
-        // Send notification - make sure this call is working
+        // Send acceptance request notification
         try {
-            logger.info("Sending notification for delivery {} to user {}", deliveryId, deliveryPersonId);
-            notificationService.sendDeliveryAssignmentNotification(deliveryPersonId, savedDelivery);
+            String fullName = closestPerson.getFirstName() + " " + closestPerson.getLastName();
+
+            logger.info("Sending assignment request for delivery {} to user {} (Name: {})",
+                    deliveryId, closestPerson.getId(), fullName);
+
+            notificationService.sendAssignmentRequestNotification(
+                    closestPerson.getId(),
+                    savedDelivery
+            );
         } catch (Exception e) {
-            logger.error("Failed to send notification: {}", e.getMessage(), e);
+            logger.error("Failed to send notification: {}", e.getMessage());
         }
 
         return savedDelivery;
     }
 
+
+    private List<User> findAvailableDeliveryPersons(DeliveryRequest delivery) {
+        return userRepository.findByRolesInAndEnabled(
+                        List.of(Role.ROLE_PROFESSIONAL, Role.ROLE_TEMPORARY),
+                        true
+                ).stream()
+                .filter(user ->
+                        user.isAvailable() &&
+                                canHandlePackageType(user, delivery.getPackageType())
+                )
+                .collect(Collectors.toList());
+    }
+
+    private boolean canHandlePackageType(User user, PackageType packageType) {
+        if (user.getVehicleType() == null) return false;
+
+        return switch (packageType) {
+            case SMALL, FRAGILE -> true;  // All vehicles can handle
+            case MEDIUM -> user.getVehicleType().getMaxWeight() >= 10;
+            case LARGE -> user.getVehicleType().getMaxWeight() >= 20;
+            case HEAVY -> user.getVehicleType().getMaxWeight() >= 50;
+        };
+    }
     private List<User> findAvailableDeliveryPersons() {
         return userRepository.findByRolesInAndEnabled(
                         List.of(Role.ROLE_PROFESSIONAL, Role.ROLE_TEMPORARY),

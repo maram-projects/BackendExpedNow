@@ -7,7 +7,7 @@ import java.util.List;
 
 public interface NotificationServiceInterface {
 
-    void sendDeliveryAssignmentNotification(String userId, DeliveryRequest delivery);
+    void sendAssignmentRequestNotification(String deliveryPersonId, DeliveryRequest delivery);
 
     List<Notification> getUnreadNotifications(String userId);
 

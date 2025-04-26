@@ -1,5 +1,6 @@
 package com.example.ExpedNow.controllers;
 
+import com.example.ExpedNow.dto.LoginRequest;
 import com.example.ExpedNow.models.enums.Role;
 import com.example.ExpedNow.models.User;
 import com.example.ExpedNow.repositories.UserRepository;
@@ -264,14 +265,4 @@ public class AuthController {
         }
     }
 
-    @Data
-    static class LoginRequest {
-        @NotBlank
-        @Email
-        private String email;
-
-        @NotBlank
-        @Size(min = 8)
-        private String password;
-    }
 }

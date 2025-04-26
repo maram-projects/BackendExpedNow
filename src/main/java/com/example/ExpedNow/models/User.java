@@ -5,7 +5,7 @@ import com.example.ExpedNow.models.enums.VehicleType;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
-
+import org.springframework.data.mongodb.core.mapping.Field;
 import java.time.LocalDateTime;
 import java.util.Date;
 import java.util.HashSet;
@@ -21,20 +21,16 @@ public class User {
     private String id;
 
     private String firstName;
-
     private String lastName;
-
     private String email;
-
     private String password;
-
     private String phone;
-
     private String address;
-
     private Date dateOfRegistration;
 
+    @Field("vehicle_type")  // MongoDB field name customization
     private VehicleType vehicleType;
+
     private String assignedVehicleId;
 
     @Builder.Default
@@ -52,16 +48,14 @@ public class User {
     private LocalDateTime lockTime;
 
     // For delivery persons
-
     private double rating;
-
     private int completedDeliveries;
-
     private Date lastActive;
 
     @Builder.Default
     private Set<Role> roles = new HashSet<>();
 
+    // Rest of the methods remain unchanged...
     public void incrementFailedAttempts() {
         this.failedLoginAttempts++;
     }
@@ -71,11 +65,9 @@ public class User {
         this.lockTime = null;
     }
 
-    // Combined availability method
     public boolean isAvailable() {
         return this.enabled && this.available;
     }
-
 
     public void addRole(Role role) {
         this.roles.add(role);
@@ -90,15 +82,10 @@ public class User {
     }
 
     public void updateRating(double newRating) {
-        // Example of a custom method to update rating based on business logic
-        double currentRating = this.rating;
-        int deliveries = this.completedDeliveries;
-
-        if (deliveries == 0) {
+        if (this.completedDeliveries == 0) {
             this.rating = newRating;
         } else {
-            // Weighted average calculation (just an example)
-            this.rating = ((currentRating * deliveries) + newRating) / (deliveries + 1);
+            this.rating = ((this.rating * this.completedDeliveries) + newRating) / (this.completedDeliveries + 1);
         }
         this.completedDeliveries++;
     }
@@ -110,4 +97,18 @@ public class User {
     private double successScore = 0.0;
     private int totalDeliveries = 0;
     private double averageDeliveryTime = 0.0;
+
+    // In your User class
+    public String getId() {
+        return this.id;
+    }
+
+    public String getEmail() {  // Should match what you're using for username
+        return this.email;
+    }
+
+    public String getFullName() {
+        return (firstName != null ? firstName : "") + " " + (lastName != null ? lastName : "");
+    }
+
 }

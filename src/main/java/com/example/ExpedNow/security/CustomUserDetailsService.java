@@ -19,6 +19,7 @@ import java.util.Collections;
 @Service("customUserDetailsService")
 public class CustomUserDetailsService implements UserDetailsService {
 
+
     private final UserRepository userRepository;
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final int LOCK_TIME_MINUTES = 30;
@@ -45,6 +46,9 @@ public class CustomUserDetailsService implements UserDetailsService {
                 user.getLockTime()
         );
     }
+
+
+
 
     // Update your CustomUserDetailsService's getAuthorities method
     private Collection<? extends GrantedAuthority> getAuthorities(User user) {

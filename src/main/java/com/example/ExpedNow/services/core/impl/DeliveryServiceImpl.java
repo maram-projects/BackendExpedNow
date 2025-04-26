@@ -1,5 +1,6 @@
 package com.example.ExpedNow.services.core.impl;
 
+import com.example.ExpedNow.dto.DeliveryResponseDTO;
 import com.example.ExpedNow.models.DeliveryRequest;
 import com.example.ExpedNow.repositories.DeliveryReqRepository;
 import com.example.ExpedNow.services.core.DeliveryServiceInterface;
@@ -12,6 +13,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @Primary
@@ -32,9 +34,13 @@ public class DeliveryServiceImpl implements DeliveryServiceInterface {
     @Override
     public DeliveryRequest createDelivery(DeliveryRequest delivery) {
         // Save the delivery first
+
         DeliveryRequest savedDelivery = deliveryRepository.save(delivery);
-        // Update vehicle availability
-        vehicleService.setVehicleUnavailable(savedDelivery.getVehicleId());
+
+        // Only update vehicle availability if vehicleId is provided
+        if (savedDelivery.getVehicleId() != null && !savedDelivery.getVehicleId().isEmpty()) {
+            vehicleService.setVehicleUnavailable(savedDelivery.getVehicleId());
+        }
 
         // Try to assign the delivery immediately if possible
         try {
@@ -85,5 +91,49 @@ public class DeliveryServiceImpl implements DeliveryServiceInterface {
     public DeliveryRequest getDeliveryById(String id) {
         return deliveryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery not found with id: " + id));
+    }
+
+    @Override
+    public DeliveryRequest resetDeliveryAssignment(String deliveryId, String deliveryPersonId) {
+        DeliveryRequest delivery = getDeliveryById(deliveryId);
+
+        if (!deliveryPersonId.equals(delivery.getDeliveryPersonId())) {
+            throw new IllegalStateException("Not authorized to reject this delivery");
+        }
+
+        delivery.setDeliveryPersonId(null);
+        delivery.setAssignedAt(null);
+        return deliveryRepository.save(delivery);
+    }
+
+    @Override
+    public List<DeliveryResponseDTO> getAssignedPendingDeliveries(String deliveryPersonId) {
+        logger.info("Fetching assigned pending deliveries for user: {}", deliveryPersonId);
+
+        List<DeliveryRequest> deliveries = deliveryRepository.findByStatusAndDeliveryPersonId(
+                DeliveryRequest.DeliveryReqStatus.PENDING,
+                deliveryPersonId
+        );
+
+        logger.info("Found {} deliveries", deliveries.size());
+        return deliveries.stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
+    }
+
+    private DeliveryResponseDTO convertToDto(DeliveryRequest delivery) {
+        return new DeliveryResponseDTO(
+                delivery.getId(),
+                delivery.getPickupAddress(),
+                delivery.getDeliveryAddress(),
+                delivery.getPackageDescription(),
+                delivery.getPackageWeight(),
+                delivery.getVehicleId(),
+                delivery.getScheduledDate(),
+                delivery.getAdditionalInstructions(),
+                delivery.getStatus().name(),
+                delivery.getCreatedAt(),
+                delivery.getClientId()
+        );
     }
 }

@@ -19,6 +19,5 @@ public interface VehicleServiceInterface {
 
     List<VehicleDTO> getAvailableVehicles();
 
-    VehicleDTO setVehicleUnavailable(String id);
-
+    void setVehicleUnavailable(String vehicleId);
 }

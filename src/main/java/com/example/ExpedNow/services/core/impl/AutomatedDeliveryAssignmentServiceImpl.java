@@ -32,28 +32,34 @@ public class AutomatedDeliveryAssignmentServiceImpl implements AutomatedDelivery
     @Override
     @Scheduled(fixedRate = 300000) // 5 minutes in milliseconds
     public void assignPendingDeliveries() {
-        logger.info("Starting automated delivery assignment process");
+        logger.info("🔄 Starting automated delivery assignment process...");
+
         List<DeliveryRequest> pendingDeliveries = deliveryRepository.findByStatus(DeliveryRequest.DeliveryReqStatus.PENDING);
 
         if (pendingDeliveries.isEmpty()) {
-            logger.info("No pending deliveries found");
+            logger.info("✅ No pending deliveries found. Nothing to assign.");
             return;
         }
 
-        logger.info("Found {} pending deliveries to assign", pendingDeliveries.size());
+        logger.info("📦 Found {} pending deliveries to assign.", pendingDeliveries.size());
         int assignedCount = 0;
 
         for (DeliveryRequest delivery : pendingDeliveries) {
             try {
-                deliveryAssignmentService.assignDelivery(delivery.getId());
-                assignedCount++;
-                logger.info("Successfully assigned delivery ID: {}", delivery.getId());
+                DeliveryRequest assignedDelivery = deliveryAssignmentService.assignDelivery(delivery.getId());
+                if (assignedDelivery.getDeliveryPersonId() != null) {
+                    assignedCount++;
+                    logger.info("✔️ Successfully assigned delivery ID: {} to delivery person ID: {}",
+                            assignedDelivery.getId(), assignedDelivery.getDeliveryPersonId());
+                } else {
+                    logger.warn("⚠️ No delivery person available for delivery ID: {}", delivery.getId());
+                }
             } catch (Exception e) {
-                logger.error("Failed to assign delivery ID: {}. Error: {}", delivery.getId(), e.getMessage());
+                logger.error("❌ Failed to assign delivery ID: {}. Error: {}", delivery.getId(), e.getMessage());
             }
         }
 
-        logger.info("Completed assignment process. Assigned {} out of {} deliveries",
+        logger.info("🏁 Assignment process completed. Successfully assigned {} out of {} deliveries.",
                 assignedCount, pendingDeliveries.size());
     }
 }

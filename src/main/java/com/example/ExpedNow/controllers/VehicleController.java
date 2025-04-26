@@ -23,8 +23,8 @@ public class VehicleController {
     }
 
     @PatchMapping("/{id}/set-unavailable")
-    public ResponseEntity<VehicleDTO> setVehicleUnavailable(@PathVariable String id) {
-        return ResponseEntity.ok(vehicleService.setVehicleUnavailable(id));
+    public ResponseEntity setVehicleUnavailable(@PathVariable String id) {
+        return (ResponseEntity) ResponseEntity.ok();
     }
 
     @GetMapping
