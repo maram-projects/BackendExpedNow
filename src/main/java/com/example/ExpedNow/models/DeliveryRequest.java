@@ -4,6 +4,9 @@ import com.example.ExpedNow.models.enums.PackageType;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
+import org.springframework.data.mongodb.core.mapping.FieldType;
+
 import java.time.LocalDateTime;
 import java.util.Date;
 
@@ -24,7 +27,7 @@ import java.util.Date;
 
         private String vehicleId;
 
-        private Date scheduledDate;
+
 
     private PackageType packageType;
 
@@ -33,17 +36,20 @@ import java.util.Date;
 
         private DeliveryReqStatus status = DeliveryReqStatus.PENDING;
 
-        private Date createdAt = new Date();
 
         private String clientId;
 
         private String deliveryPersonId;
 
-        private Date assignedAt;
 
-        private Date startedAt;
 
-        private Date completedAt;
+    private LocalDateTime scheduledDate;
+    private LocalDateTime createdAt;
+    private LocalDateTime assignedAt;
+    private LocalDateTime startedAt;
+    private LocalDateTime completedAt;
+
+
 
         private String notes;
 
@@ -64,4 +70,6 @@ import java.util.Date;
         DELIVERED,
         CANCELLED
     }
+
+
 }

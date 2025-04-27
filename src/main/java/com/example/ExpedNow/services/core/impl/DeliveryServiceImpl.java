@@ -12,6 +12,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
+import java.time.ZoneId;
+import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -34,7 +36,6 @@ public class DeliveryServiceImpl implements DeliveryServiceInterface {
     @Override
     public DeliveryRequest createDelivery(DeliveryRequest delivery) {
         // Save the delivery first
-
         DeliveryRequest savedDelivery = deliveryRepository.save(delivery);
 
         // Only update vehicle availability if vehicleId is provided
@@ -42,15 +43,18 @@ public class DeliveryServiceImpl implements DeliveryServiceInterface {
             vehicleService.setVehicleUnavailable(savedDelivery.getVehicleId());
         }
 
-        // Try to assign the delivery immediately if possible
-        try {
-            deliveryAssignmentService.assignDelivery(savedDelivery.getId());
-            logger.info("Delivery {} automatically assigned upon creation", savedDelivery.getId());
-        } catch (Exception e) {
-            // If immediate assignment fails (e.g., no available delivery persons),
-            // the scheduled task will handle it later
-            logger.info("Immediate assignment failed for delivery {}. Will be picked up by scheduled assignment.",
-                    savedDelivery.getId());
+        // Seulement tenter d'assigner si aucun livreur n'est déjà assigné
+        if (savedDelivery.getDeliveryPersonId() == null || savedDelivery.getDeliveryPersonId().isEmpty()) {
+            try {
+                deliveryAssignmentService.assignDelivery(savedDelivery.getId());
+                logger.info("Delivery {} automatically assigned upon creation", savedDelivery.getId());
+            } catch (Exception e) {
+                logger.info("Immediate assignment failed for delivery {}. Will be picked up by scheduled assignment.",
+                        savedDelivery.getId());
+            }
+        } else {
+            logger.info("Delivery {} already has a delivery person assigned: {}. Skipping assignment.",
+                    savedDelivery.getId(), savedDelivery.getDeliveryPersonId());
         }
 
         return savedDelivery;
@@ -122,6 +126,12 @@ public class DeliveryServiceImpl implements DeliveryServiceInterface {
     }
 
     private DeliveryResponseDTO convertToDto(DeliveryRequest delivery) {
+        // تحويل LocalDateTime إلى Date
+        Date scheduledDate = delivery.getScheduledDate() != null ?
+                Date.from(delivery.getScheduledDate().atZone(ZoneId.systemDefault()).toInstant()) : null;
+        Date createdAt = delivery.getCreatedAt() != null ?
+                Date.from(delivery.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant()) : null;
+
         return new DeliveryResponseDTO(
                 delivery.getId(),
                 delivery.getPickupAddress(),
@@ -129,10 +139,10 @@ public class DeliveryServiceImpl implements DeliveryServiceInterface {
                 delivery.getPackageDescription(),
                 delivery.getPackageWeight(),
                 delivery.getVehicleId(),
-                delivery.getScheduledDate(),
+                scheduledDate, // استخدام Date المحول
                 delivery.getAdditionalInstructions(),
                 delivery.getStatus().name(),
-                delivery.getCreatedAt(),
+                createdAt, // استخدام Date المحول
                 delivery.getClientId()
         );
     }

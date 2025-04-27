@@ -19,8 +19,11 @@ public interface DeliveryReqRepository extends MongoRepository<DeliveryRequest, 
             String deliveryPersonId
     );
 
-
-
-    @Query("{ 'deliveryPersonId': ?0, 'status': 'PENDING' }") // تأكد من تطابق الحروف
+    @Query("{ 'deliveryPersonId': ?0, 'status': 'PENDING' }")
     List<DeliveryRequest> findAssignedPendingDeliveries(String deliveryPersonId);
+
+    List<DeliveryRequest> findByStatusAndDeliveryPersonIdIsNull(DeliveryRequest.DeliveryReqStatus status);
+    // أضف إلى DeliveryReqRepository
+    @Query("{ 'deliveryPersonId': ?0, 'status': { $in: ['ASSIGNED', 'APPROVED', 'IN_TRANSIT'] } }")
+    List<DeliveryRequest> findActiveDeliveriesByDeliveryPerson(String deliveryPersonId);
 }

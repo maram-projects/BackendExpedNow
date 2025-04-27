@@ -16,6 +16,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
@@ -53,6 +54,13 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
         DeliveryRequest delivery = deliveryRepository.findById(deliveryId)
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery not found"));
 
+        // Vérifier si la livraison a déjà un livreur assigné
+        if (delivery.getDeliveryPersonId() != null && !delivery.getDeliveryPersonId().isEmpty()) {
+            logger.info("Delivery {} already has a delivery person assigned: {}. Skipping assignment.",
+                    deliveryId, delivery.getDeliveryPersonId());
+            return delivery;
+        }
+
         // Only assign pending deliveries
         if (delivery.getStatus() != DeliveryRequest.DeliveryReqStatus.PENDING) {
             throw new IllegalStateException("Only pending deliveries can be assigned");
@@ -75,9 +83,12 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
         // Find closest suitable delivery person
         User closestPerson = findClosestDeliveryPerson(suitablePersons, pickupLocation);
 
-        // Assign but keep status as PENDING until acceptance
+        // Update status to ASSIGNED
+        delivery.setStatus(DeliveryRequest.DeliveryReqStatus.ASSIGNED);
+
+        // Assign delivery person
         delivery.setDeliveryPersonId(closestPerson.getId());
-        delivery.setAssignedAt(new Date());  // Track assignment time
+        delivery.setAssignedAt(LocalDateTime.now());  // Track assignment time
         DeliveryRequest savedDelivery = deliveryRepository.save(delivery);
 
         // Send acceptance request notification
@@ -97,10 +108,8 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
 
         return savedDelivery;
     }
-
-
     private List<User> findAvailableDeliveryPersons(DeliveryRequest delivery) {
-        return userRepository.findByRolesInAndEnabled(
+        List<User> availableUsers = userRepository.findByRolesInAndEnabled(
                         List.of(Role.ROLE_PROFESSIONAL, Role.ROLE_TEMPORARY),
                         true
                 ).stream()
@@ -109,6 +118,22 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
                                 canHandlePackageType(user, delivery.getPackageType())
                 )
                 .collect(Collectors.toList());
+
+        // فلترة المستخدمين حسب ما إذا كانوا لديهم طلبات توصيل نشطة بالفعل
+        return availableUsers.stream()
+                .filter(user -> !hasActiveDeliveries(user.getId()))
+                .collect(Collectors.toList());
+    }
+
+
+    private boolean hasActiveDeliveries(String userId) {
+        List<DeliveryRequest> activeDeliveries = deliveryRepository.findActiveDeliveriesByDeliveryPerson(userId);
+        return !activeDeliveries.isEmpty();
+    }
+    private boolean isActiveDelivery(DeliveryRequest delivery) {
+        return delivery.getStatus() == DeliveryRequest.DeliveryReqStatus.ASSIGNED ||
+                delivery.getStatus() == DeliveryRequest.DeliveryReqStatus.APPROVED ||
+                delivery.getStatus() == DeliveryRequest.DeliveryReqStatus.IN_TRANSIT;
     }
 
     private boolean canHandlePackageType(User user, PackageType packageType) {
@@ -229,4 +254,6 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
     public List<DeliveryRequest> getPendingDeliveries() {
         return deliveryRepository.findByStatus(DeliveryRequest.DeliveryReqStatus.PENDING);
     }
+
+
 }

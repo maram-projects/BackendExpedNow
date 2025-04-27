@@ -14,21 +14,27 @@ import org.springframework.data.mongodb.core.convert.MappingMongoConverter;
 import org.springframework.data.mongodb.core.convert.MongoCustomConversions;
 import org.springframework.data.mongodb.core.mapping.MongoMappingContext;
 
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.Set;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.*;
 
 @Configuration
 public class MongoConfig {
 
     @Bean
     public MongoCustomConversions customConversions() {
-        return new MongoCustomConversions(Arrays.asList(
-                new StringToRoleConverter(),
-                new RoleToStringConverter(),
-                new ArrayListToRoleSetConverter()
-        ));
+        List<Converter<?, ?>> converters = new ArrayList<>();
+
+        // Role converters
+        converters.add(new StringToRoleConverter());
+        converters.add(new RoleToStringConverter());
+        converters.add(new ArrayListToRoleSetConverter());
+
+        // DateTime converters
+        converters.add(localDateTimeToDateConverter());
+        converters.add(dateToLocalDateTimeConverter());
+
+        return new MongoCustomConversions(converters);
     }
 
     @ReadingConverter
@@ -65,6 +71,26 @@ public class MongoConfig {
     public MongoTemplate mongoTemplate(MongoDatabaseFactory mongoDbFactory, MongoMappingContext context) {
         MappingMongoConverter converter = new MappingMongoConverter(new DefaultDbRefResolver(mongoDbFactory), context);
         converter.setTypeMapper(new DefaultMongoTypeMapper(null));
+        converter.setCustomConversions(customConversions());
+        converter.afterPropertiesSet();
         return new MongoTemplate(mongoDbFactory, converter);
+    }
+
+    public Converter<LocalDateTime, Date> localDateTimeToDateConverter() {
+        return new Converter<LocalDateTime, Date>() {
+            @Override
+            public Date convert(LocalDateTime source) {
+                return Date.from(source.atZone(ZoneId.systemDefault()).toInstant());
+            }
+        };
+    }
+
+    public Converter<Date, LocalDateTime> dateToLocalDateTimeConverter() {
+        return new Converter<Date, LocalDateTime>() {
+            @Override
+            public LocalDateTime convert(Date source) {
+                return source.toInstant().atZone(ZoneId.systemDefault()).toLocalDateTime();
+            }
+        };
     }
 }

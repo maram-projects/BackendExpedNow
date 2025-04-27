@@ -2,9 +2,12 @@ package com.example.ExpedNow.controllers;
 
 import com.example.ExpedNow.dto.DeliveryRequestDTO;
 import com.example.ExpedNow.dto.DeliveryResponseDTO;
+import com.example.ExpedNow.dto.StatusUpdateRequest;
 import com.example.ExpedNow.models.DeliveryRequest;
+import com.example.ExpedNow.models.Mission;
 import com.example.ExpedNow.models.enums.PackageType;
 import com.example.ExpedNow.security.CustomUserDetailsService;
+import com.example.ExpedNow.services.core.MissionServiceInterface;
 import com.example.ExpedNow.services.core.impl.DeliveryServiceImpl;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -12,12 +15,15 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.Date;
-import java.util.List;
+import java.time.LocalDateTime;
+import java.time.ZoneId;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @RestController
@@ -25,9 +31,13 @@ import java.util.stream.Collectors;
 public class DeliveryController {
     private static final Logger logger = LoggerFactory.getLogger(DeliveryController.class);
     private final DeliveryServiceImpl deliveryService;
+    private final MissionServiceInterface missionService;
 
-    public DeliveryController(DeliveryServiceImpl deliveryService) {
+    // التصحيح: حقن MissionService في الكونستركتور
+    public DeliveryController(DeliveryServiceImpl deliveryService,
+                              MissionServiceInterface missionService) {
         this.deliveryService = deliveryService;
+        this.missionService = missionService;
     }
 
     @PostMapping("/request")
@@ -59,7 +69,15 @@ public class DeliveryController {
                 delivery.setVehicleId(requestDTO.vehicleId());
             }
 
-            delivery.setScheduledDate(requestDTO.scheduledDate());
+            Date scheduledDateFromDTO = requestDTO.scheduledDate();
+            if (scheduledDateFromDTO != null) {
+                delivery.setScheduledDate(scheduledDateFromDTO.toInstant()
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDateTime());
+            } else {
+                delivery.setScheduledDate(null);
+            }
+
             delivery.setAdditionalInstructions(requestDTO.additionalInstructions());
 
             // Set coordinates if present
@@ -78,10 +96,10 @@ public class DeliveryController {
 
             delivery.setClientId(clientId);
             delivery.setStatus(DeliveryRequest.DeliveryReqStatus.PENDING);
-            delivery.setCreatedAt(new Date());
+            delivery.setCreatedAt(LocalDateTime.now());
 
             DeliveryRequest savedDelivery = deliveryService.createDelivery(delivery);
-            return new ResponseEntity<>(mapToDTO(savedDelivery), HttpStatus.CREATED);
+            return new ResponseEntity<>(convertToDto(savedDelivery), HttpStatus.CREATED);
         } catch (Exception e) {
             e.printStackTrace();
             return new ResponseEntity<>("Error creating delivery: " + e.getMessage(),
@@ -91,23 +109,52 @@ public class DeliveryController {
 
     @PostMapping("/{id}/accept")
     @PreAuthorize("hasRole('DELIVERY_PERSON')")
-    public ResponseEntity<DeliveryResponseDTO> acceptDelivery(
+    @Transactional
+    public ResponseEntity<?> acceptDelivery(
             @PathVariable String id,
-            @RequestParam String deliveryPersonId) {
+            @RequestBody Map<String, String> request) {
 
-        DeliveryRequest delivery = deliveryService.getDeliveryById(id);
+        String deliveryPersonId = request.get("deliveryPersonId");
 
-        // Verify assignment
-        if (!deliveryPersonId.equals(delivery.getDeliveryPersonId())) {
-            throw new IllegalStateException("Not authorized to accept this delivery");
+        try {
+            logger.info("Accepting delivery {} by user {}", id, deliveryPersonId);
+
+            // 1. تحقق من الطلب
+            DeliveryRequest delivery = deliveryService.getDeliveryById(id);
+
+            // 2. تحقق من أن الطلب معين للموصل المحدد
+            if (!deliveryPersonId.equals(delivery.getDeliveryPersonId())) {
+                logger.warn("Unauthorized access attempt by user {}", deliveryPersonId);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body("Not authorized to accept this delivery");
+            }
+
+            // 3. تحقق من الحالة (إما PENDING أو ASSIGNED)
+            if (delivery.getStatus() != DeliveryRequest.DeliveryReqStatus.ASSIGNED &&
+                    delivery.getStatus() != DeliveryRequest.DeliveryReqStatus.PENDING) {
+                return ResponseEntity.badRequest()
+                        .body("Cannot accept delivery with status: " + delivery.getStatus());
+            }
+
+            // 4. إنشاء مهمة (ستقوم بتحديث الحالة تلقائيًا إلى APPROVED)
+            Mission newMission = missionService.createMission(id, deliveryPersonId);
+            logger.info("New mission created with ID: {}", newMission.getId());
+
+            // تحديث حالة الطلب بشكل صريح (للتأكد)
+            delivery = deliveryService.updateDeliveryStatus(id, DeliveryRequest.DeliveryReqStatus.APPROVED);
+
+            // 5. تحضير الرد
+            Map<String, Object> response = new HashMap<>();
+            response.put("delivery", convertToDto(delivery));
+            response.put("mission", newMission);
+
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            logger.error("Error in acceptDelivery:", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body("Error accepting delivery: " + e.getMessage());
         }
-
-        DeliveryRequest updated = deliveryService.updateDeliveryStatus(
-                id,
-                DeliveryRequest.DeliveryReqStatus.APPROVED
-        );
-
-        return ResponseEntity.ok(mapToDTO(updated));
     }
     @GetMapping("/assigned-pending")
     public ResponseEntity<List<DeliveryResponseDTO>> getAssignedPendingDeliveries(
@@ -130,8 +177,9 @@ public class DeliveryController {
             @RequestParam String deliveryPersonId) {
 
         DeliveryRequest updated = deliveryService.resetDeliveryAssignment(id, deliveryPersonId);
-        return ResponseEntity.ok(mapToDTO(updated));
+        return ResponseEntity.ok(convertToDto(updated));
     }
+
     @GetMapping
     @PreAuthorize("hasRole('CLIENT') or hasRole('INDIVIDUAL') or hasRole('ENTERPRISE') or hasRole('ADMIN')")
     public ResponseEntity<List<DeliveryResponseDTO>> getDeliveries(
@@ -147,7 +195,7 @@ public class DeliveryController {
         }
 
         List<DeliveryResponseDTO> responseDTOs = deliveries.stream()
-                .map(this::mapToDTO)
+                .map(this::convertToDto)
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(responseDTOs);
@@ -160,22 +208,30 @@ public class DeliveryController {
         List<DeliveryRequest> pendingDeliveries = deliveryService.getPendingDeliveries();
 
         List<DeliveryResponseDTO> responseDTOs = pendingDeliveries.stream()
-                .map(this::mapToDTO)
+                .map(this::convertToDto)
                 .collect(Collectors.toList());
 
         return ResponseEntity.ok(responseDTOs);
     }
 
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasRole('DELIVERY_PERSON') or hasRole('ADMIN')")
-    public ResponseEntity<DeliveryResponseDTO> updateStatus(
+    public ResponseEntity<?> updateStatus(
             @PathVariable String id,
             @RequestBody StatusUpdateRequest statusRequest) {
 
-        DeliveryRequest.DeliveryReqStatus newStatus = DeliveryRequest.DeliveryReqStatus.valueOf(statusRequest.status());
-        DeliveryRequest updatedDelivery = deliveryService.updateDeliveryStatus(id, newStatus);
+        try {
+            DeliveryRequest.DeliveryReqStatus newStatus =
+                    DeliveryRequest.DeliveryReqStatus.valueOf(statusRequest.status().toUpperCase());
 
-        return ResponseEntity.ok(mapToDTO(updatedDelivery));
+            DeliveryRequest updatedDelivery = deliveryService.updateDeliveryStatus(id, newStatus);
+            return ResponseEntity.ok(convertToDto(updatedDelivery));
+
+        } catch (IllegalArgumentException e) {
+            Map<String, String> errorResponse = new HashMap<>();
+            errorResponse.put("error", "Invalid status value");
+            errorResponse.put("validStatuses", Arrays.toString(DeliveryRequest.DeliveryReqStatus.values()));
+            return ResponseEntity.badRequest().body(errorResponse);
+        }
     }
 
     @DeleteMapping("/{id}")
@@ -185,9 +241,14 @@ public class DeliveryController {
         return ResponseEntity.noContent().build();
     }
 
-
     // Helper method to map Entity to DTO
-    private DeliveryResponseDTO mapToDTO(DeliveryRequest delivery) {
+    private DeliveryResponseDTO convertToDto(DeliveryRequest delivery) {
+        // تحويل LocalDateTime إلى Date
+        Date scheduledDate = delivery.getScheduledDate() != null ?
+                Date.from(delivery.getScheduledDate().atZone(ZoneId.systemDefault()).toInstant()) : null;
+        Date createdAt = delivery.getCreatedAt() != null ?
+                Date.from(delivery.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant()) : null;
+
         return new DeliveryResponseDTO(
                 delivery.getId(),
                 delivery.getPickupAddress(),
@@ -195,14 +256,11 @@ public class DeliveryController {
                 delivery.getPackageDescription(),
                 delivery.getPackageWeight(),
                 delivery.getVehicleId(),
-                delivery.getScheduledDate(),
+                scheduledDate, // استخدام Date المحول
                 delivery.getAdditionalInstructions(),
                 delivery.getStatus().name(),
-                delivery.getCreatedAt(),
+                createdAt, // استخدام Date المحول
                 delivery.getClientId()
         );
     }
-
-    // Inner record for status update requests
-    private record StatusUpdateRequest(String status) {}
 }
