@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 
 import java.time.ZoneId;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -114,12 +115,12 @@ public class DeliveryServiceImpl implements DeliveryServiceInterface {
     public List<DeliveryResponseDTO> getAssignedPendingDeliveries(String deliveryPersonId) {
         logger.info("Fetching assigned pending deliveries for user: {}", deliveryPersonId);
 
-        List<DeliveryRequest> deliveries = deliveryRepository.findByStatusAndDeliveryPersonId(
-                DeliveryRequest.DeliveryReqStatus.PENDING,
+        List<DeliveryRequest> deliveries = deliveryRepository.findByStatusInAndDeliveryPersonId(
+                Arrays.asList(DeliveryRequest.DeliveryReqStatus.PENDING, DeliveryRequest.DeliveryReqStatus.ASSIGNED),
                 deliveryPersonId
         );
 
-        logger.info("Found {} deliveries", deliveries.size());
+        logger.info("Found {} deliveries with statuses PENDING or ASSIGNED", deliveries.size());
         return deliveries.stream()
                 .map(this::convertToDto)
                 .collect(Collectors.toList());

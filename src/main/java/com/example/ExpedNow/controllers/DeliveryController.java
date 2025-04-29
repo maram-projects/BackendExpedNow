@@ -157,6 +157,8 @@ public class DeliveryController {
         }
     }
     @GetMapping("/assigned-pending")
+    @PreAuthorize("hasRole('DELIVERY_PERSON')")
+
     public ResponseEntity<List<DeliveryResponseDTO>> getAssignedPendingDeliveries(
             @AuthenticationPrincipal UserDetails userDetails) {
 

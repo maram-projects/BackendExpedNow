@@ -85,6 +85,8 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
 
         // Update status to ASSIGNED
         delivery.setStatus(DeliveryRequest.DeliveryReqStatus.ASSIGNED);
+        deliveryRepository.save(delivery);
+
 
         // Assign delivery person
         delivery.setDeliveryPersonId(closestPerson.getId());
