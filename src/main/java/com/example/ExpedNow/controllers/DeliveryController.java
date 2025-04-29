@@ -258,10 +258,10 @@ public class DeliveryController {
                 delivery.getPackageDescription(),
                 delivery.getPackageWeight(),
                 delivery.getVehicleId(),
-                scheduledDate, // استخدام Date المحول
+                scheduledDate,
                 delivery.getAdditionalInstructions(),
                 delivery.getStatus().name(),
-                createdAt, // استخدام Date المحول
+                createdAt,
                 delivery.getClientId()
         );
     }

@@ -127,7 +127,6 @@ public class DeliveryServiceImpl implements DeliveryServiceInterface {
     }
 
     private DeliveryResponseDTO convertToDto(DeliveryRequest delivery) {
-        // تحويل LocalDateTime إلى Date
         Date scheduledDate = delivery.getScheduledDate() != null ?
                 Date.from(delivery.getScheduledDate().atZone(ZoneId.systemDefault()).toInstant()) : null;
         Date createdAt = delivery.getCreatedAt() != null ?
@@ -140,10 +139,10 @@ public class DeliveryServiceImpl implements DeliveryServiceInterface {
                 delivery.getPackageDescription(),
                 delivery.getPackageWeight(),
                 delivery.getVehicleId(),
-                scheduledDate, // استخدام Date المحول
+                scheduledDate,
                 delivery.getAdditionalInstructions(),
                 delivery.getStatus().name(),
-                createdAt, // استخدام Date المحول
+                createdAt,
                 delivery.getClientId()
         );
     }
