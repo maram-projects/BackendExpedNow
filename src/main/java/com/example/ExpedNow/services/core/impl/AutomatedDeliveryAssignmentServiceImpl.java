@@ -30,20 +30,20 @@ public class AutomatedDeliveryAssignmentServiceImpl implements AutomatedDelivery
      * This method runs every 5 minutes
      */
     @Override
-    @Scheduled(fixedRate = 300000) // 5 دقائق بالميلي ثانية
+    @Scheduled(fixedRate = 300000) // 5 minutes in milliseconds
     public void assignPendingDeliveries() {
-        logger.info("🔄 بدء عملية تعيين التوصيل الآلي...");
+        logger.info("🔄 Starting automated delivery assignment process...");
 
-        // الحصول على طلبات التوصيل المعلقة بدون موصل معين
+        // Get pending delivery requests without assigned delivery person
         List<DeliveryRequest> pendingDeliveries = deliveryRepository.findByStatusAndDeliveryPersonIdIsNull(
                 DeliveryRequest.DeliveryReqStatus.PENDING);
 
         if (pendingDeliveries.isEmpty()) {
-            logger.info("✅ لم يتم العثور على طلبات معلقة. لا شيء للتعيين.");
+            logger.info("✅ No pending requests found. Nothing to assign.");
             return;
         }
 
-        logger.info("📦 تم العثور على {} طلبات معلقة للتعيين.", pendingDeliveries.size());
+        logger.info("📦 Found {} pending requests for assignment.", pendingDeliveries.size());
         int assignedCount = 0;
 
         for (DeliveryRequest delivery : pendingDeliveries) {
@@ -51,16 +51,17 @@ public class AutomatedDeliveryAssignmentServiceImpl implements AutomatedDelivery
                 DeliveryRequest assignedDelivery = deliveryAssignmentService.assignDelivery(delivery.getId());
                 if (assignedDelivery.getDeliveryPersonId() != null) {
                     assignedCount++;
-                    logger.info("✔️ تم تعيين طلب التوصيل بنجاح معرف: {} إلى موصل معرف: {}",
+                    logger.info("✔️ Successfully assigned delivery request ID: {} to delivery person ID: {}",
                             assignedDelivery.getId(), assignedDelivery.getDeliveryPersonId());
                 } else {
-                    logger.warn("⚠️ لا يوجد موصل متاح لطلب التوصيل معرف: {}", delivery.getId());
+                    logger.warn("⚠️ No available delivery person for delivery request ID: {}", delivery.getId());
                 }
             } catch (Exception e) {
-                logger.error("❌ فشل في تعيين طلب التوصيل معرف: {}. خطأ: {}", delivery.getId(), e.getMessage());
+                logger.error("❌ Failed to assign delivery request ID: {}. Error: {}", delivery.getId(), e.getMessage());
             }
         }
 
-        logger.info("🏁 اكتملت عملية التعيين. تم تعيين {} من أصل {} طلبات بنجاح.",
+        logger.info("🏁 Assignment process completed. Successfully assigned {} out of {} requests.",
                 assignedCount, pendingDeliveries.size());
-    }}
+    }
+}

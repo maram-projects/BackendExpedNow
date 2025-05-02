@@ -1,7 +1,7 @@
 package com.example.ExpedNow.controllers;
 
-
 import com.example.ExpedNow.dto.VehicleDTO;
+import com.example.ExpedNow.models.Vehicle;
 import com.example.ExpedNow.services.core.VehicleServiceInterface;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/vehicles")
@@ -23,8 +24,9 @@ public class VehicleController {
     }
 
     @PatchMapping("/{id}/set-unavailable")
-    public ResponseEntity setVehicleUnavailable(@PathVariable String id) {
-        return (ResponseEntity) ResponseEntity.ok();
+    public ResponseEntity<Void> setVehicleUnavailable(@PathVariable String id) {
+        vehicleService.setVehicleUnavailable(id);
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping
@@ -33,7 +35,7 @@ public class VehicleController {
     }
 
     @GetMapping("/available")
-    public ResponseEntity<List<VehicleDTO>> getAvailableVehicles() { // Changed return type to VehicleDTO
+    public ResponseEntity<List<VehicleDTO>> getAvailableVehicles() {
         List<VehicleDTO> availableVehicles = vehicleService.getAvailableVehicles();
         return ResponseEntity.ok(availableVehicles);
     }
@@ -62,5 +64,25 @@ public class VehicleController {
     public ResponseEntity<Void> deleteVehicle(@PathVariable String id) {
         vehicleService.deleteVehicle(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @PatchMapping("/{id}/assign")
+    public ResponseEntity<VehicleDTO> assignVehicleToUser(
+            @PathVariable String id,
+            @RequestBody Map<String, String> payload) {
+        String userId = payload.get("userId");
+
+        // First, get the vehicle
+        VehicleDTO vehicle = vehicleService.getVehicleById(id);
+
+        // Set the vehicle as unavailable
+        vehicleService.setVehicleUnavailable(id);
+
+        // Here you would typically call a service method to associate the vehicle with a user
+        // For example: vehicleService.assignVehicleToUser(id, userId);
+
+        // For now, return the updated vehicle
+        VehicleDTO updatedVehicle = vehicleService.getVehicleById(id);
+        return ResponseEntity.ok(updatedVehicle);
     }
 }
