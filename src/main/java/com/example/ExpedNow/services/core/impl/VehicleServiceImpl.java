@@ -17,6 +17,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.Date;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -34,16 +35,7 @@ public class VehicleServiceImpl implements VehicleServiceInterface {
         createUploadDirectory();
     }
 
-    private void createUploadDirectory() {
-        try {
-            Path path = Paths.get(uploadDir);
-            if (!Files.exists(path)) {
-                Files.createDirectories(path);
-            }
-        } catch (IOException e) {
-            throw new RuntimeException("Could not create upload directory", e);
-        }
-    }
+
 
     @Override
     public List<VehicleDTO> getAllVehicles() {
@@ -66,9 +58,13 @@ public class VehicleServiceImpl implements VehicleServiceInterface {
         if (photo != null && !photo.isEmpty()) {
             String filename = savePhoto(photo);
             vehicle.setPhotoPath(filename);
+            System.out.println("Vehicle photo saved with filename: " + filename);
         }
 
-        return convertToDTO(vehicleRepository.save(vehicle));
+        Vehicle savedVehicle = vehicleRepository.save(vehicle);
+        VehicleDTO result = convertToDTO(savedVehicle);
+        System.out.println("Returning vehicle with photo URL: " + result.getVehiclePhotoUrl());
+        return result;
     }
 
     @Override
@@ -99,12 +95,36 @@ public class VehicleServiceImpl implements VehicleServiceInterface {
         vehicleRepository.deleteById(id);
     }
 
+    // In your service class
+    private VehicleDTO convertToVehicleDTO(Vehicle vehicle) {
+        VehicleDTO dto = new VehicleDTO();
+        // Map entity fields to DTO's renamed fields
+        dto.setId(vehicle.getId());
+        dto.setVehicleBrand(vehicle.getMake());        // make -> vehicleBrand
+        dto.setVehicleModel(vehicle.getModel());       // model -> vehicleModel
+        dto.setVehicleYear(vehicle.getYear());         // year -> vehicleYear
+        dto.setVehiclePlateNumber(vehicle.getLicensePlate());  // licensePlate -> vehiclePlateNumber
+        dto.setVehicleType(vehicle.getVehicleType());
+        dto.setAvailable(vehicle.isAvailable());
+        dto.setVehiclePhotoUrl(vehicle.getPhotoPath()); // photoPath -> vehiclePhotoUrl
+        dto.setVehicleCapacityKg(vehicle.getMaxLoad()); // maxLoad -> vehicleCapacityKg
+
+        // Set defaults for non-existing fields
+        dto.setVehicleColor("N/A");
+        dto.setVehicleVolumeM3(0.0);
+        dto.setVehicleHasFridge(false);
+        return dto;
+    }
+
     private void updateVehicleFields(Vehicle vehicle, VehicleDTO dto) {
-        vehicle.setMake(dto.getMake());
-        vehicle.setModel(dto.getModel());
-        vehicle.setYear(dto.getYear());
-        vehicle.setLicensePlate(dto.getLicensePlate());
+        vehicle.setMake(dto.getVehicleBrand());        // vehicleBrand -> make
+        vehicle.setModel(dto.getVehicleModel());       // vehicleModel -> model
+        vehicle.setYear(dto.getVehicleYear());         // vehicleYear -> year
+        vehicle.setLicensePlate(dto.getVehiclePlateNumber());  // vehiclePlateNumber -> licensePlate
         vehicle.setVehicleType(dto.getVehicleType());
+        vehicle.setAvailable(dto.isAvailable());
+        vehicle.setPhotoPath(dto.getVehiclePhotoUrl()); // vehiclePhotoUrl -> photoPath
+        vehicle.setMaxLoad(dto.getVehicleCapacityKg()); // vehicleCapacityKg -> maxLoad
     }
 
     private void updateVehiclePhoto(Vehicle vehicle, MultipartFile photo) {
@@ -118,12 +138,25 @@ public class VehicleServiceImpl implements VehicleServiceInterface {
         try {
             String filename = UUID.randomUUID() + "_" + photo.getOriginalFilename();
             Path filePath = Paths.get(uploadDir).resolve(filename);
+
+            // Detailed logging
+            System.out.println("Attempting to save file to: " + filePath.toAbsolutePath());
+            System.out.println("File size: " + photo.getSize());
+            System.out.println("Content type: " + photo.getContentType());
+
             Files.copy(photo.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+            System.out.println("File saved successfully. Accessible at: /uploads/vehicle-photos/" + filename);
+            System.out.println("Full URL should be: http://localhost:8080/uploads/vehicle-photos/" + filename);
+
             return filename;
         } catch (IOException e) {
             throw new RuntimeException("Failed to store file: " + e.getMessage(), e);
         }
     }
+
+
+
 
     private void deletePhoto(String filename) {
         try {
@@ -134,19 +167,41 @@ public class VehicleServiceImpl implements VehicleServiceInterface {
         }
     }
 
+    // بدل ما يكون عندك دالتين منفصلتين
     private VehicleDTO convertToDTO(Vehicle vehicle) {
         VehicleDTO dto = new VehicleDTO();
-        BeanUtils.copyProperties(vehicle, dto);
+        // هنا ضيف كل الحقول المطلوبة
+        dto.setId(vehicle.getId());
+        dto.setVehicleType(vehicle.getVehicleType());
+        dto.setVehicleBrand(vehicle.getMake());
+        dto.setVehicleModel(vehicle.getModel());
+        dto.setVehicleYear(vehicle.getYear());
+        dto.setVehiclePlateNumber(vehicle.getLicensePlate());
+        dto.setVehicleCapacityKg(vehicle.getMaxLoad());
+        dto.setVehiclePhotoUrl(getPhotoUrl(vehicle.getPhotoPath()));
         dto.setAvailable(vehicle.isAvailable());
-        dto.setMaxLoad(vehicle.getMaxLoad()); // Add this
+
+        // الحقول الإضافية اللي ما عندها مقابل في الموديل
+        dto.setVehicleColor("N/A");
+        dto.setVehicleVolumeM3(0.0);
+        dto.setVehicleHasFridge(false);
+        dto.setVehicleInsuranceExpiry(new Date());
+        dto.setVehicleInspectionExpiry(new Date());
+
         return dto;
     }
 
     private Vehicle convertToEntity(VehicleDTO dto) {
         Vehicle vehicle = new Vehicle();
-        BeanUtils.copyProperties(dto, vehicle);
-        vehicle.setAvailable(true); // Force available to true for new vehicles
-        vehicle.setMaxLoad(dto.getMaxLoad());
+        // Reverse mapping for renamed fields
+        vehicle.setMake(dto.getVehicleBrand());
+        vehicle.setModel(dto.getVehicleModel());
+        vehicle.setYear(dto.getVehicleYear());
+        vehicle.setLicensePlate(dto.getVehiclePlateNumber());
+        vehicle.setVehicleType(dto.getVehicleType());
+        vehicle.setAvailable(dto.isAvailable());
+        vehicle.setPhotoPath(dto.getVehiclePhotoUrl());
+        vehicle.setMaxLoad(dto.getVehicleCapacityKg());
         return vehicle;
     }
     @Override
@@ -166,7 +221,26 @@ public class VehicleServiceImpl implements VehicleServiceInterface {
         vehicle.setAvailable(false);
         vehicleRepository.save(vehicle);
     }
+    private void createUploadDirectory() {
+        try {
+            Path path = Paths.get(uploadDir);
+            if (!Files.exists(path)) {
+                Files.createDirectories(path);
+            }
+            // Add logging to verify
+            System.out.println("Upload directory: " + path.toAbsolutePath());
+        } catch (IOException e) {
+            throw new RuntimeException("Could not create upload directory", e);
+        }
+    }
 
+    private String getPhotoUrl(String filename) {
+        if (filename == null || filename.isEmpty()) {
+            return null;
+        }
+        // Return just the filename, let frontend construct full URL
+        return filename;
+    }
 
 
 }

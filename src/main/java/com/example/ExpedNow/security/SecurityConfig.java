@@ -59,6 +59,10 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+                        .requestMatchers("/api/auth/by-vehicle/**").permitAll() // أو hasRole حسب احتياجاتك
+                        .requestMatchers("/api/auth/assigned-vehicle/**").permitAll()
+                        .requestMatchers("/api/users/by-vehicle/**").authenticated()
+
                         // Public endpoints
                         .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/confirm-account").permitAll()
                         .requestMatchers("/oauth2/**").permitAll()

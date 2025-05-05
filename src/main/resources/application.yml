@@ -49,12 +49,11 @@ spring:
     active: dev
 
 jwt:
-  secret: G7ZPaRwhmVa8yQ+NjJv5rjMczdbNLCCHsVt0k36bH+4=
+  secret: JyjU9VeyQ379IKLSti+DkuTzGuoSWPnwv2oJr+4d5Jo=
   expirationMs: 86400000
-
+  refreshExpirationMs: 604800000
 file:
-  upload-dir: ./uploads/vehicle-photos
-
+  upload-dir: C:\pfe4\uploads
 google:
   maps:
     api:

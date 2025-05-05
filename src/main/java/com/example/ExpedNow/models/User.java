@@ -4,8 +4,8 @@ import com.example.ExpedNow.models.enums.Role;
 import com.example.ExpedNow.models.enums.VehicleType;
 import lombok.*;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
 import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.LocalDateTime;
 import java.util.Date;
@@ -74,6 +74,13 @@ public class User {
     private int failedLoginAttempts = 0;
     private LocalDateTime lockTime;
 
+
+
+    @Transient // Marks this as NOT a persistent field
+    private Vehicle assignedVehicle;
+
+    public Vehicle getAssignedVehicle() { return assignedVehicle; }
+    public void setAssignedVehicle(Vehicle vehicle) { this.assignedVehicle = vehicle; }
     // Roles
     @Builder.Default
     private Set<Role> roles = new HashSet<>();
@@ -103,4 +110,6 @@ public class User {
     }
     public void markActive() { this.lastActive = new Date(); }
     public String getFullName() { return (firstName != null ? firstName : "") + " " + (lastName != null ? lastName : ""); }
+
+
 }

@@ -52,6 +52,9 @@ public class UserDTO {
     private String availabilitySchedule;
     private boolean hasCompanyAffiliation;
 
+    private VehicleDTO assignedVehicle;
+
+
     // Account status
     private boolean verified;
     private boolean enabled;
@@ -70,4 +73,8 @@ public class UserDTO {
 
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
+
+
+    public VehicleDTO getAssignedVehicle() { return assignedVehicle; }
+    public void setAssignedVehicle(VehicleDTO vehicle) { this.assignedVehicle = vehicle; }
 }

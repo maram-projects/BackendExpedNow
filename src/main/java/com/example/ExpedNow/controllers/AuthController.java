@@ -1,6 +1,7 @@
 package com.example.ExpedNow.controllers;
 
 import com.example.ExpedNow.dto.LoginRequest;
+import com.example.ExpedNow.dto.UserDTO;
 import com.example.ExpedNow.models.enums.Role;
 import com.example.ExpedNow.models.User;
 import com.example.ExpedNow.repositories.UserRepository;
@@ -8,10 +9,6 @@ import com.example.ExpedNow.security.CustomUserDetailsService;
 import com.example.ExpedNow.security.JwtUtil;
 import com.example.ExpedNow.services.core.impl.UserServiceImpl;
 import com.example.ExpedNow.services.core.impl.VehicleServiceImpl;
-import jakarta.validation.constraints.Email;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Size;
-import lombok.Data;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -264,5 +261,4 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
-
 }
