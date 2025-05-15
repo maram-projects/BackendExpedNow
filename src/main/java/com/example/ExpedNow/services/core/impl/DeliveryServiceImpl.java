@@ -10,6 +10,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import java.time.ZoneId;
@@ -127,10 +128,19 @@ public class DeliveryServiceImpl implements DeliveryServiceInterface {
     }
 
     private DeliveryResponseDTO convertToDto(DeliveryRequest delivery) {
+        // Convert all LocalDateTime fields to Date with proper timezone handling
         Date scheduledDate = delivery.getScheduledDate() != null ?
                 Date.from(delivery.getScheduledDate().atZone(ZoneId.systemDefault()).toInstant()) : null;
         Date createdAt = delivery.getCreatedAt() != null ?
                 Date.from(delivery.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant()) : null;
+        Date updatedAt = delivery.getUpdatedAt() != null ?
+                Date.from(delivery.getUpdatedAt().atZone(ZoneId.systemDefault()).toInstant()) : null;
+        Date assignedAt = delivery.getAssignedAt() != null ?
+                Date.from(delivery.getAssignedAt().atZone(ZoneId.systemDefault()).toInstant()) : null;
+        Date startedAt = delivery.getStartedAt() != null ?
+                Date.from(delivery.getStartedAt().atZone(ZoneId.systemDefault()).toInstant()) : null;
+        Date completedAt = delivery.getCompletedAt() != null ?
+                Date.from(delivery.getCompletedAt().atZone(ZoneId.systemDefault()).toInstant()) : null;
 
         return new DeliveryResponseDTO(
                 delivery.getId(),
@@ -143,7 +153,28 @@ public class DeliveryServiceImpl implements DeliveryServiceInterface {
                 delivery.getAdditionalInstructions(),
                 delivery.getStatus().name(),
                 createdAt,
-                delivery.getClientId()
+                delivery.getClientId(),
+                updatedAt,
+                assignedAt,
+                startedAt,
+                completedAt,
+                delivery.getPickupLatitude(),
+                delivery.getPickupLongitude(),
+                delivery.getDeliveryLatitude(),
+                delivery.getDeliveryLongitude()
         );
+    }
+    @Override
+    public List<DeliveryResponseDTO> getDeliveryHistory(String deliveryPersonId) {
+        logger.info("Fetching delivery history for user: {}", deliveryPersonId);
+
+        // Sort by updatedAt in descending order (newest first)
+        Sort sort = Sort.by(Sort.Direction.DESC, "updatedAt");
+        List<DeliveryRequest> deliveries = deliveryRepository.findDeliveryHistoryByDeliveryPerson(deliveryPersonId, sort);
+
+        logger.info("Found {} historical deliveries", deliveries.size());
+        return deliveries.stream()
+                .map(this::convertToDto)
+                .collect(Collectors.toList());
     }
 }

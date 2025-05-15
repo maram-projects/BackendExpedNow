@@ -26,4 +26,4 @@ public interface DeliveryServiceInterface {
     //List<DeliveryRequest> getAssignedPendingDeliveries(String deliveryPersonId);
 
     List<DeliveryResponseDTO> getAssignedPendingDeliveries(String deliveryPersonId);
-}
+    List<DeliveryResponseDTO> getDeliveryHistory(String deliveryPersonId);}

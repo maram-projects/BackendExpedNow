@@ -36,13 +36,15 @@ import java.util.stream.Collectors;
 @Primary
 public class UserServiceImpl implements UserServiceInterface {
     private static final Logger logger = LoggerFactory.getLogger(UserServiceImpl.class);
-
+    private String id;
     private final UserRepository userRepository;
     private final VerificationTokenRepository verificationTokenRepository;
     private final PasswordEncoder passwordEncoder;
     private final JavaMailSender mailSender;
     private final VehicleRepository vehicleRepository;
-
+    public String getId() {
+        return id;
+    }
     @Value("${app.jwt.secret:G7ZPaRwhmVa8yQ+NjJv5rjMczdbNLCCHsVt0k36bH+4=}")
     private String jwtSecret;
 

@@ -1,6 +1,7 @@
 package com.example.ExpedNow.repositories;
 
 import com.example.ExpedNow.models.DeliveryRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 
@@ -33,5 +34,7 @@ public interface DeliveryReqRepository extends MongoRepository<DeliveryRequest, 
     List<DeliveryRequest> findByVehicleId(String vehicleId);
 
     List<DeliveryRequest> findByStatusInAndDeliveryPersonId(List<DeliveryRequest.DeliveryReqStatus> statuses, String deliveryPersonId);
-}
+
+    @Query("{ 'deliveryPersonId': ?0, 'status': { $in: ['APPROVED', 'REJECTED', 'COMPLETED', 'CANCELLED'] } }")
+    List<DeliveryRequest> findDeliveryHistoryByDeliveryPerson(String deliveryPersonId, Sort sort);}
 

@@ -235,6 +235,17 @@ public class DeliveryController {
             return ResponseEntity.badRequest().body(errorResponse);
         }
     }
+    @GetMapping("/history")
+    @PreAuthorize("hasRole('DELIVERY_PERSON')")
+    public ResponseEntity<List<DeliveryResponseDTO>> getDeliveryHistory(
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        String deliveryPersonId = ((CustomUserDetailsService.CustomUserDetails) userDetails).getUserId();
+        logger.info("Fetching delivery history for user: {}", deliveryPersonId);
+
+        List<DeliveryResponseDTO> history = deliveryService.getDeliveryHistory(deliveryPersonId);
+        return ResponseEntity.ok(history);
+    }
 
     @DeleteMapping("/{id}")
     @PreAuthorize("hasRole('CLIENT') or hasRole('INDIVIDUAL') or hasRole('ENTERPRISE') or hasRole('ADMIN')")
@@ -245,11 +256,19 @@ public class DeliveryController {
 
     // Helper method to map Entity to DTO
     private DeliveryResponseDTO convertToDto(DeliveryRequest delivery) {
-        // تحويل LocalDateTime إلى Date
+        // Convert LocalDateTime to Date with proper timezone handling
         Date scheduledDate = delivery.getScheduledDate() != null ?
                 Date.from(delivery.getScheduledDate().atZone(ZoneId.systemDefault()).toInstant()) : null;
         Date createdAt = delivery.getCreatedAt() != null ?
                 Date.from(delivery.getCreatedAt().atZone(ZoneId.systemDefault()).toInstant()) : null;
+        Date updatedAt = delivery.getUpdatedAt() != null ?
+                Date.from(delivery.getUpdatedAt().atZone(ZoneId.systemDefault()).toInstant()) : null;
+        Date assignedAt = delivery.getAssignedAt() != null ?
+                Date.from(delivery.getAssignedAt().atZone(ZoneId.systemDefault()).toInstant()) : null;
+        Date startedAt = delivery.getStartedAt() != null ?
+                Date.from(delivery.getStartedAt().atZone(ZoneId.systemDefault()).toInstant()) : null;
+        Date completedAt = delivery.getCompletedAt() != null ?
+                Date.from(delivery.getCompletedAt().atZone(ZoneId.systemDefault()).toInstant()) : null;
 
         return new DeliveryResponseDTO(
                 delivery.getId(),
@@ -262,7 +281,16 @@ public class DeliveryController {
                 delivery.getAdditionalInstructions(),
                 delivery.getStatus().name(),
                 createdAt,
-                delivery.getClientId()
+                delivery.getClientId(),
+                updatedAt,
+                assignedAt,
+                startedAt,
+                completedAt,
+                delivery.getPickupLatitude(),
+                delivery.getPickupLongitude(),
+                delivery.getDeliveryLatitude(),
+                delivery.getDeliveryLongitude()
         );
     }
+
 }

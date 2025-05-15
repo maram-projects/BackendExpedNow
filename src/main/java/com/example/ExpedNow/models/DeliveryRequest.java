@@ -1,75 +1,77 @@
-package com.example.ExpedNow.models;
+    package com.example.ExpedNow.models;
 
-import com.example.ExpedNow.models.enums.PackageType;
-import lombok.Data;
-import org.springframework.data.annotation.Id;
-import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.Field;
-import org.springframework.data.mongodb.core.mapping.FieldType;
+    import com.example.ExpedNow.models.enums.PackageType;
+    import lombok.Data;
+    import org.springframework.data.annotation.Id;
+    import org.springframework.data.annotation.LastModifiedDate;
+    import org.springframework.data.mongodb.core.mapping.Document;
+    import org.springframework.data.mongodb.core.mapping.Field;
+    import org.springframework.data.mongodb.core.mapping.FieldType;
 
-import java.time.LocalDateTime;
-import java.util.Date;
+    import java.time.LocalDateTime;
+    import java.util.Date;
 
-@Data
-@Document(collection = "deliveriesRequest")
+    @Data
+    @Document(collection = "deliveriesRequest")
 
-    public class DeliveryRequest {
-    @Id
-        private String id;
+        public class DeliveryRequest {
+        @Id
+            private String id;
 
-        private String pickupAddress;
+            private String pickupAddress;
 
-        private String deliveryAddress;
+            private String deliveryAddress;
 
-        private String packageDescription;
+            private String packageDescription;
 
-        private double packageWeight;
+            private double packageWeight;
 
-        private String vehicleId;
-
-
-
-    private PackageType packageType;
-
-
-    private String additionalInstructions;
-
-        private DeliveryReqStatus status = DeliveryReqStatus.PENDING;
-
-
-        private String clientId;
-
-        private String deliveryPersonId;
+            private String vehicleId;
 
 
 
-    private LocalDateTime scheduledDate;
-    private LocalDateTime createdAt;
-    private LocalDateTime assignedAt;
-    private LocalDateTime startedAt;
-    private LocalDateTime completedAt;
+        private PackageType packageType;
+
+
+        private String additionalInstructions;
+
+            private DeliveryReqStatus status = DeliveryReqStatus.PENDING;
+
+
+            private String clientId;
+
+            private String deliveryPersonId;
 
 
 
-        private String notes;
+        private LocalDateTime scheduledDate;
+        private LocalDateTime createdAt;
+        private LocalDateTime assignedAt;
+        private LocalDateTime startedAt;
+        private LocalDateTime completedAt;
 
-        // For location tracking
-        private double pickupLatitude;
 
-        private double pickupLongitude;
 
-        private double deliveryLatitude;
+            private String notes;
 
-        private double deliveryLongitude;
+            // For location tracking
+            private double pickupLatitude;
 
-    public enum DeliveryReqStatus {
-        PENDING,         // Initial state
-        ASSIGNED,        // Delivery person assigned but not accepted
-        APPROVED,        // Delivery person accepted
-        IN_TRANSIT,
-        DELIVERED,
-        CANCELLED
+            private double pickupLongitude;
+
+            private double deliveryLatitude;
+        @LastModifiedDate
+        private LocalDateTime updatedAt;
+            private double deliveryLongitude;
+
+        public enum DeliveryReqStatus {
+            PENDING,         // Initial state
+            ASSIGNED,        // Delivery person assigned but not accepted
+            APPROVED,        // Delivery person accepted
+            IN_TRANSIT,
+            DELIVERED,
+            CANCELLED
+        }
+
+
     }
-
-
-}

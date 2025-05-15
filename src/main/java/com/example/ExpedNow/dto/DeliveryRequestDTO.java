@@ -2,7 +2,6 @@ package com.example.ExpedNow.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import jakarta.validation.constraints.*;
-
 import java.util.Date;
 
 public record DeliveryRequestDTO(
@@ -10,14 +9,14 @@ public record DeliveryRequestDTO(
         @NotBlank String deliveryAddress,
         @NotBlank String packageDescription,
         @Positive double packageWeight,
-        String vehicleId, // No validation since it's optional
+        String vehicleId, // Optional
         @FutureOrPresent
         @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'", timezone = "UTC")
         Date scheduledDate,
-        String packageType,
-        String additionalInstructions,
-        Double pickupLatitude,
-        Double pickupLongitude,
-        Double deliveryLatitude,
-        Double deliveryLongitude
-){}
+        String packageType, // Optional
+        String additionalInstructions, // Optional
+        Double pickupLatitude, // Optional
+        Double pickupLongitude, // Optional
+        Double deliveryLatitude, // Optional
+        Double deliveryLongitude // Optional
+) {}
