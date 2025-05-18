@@ -13,6 +13,7 @@ import java.util.Optional;
 public interface UserRepository extends MongoRepository<User, String> {
 
     Optional<User> findByEmail(String email);
+    Optional<User> findById(String id); // Doit retourner Optional
     boolean existsByEmail(String email);
     List<User> findByRolesInAndEnabled(List<Role> roles, boolean enabled);
     List<User> findAllByRolesContaining(Role role);

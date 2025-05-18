@@ -9,9 +9,10 @@ import io.jsonwebtoken.security.Keys;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import java.security.Key;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Component
 public class JwtUtil {
@@ -27,39 +28,41 @@ public class JwtUtil {
         this.userRepository = userRepository;
     }
 
-    // In your JwtUtils class, modify the generateToken method:
-    public String generateToken(String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found with email: " + email));
-
-        Claims claims = Jwts.claims().setSubject(email);
-
-        // Add both the original roles and mapped roles for Spring Security
-        List<String> roleNames = new ArrayList<>();
-
-        for (Role role : user.getRoles()) {
-            roleNames.add(role.name());
-
-            // For INDIVIDUAL, ENTERPRISE roles, also add CLIENT role for Spring Security
-            if (role == Role.ROLE_INDIVIDUAL || role == Role.ROLE_ENTERPRISE) {
-                roleNames.add("CLIENT");
-            }
-            // For TEMPORARY, PROFESSIONAL roles, also add DELIVERY role
-            else if (role == Role.ROLE_TEMPORARY || role == Role.ROLE_PROFESSIONAL) {
-                roleNames.add("DELIVERY");
-            }
-            // No mapping needed for ADMIN - keep as is
-        }
-
-        claims.put("roles", roleNames);
+    public String generateToken(String userId) {
+        User user = userRepository.findById(userId) // Ici findByEmail -> findById
+                .orElseThrow(() -> new RuntimeException("User not found with ID: " + userId));
 
         return Jwts.builder()
-                .setClaims(claims)
-                .setSubject(email)
+                .setSubject(userId)
+                .claim("email", user.getEmail())
+                .claim("roles", getMappedRoles(user.getRoles()))
                 .setIssuedAt(new Date())
                 .setExpiration(new Date(System.currentTimeMillis() + jwtExpirationMs))
                 .signWith(jwtSecretKey, SignatureAlgorithm.HS256)
                 .compact();
+    }
+
+    private List<String> getMappedRoles(Set<Role> roles) {
+        return roles.stream()
+                .map(role -> {
+                    // Keep ADMIN role as "ADMIN" without conversion
+                    if (role == Role.ADMIN) {
+                        return "ADMIN";
+                    }
+
+                    // Other role mappings
+                    switch (role) {
+                        case ROLE_INDIVIDUAL:
+                        case ROLE_ENTERPRISE:
+                            return "CLIENT";
+                        case ROLE_TEMPORARY:
+                        case ROLE_PROFESSIONAL:
+                            return "DELIVERY";
+                        default:
+                            return role.name();
+                    }
+                })
+                .collect(Collectors.toList());
     }
 
     public boolean validateToken(String token) {
@@ -74,12 +77,21 @@ public class JwtUtil {
         }
     }
 
-    public String getEmailFromToken(String token) {
+    public String getUserIdFromToken(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(jwtSecretKey)
                 .build()
                 .parseClaimsJws(token)
                 .getBody()
                 .getSubject();
+    }
+
+    public String getEmailFromToken(String token) {
+        return Jwts.parserBuilder()
+                .setSigningKey(jwtSecretKey)
+                .build()
+                .parseClaimsJws(token)
+                .getBody()
+                .get("email", String.class);
     }
 }

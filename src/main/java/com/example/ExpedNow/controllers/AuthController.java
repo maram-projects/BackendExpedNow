@@ -2,6 +2,7 @@ package com.example.ExpedNow.controllers;
 
 import com.example.ExpedNow.dto.LoginRequest;
 import com.example.ExpedNow.dto.UserDTO;
+import com.example.ExpedNow.exception.ResourceNotFoundException;
 import com.example.ExpedNow.models.enums.Role;
 import com.example.ExpedNow.models.User;
 import com.example.ExpedNow.repositories.UserRepository;
@@ -63,10 +64,6 @@ public class AuthController {
                 return ResponseEntity.badRequest().body(Map.of("message", "Email already exists"));
             }
 
-            if (user.getDateOfRegistration() == null) {
-                user.setDateOfRegistration(new Date());
-            }
-
             EnumSet<Role> roles = EnumSet.noneOf(Role.class);
 
             switch (userType.toLowerCase()) {
@@ -90,46 +87,26 @@ public class AuthController {
                     roles.add(Role.ADMIN);
                     break;
                 default:
-                    roles.add(Role.ROLE_CLIENT);
-                    roles.add(Role.ROLE_INDIVIDUAL);
+                    return ResponseEntity.badRequest().body(Map.of("message", "Invalid user type"));
             }
 
-            // Handle vehicle assignment if the user is a delivery person
-            String assignedVehicleId = user.getAssignedVehicleId();
-            if (assignedVehicleId != null && !assignedVehicleId.isEmpty() &&
-                    (userType.equalsIgnoreCase("professional") || userType.equalsIgnoreCase("temporary"))) {
-                // Set the vehicle as unavailable if provided
-                vehicleService.setVehicleUnavailable(assignedVehicleId);
-            }
+            User registeredUser = userService.registerUser(user, roles);
+            String token = jwtUtil.generateToken(registeredUser.getId());
 
-            try {
-                User registeredUser = userService.registerUser(user, roles);
-                String token = jwtUtil.generateToken(registeredUser.getEmail());
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Registration successful");
+            response.put("token", token);
+            response.put("userId", registeredUser.getId());
+            response.put("email", registeredUser.getEmail());
+            response.put("firstName", registeredUser.getFirstName());
+            response.put("lastName", registeredUser.getLastName());
+            response.put("userType", userType);
+            response.put("verified", registeredUser.isVerified());
 
-                Map<String, Object> response = new HashMap<>();
-                response.put("message", "Registration successful");
-                response.put("token", token);
-                response.put("email", registeredUser.getEmail());
-                response.put("firstName", registeredUser.getFirstName());
-                response.put("lastName", registeredUser.getLastName());
-                response.put("userType", userType);
-                response.put("assignedVehicleId", registeredUser.getAssignedVehicleId());
-
-                return ResponseEntity.ok(response);
-            } catch (Exception e) {
-                System.err.println("Error during user registration: " + e.getMessage());
-                if (e.getMessage().contains("JavaMailSender") ||
-                        (e.getCause() != null && e.getCause().toString().contains("Mail"))) {
-                    return ResponseEntity.ok(Map.of(
-                            "message", "Registration successful but verification email could not be sent",
-                            "email", user.getEmail()
-                    ));
-                }
-                throw e;
-            }
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.badRequest().body(Map.of("message", "Registration failed: " + e.getMessage()));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("message", "Registration failed: " + e.getMessage()));
         }
     }
 
@@ -156,14 +133,13 @@ public class AuthController {
             CustomUserDetailsService.CustomUserDetails userDetails =
                     (CustomUserDetailsService.CustomUserDetails) authentication.getPrincipal();
 
-            User user = userRepository.findById(userDetails.getUserId())
+            User user = userRepository.findByEmail(loginRequest.getEmail())
                     .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
-            // Reset failed attempts on success
             user.resetFailedAttempts();
             userRepository.save(user);
 
-            String token = jwtUtil.generateToken(user.getEmail());
+            String token = jwtUtil.generateToken(user.getId());
             String userType = determineUserType(user.getRoles());
 
             Map<String, Object> responseMap = new HashMap<>();
@@ -175,7 +151,6 @@ public class AuthController {
             responseMap.put("lastName", user.getLastName());
             responseMap.put("verified", user.isVerified());
 
-            // Include vehicle information for delivery persons
             if (user.getRoles().contains(Role.ROLE_DELIVERY_PERSON)) {
                 responseMap.put("vehicleType", user.getVehicleType());
                 responseMap.put("assignedVehicleId", user.getAssignedVehicleId());
@@ -187,18 +162,27 @@ public class AuthController {
             handleFailedLoginAttempt(loginRequest.getEmail());
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
                     .body(Map.of("error", "Invalid email or password"));
-        } catch (CustomUserDetailsService.AccountNotVerifiedException e) {
-            return ResponseEntity.status(HttpStatus.FORBIDDEN)
-                    .body(Map.of("error", e.getMessage()));
-        } catch (CustomUserDetailsService.AccountLockedException e) {
-            return ResponseEntity.status(HttpStatus.LOCKED)
-                    .body(Map.of("error", e.getMessage()));
         } catch (Exception e) {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Login failed: " + e.getMessage()));
         }
     }
 
+    @ControllerAdvice
+    public class GlobalExceptionHandler {
+
+        @ExceptionHandler(ResourceNotFoundException.class)
+        public ResponseEntity<?> handleResourceNotFound(ResourceNotFoundException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", ex.getMessage()));
+        }
+
+        @ExceptionHandler(Exception.class)
+        public ResponseEntity<?> handleGlobalException(Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "An unexpected error occurred"));
+        }
+    }
     private void handleFailedLoginAttempt(String email) {
         userRepository.findByEmail(email).ifPresent(user -> {
             user.incrementFailedAttempts();

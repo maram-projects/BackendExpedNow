@@ -70,10 +70,7 @@ public class UserServiceImpl implements UserServiceInterface {
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
     }
 
-    @Override
-    public User findById(String id) {
-        return null;
-    }
+
 
     @Override
     public Collection<GrantedAuthority> getUserAuthorities(String userId) {
@@ -212,19 +209,26 @@ public class UserServiceImpl implements UserServiceInterface {
         return userRepository.save(user);
     }
 
+    // In UserServiceImpl.java - Update getUserIdFromToken
     @Override
     public String getUserIdFromToken(String authHeader) {
-        // Extract token from Authorization header
         String token = authHeader.replace("Bearer ", "");
 
-        // Parse the token and get user id from claims
         Claims claims = Jwts.parser()
                 .setSigningKey(jwtSecret)
                 .parseClaimsJws(token)
                 .getBody();
 
-        return claims.getSubject(); // Assuming subject is the user ID
+        String userId = claims.getSubject();
+        logger.info("Extracted user ID from token: {}", userId);
+
+        if (!userRepository.existsById(userId)) {
+            throw new ResourceNotFoundException("User not found with ID from token: " + userId);
+        }
+
+        return userId;
     }
+
 
     @Override
     public String getEmailFromToken(String authHeader) {
@@ -278,18 +282,21 @@ public class UserServiceImpl implements UserServiceInterface {
     public List<User> getAllDeliveryPersons() {
         return userRepository.findAllByRolesContaining(Role.ROLE_DELIVERY_PERSON)
                 .stream()
-                .map(user -> {
-                    if (user.getAssignedVehicleId() != null && !user.getAssignedVehicleId().isEmpty()) {
-                        // استعمل الـ repository مباشرة بدل ما تستعمل الـ service
-                        Vehicle vehicle = vehicleRepository.findById(user.getAssignedVehicleId()).orElse(null);
-                        user.setAssignedVehicle(vehicle);
+                .peek(user -> {
+                    if (user.getAssignedVehicleId() != null) {
+                        vehicleRepository.findById(user.getAssignedVehicleId())
+                                .ifPresent(user::setAssignedVehicle);
                     }
-                    return user;
                 })
                 .collect(Collectors.toList());
     }
 
-
+    // In UserServiceImpl.java
+    @Override
+    public User findById(String id) {
+        return userRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + id));
+    }
 
     @Override
     public List<UserDTO> findAvailableDrivers() {
@@ -319,36 +326,47 @@ public class UserServiceImpl implements UserServiceInterface {
     public ResponseEntity<?> assignVehicleToUser(String userId, String vehicleId) {
         try {
             User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+                    .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
 
-            Vehicle vehicle = vehicleRepository.findById(vehicleId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found"));
-
-            // تحقق إذا كانت المركبة متاحة
-            if (!vehicle.isAvailable()) {
-                return ResponseEntity.badRequest().body("Vehicle is already assigned");
+            if (!user.getRoles().contains(Role.ROLE_DELIVERY_PERSON)) {
+                return ResponseEntity.badRequest()
+                        .body(Collections.singletonMap("error", "User is not a delivery person"));
             }
 
-            // تعيين المركبة للمستخدم
+            Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found with ID: " + vehicleId));
+
+            if (!vehicle.isAvailable()) {
+                return ResponseEntity.badRequest()
+                        .body(Collections.singletonMap("error", "Vehicle is already assigned"));
+            }
+
             user.setAssignedVehicleId(vehicleId);
             vehicle.setAvailable(false);
 
             userRepository.save(user);
             vehicleRepository.save(vehicle);
 
-            return ResponseEntity.ok().body("Vehicle assigned successfully");
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("Error assigning vehicle");
+            return ResponseEntity.ok()
+                    .body(Collections.singletonMap("message", "Vehicle assigned successfully"));
+        } catch (ResourceNotFoundException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Collections.singletonMap("error", ex.getMessage()));
+        } catch (Exception ex) {
+            logger.error("Error assigning vehicle: {}", ex.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Collections.singletonMap("error", "Failed to assign vehicle"));
         }
     }
 
+
+
     @Override
     public UserDTO getUserByVehicle(String vehicleId) {
-        User user = userRepository.findByAssignedVehicleId(vehicleId)
-                .orElseThrow(() -> new ResourceNotFoundException("No user assigned to this vehicle"));
-        return convertToDTO(user);
+        return userRepository.findByAssignedVehicleId(vehicleId)
+                .map(this::convertToDTO)
+                .orElseThrow(() -> new ResourceNotFoundException("No user assigned to vehicle ID: " + vehicleId));
     }
-
     @Override
     public List<UserDTO> getAvailableDrivers() {
         return userRepository.findByRolesContainingAndAssignedVehicleIdIsNull(String.valueOf(Role.ROLE_DELIVERY_PERSON))

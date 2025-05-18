@@ -7,6 +7,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.util.Map;
 
@@ -17,14 +18,12 @@ public class AvailabilityDTO {
     private String id;
     private String userId;
     private Map<DayOfWeek, DayScheduleDTO> weeklySchedule;
-
-
-    // Map each day of week to a pair of start-end times
+    // Add monthly schedule mapping date to schedule
+    private Map<LocalDate, DayScheduleDTO> monthlySchedule;
 
     @Data
     @NoArgsConstructor
     @AllArgsConstructor
-    // In AvailabilityDTO.java
     public static class DayScheduleDTO {
         @NotNull
         private boolean working;

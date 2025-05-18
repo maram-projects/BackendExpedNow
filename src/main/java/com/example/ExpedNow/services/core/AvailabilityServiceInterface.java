@@ -4,28 +4,26 @@ import com.example.ExpedNow.dto.AvailabilityDTO;
 import com.example.ExpedNow.models.AvailabilitySchedule;
 
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.List;
+import java.util.Set;
 
 public interface AvailabilityServiceInterface {
-
-    // Create or update a user's availability schedule
     AvailabilitySchedule saveSchedule(AvailabilityDTO scheduleDTO);
-
-    // Get a user's availability schedule
-    //AvailabilityDTO getScheduleForUser(String userId);
-
-    // Check if a user is available at a specific time
-    boolean isUserAvailableAt(String userId, LocalDateTime dateTime);
-
-    // Set availability for specific day
-    AvailabilitySchedule setDayAvailability(String userId, DayOfWeek day,
-                                            boolean isWorking, LocalTime startTime, LocalTime endTime);
     AvailabilityDTO getScheduleForUser(String userId);
-
-    // Find all available delivery persons at a specific time
+    boolean isUserAvailableAt(String userId, DayOfWeek day, LocalTime time);
+    boolean isUserAvailableAt(String userId, LocalDate date, LocalTime time);
+    boolean isUserAvailableAt(String userId, LocalDateTime dateTime);
+    AvailabilitySchedule setDayAvailability(String userId, DayOfWeek day, boolean isWorking, LocalTime startTime, LocalTime endTime);
+    AvailabilitySchedule setDateAvailability(String userId, LocalDate date, boolean isWorking, LocalTime startTime, LocalTime endTime);
+    AvailabilitySchedule setDateRangeAvailability(String userId, LocalDate startDate, LocalDate endDate, boolean isWorking, LocalTime startTime, LocalTime endTime);
     List<String> findAvailableDeliveryPersonsAt(LocalDateTime dateTime);
 
-    boolean isUserAvailableAt(String id, DayOfWeek dayOfWeek, LocalTime time);
+    // Add the missing methods that are implemented in AvailabilityServiceImpl but not declared in this interface
+    AvailabilitySchedule generateMonthlyScheduleFromWeeklyPattern(String userId, LocalDate startDate, LocalDate endDate);
+    AvailabilitySchedule setWeekdaysInRangeAvailability(String userId, LocalDate startDate, LocalDate endDate, Set<DayOfWeek> daysOfWeek, boolean isWorking, LocalTime startTime, LocalTime endTime);
+    AvailabilitySchedule copyMonthlyAvailability(String userId, LocalDate sourceMonthStart, LocalDate targetMonthStart);
+    AvailabilitySchedule clearAllMonthlySchedule(String userId);
 }
