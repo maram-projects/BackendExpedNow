@@ -83,7 +83,7 @@ public class AvailabilityController {
 
 
     @GetMapping("/{userId}")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.id")
+    @PreAuthorize("@securityService.canAccessAvailability(authentication, #userId)")
     public ResponseEntity<?> getSchedule(@PathVariable String userId,
                                          Authentication authentication) {
         try {

@@ -13,6 +13,7 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Arrays;
 import java.util.Date;
@@ -37,21 +38,47 @@ public class DeliveryServiceImpl implements DeliveryServiceInterface {
 
     @Override
     public DeliveryRequest createDelivery(DeliveryRequest delivery) {
+        // Set created timestamp
+        if (delivery.getCreatedAt() == null) {
+            delivery.setCreatedAt(LocalDateTime.now());
+        }
+
+        // Ensure proper status for new delivery
+        if (delivery.getStatus() == null) {
+            delivery.setStatus(DeliveryRequest.DeliveryReqStatus.PENDING);
+        }
+
         // Save the delivery first
+        logger.info("Creating new delivery request from client ID: {}", delivery.getClientId());
         DeliveryRequest savedDelivery = deliveryRepository.save(delivery);
+        logger.info("Successfully created delivery with ID: {}", savedDelivery.getId());
 
         // Only update vehicle availability if vehicleId is provided
         if (savedDelivery.getVehicleId() != null && !savedDelivery.getVehicleId().isEmpty()) {
-            vehicleService.setVehicleUnavailable(savedDelivery.getVehicleId());
+            try {
+                vehicleService.setVehicleUnavailable(savedDelivery.getVehicleId());
+                logger.info("Marked vehicle {} as unavailable", savedDelivery.getVehicleId());
+            } catch (Exception e) {
+                logger.error("Failed to update vehicle availability: {}", e.getMessage());
+                // Continue execution - this shouldn't prevent delivery assignment
+            }
         }
 
-        // Seulement tenter d'assigner si aucun livreur n'est déjà assigné
+        // Attempt immediate assignment only if no delivery person is already specified
         if (savedDelivery.getDeliveryPersonId() == null || savedDelivery.getDeliveryPersonId().isEmpty()) {
+            logger.info("Attempting immediate assignment for delivery: {}", savedDelivery.getId());
             try {
-                deliveryAssignmentService.assignDelivery(savedDelivery.getId());
-                logger.info("Delivery {} automatically assigned upon creation", savedDelivery.getId());
+                DeliveryRequest assigned = deliveryAssignmentService.assignDelivery(savedDelivery.getId());
+                if (assigned.getDeliveryPersonId() != null && !assigned.getDeliveryPersonId().isEmpty()) {
+                    logger.info("Delivery {} successfully assigned to delivery person: {}",
+                            assigned.getId(), assigned.getDeliveryPersonId());
+                    return assigned; // Return the updated delivery with assignment info
+                } else {
+                    logger.warn("Immediate assignment failed - no delivery person was assigned");
+                }
             } catch (Exception e) {
-                logger.info("Immediate assignment failed for delivery {}. Will be picked up by scheduled assignment.",
+                logger.error("Error during immediate assignment: {}", e.getMessage(), e);
+                logger.info("Delivery {} will be picked up by scheduled assignment.",
                         savedDelivery.getId());
             }
         } else {
@@ -59,9 +86,9 @@ public class DeliveryServiceImpl implements DeliveryServiceInterface {
                     savedDelivery.getId(), savedDelivery.getDeliveryPersonId());
         }
 
+        // Return the saved delivery (whether assignment worked or not)
         return savedDelivery;
     }
-
     @Override
     public List<DeliveryRequest> getAllDeliveries() {
         return deliveryRepository.findAll();

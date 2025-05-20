@@ -12,6 +12,8 @@ public class UserDTO {
     private String firstName;
     private String lastName;
     private String password;
+    private String confirmPassword;
+
     private String email;
     private String phone;
     private String address;
@@ -77,4 +79,13 @@ public class UserDTO {
 
     public VehicleDTO getAssignedVehicle() { return assignedVehicle; }
     public void setAssignedVehicle(VehicleDTO vehicle) { this.assignedVehicle = vehicle; }
+
+    // Add getter and setter
+    public String getConfirmPassword() {
+        return confirmPassword;
+    }
+
+    public void setConfirmPassword(String confirmPassword) {
+        this.confirmPassword = confirmPassword;
+    }
 }

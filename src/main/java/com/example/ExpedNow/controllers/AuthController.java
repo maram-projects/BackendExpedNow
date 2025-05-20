@@ -13,6 +13,7 @@ import com.example.ExpedNow.services.core.impl.VehicleServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
@@ -56,6 +57,11 @@ public class AuthController {
     public ResponseEntity<?> register(@RequestBody User user,
                                       @RequestParam String userType) {
         try {
+            // Validate password match
+            if (!user.getPassword().equals(user.getConfirmPassword())) {
+                return ResponseEntity.badRequest().body(Map.of("message", "Passwords do not match"));
+            }
+
             if (user.getEmail() == null || user.getPassword() == null) {
                 return ResponseEntity.badRequest().body(Map.of("message", "Email and password are required"));
             }
@@ -85,23 +91,36 @@ public class AuthController {
                     break;
                 case "admin":
                     roles.add(Role.ADMIN);
+                    // Auto-verify and auto-approve admin accounts
+                    user.setVerified(true);
+                    user.setApproved(true);
+                    user.setEnabled(true);
                     break;
+
                 default:
                     return ResponseEntity.badRequest().body(Map.of("message", "Invalid user type"));
             }
 
-            User registeredUser = userService.registerUser(user, roles);
-            String token = jwtUtil.generateToken(registeredUser.getId());
+            // Set approved status - only admins are auto-approved
+            boolean isAdmin = roles.contains(Role.ADMIN);
+            user.setApproved(isAdmin);
+            user.setEnabled(isAdmin);
 
+            User registeredUser = userService.registerUser(user, roles);
+
+            // For non-admin users, don't generate token yet
             Map<String, Object> response = new HashMap<>();
-            response.put("message", "Registration successful");
-            response.put("token", token);
-            response.put("userId", registeredUser.getId());
-            response.put("email", registeredUser.getEmail());
-            response.put("firstName", registeredUser.getFirstName());
-            response.put("lastName", registeredUser.getLastName());
-            response.put("userType", userType);
-            response.put("verified", registeredUser.isVerified());
+            response.put("message", isAdmin ? "Registration successful" : "Registration successful. Waiting for admin approval.");
+
+            if (isAdmin) {
+                String token = jwtUtil.generateToken(registeredUser.getId());
+                response.put("token", token);
+                response.put("userId", registeredUser.getId());
+                response.put("email", registeredUser.getEmail());
+                response.put("firstName", registeredUser.getFirstName());
+                response.put("lastName", registeredUser.getLastName());
+                response.put("userType", userType);
+            }
 
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -110,6 +129,63 @@ public class AuthController {
         }
     }
 
+
+    // Add these new endpoints for password reset
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
+        try {
+            String email = request.get("email");
+            if (email == null || email.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Email is required"));
+            }
+
+            userService.createPasswordResetToken(email);
+            return ResponseEntity.ok(Map.of("message", "Password reset email sent if account exists"));
+        } catch (UsernameNotFoundException e) {
+            // Don't reveal if email doesn't exist (security best practice)
+            return ResponseEntity.ok(Map.of("message", "If an account exists, a password reset email has been sent"));
+        } catch (Exception e) {
+            return ResponseEntity.internalServerError()
+                    .body(Map.of("error", "Failed to process password reset: " + e.getMessage()));
+        }
+    }
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> request) {
+        try {
+            String token = request.get("token");
+            String newPassword = request.get("newPassword");
+            String confirmPassword = request.get("confirmPassword");
+
+            if (!newPassword.equals(confirmPassword)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Passwords do not match"));
+            }
+
+            userService.resetPassword(token, newPassword);
+            return ResponseEntity.ok(Map.of("message", "Password reset successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    // Add these new endpoints for admin approval
+    @PreAuthorize("hasAuthority('ADMIN')")
+    @GetMapping("/pending-approvals")
+    public ResponseEntity<List<User>> getPendingApprovals() {
+        return ResponseEntity.ok(userService.findByApprovedFalse());
+    }
+
+
+
+    @PreAuthorize("hasAuthority('ADMIN')")
+    @PostMapping("/reject-user/{userId}")
+    public ResponseEntity<?> rejectUser(@PathVariable String userId) {
+        try {
+            userService.rejectUser(userId);
+            return ResponseEntity.ok(Map.of("message", "User rejected successfully"));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
     @GetMapping("/confirm-account")
     public ResponseEntity<?> confirmAccount(@RequestParam String token) {
         try {

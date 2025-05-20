@@ -26,14 +26,16 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: lamiahaded99@gmail.com
-    password: mayd feqb ooup krqz
+    username: lamiahaded99@gmail.com # تأكد أنه حساب Gmail صالح
+    password: zznu ywvs nvdc miso    # كلمة مرور التطبيق لا كلمة المرور الأساسية
     properties:
       mail:
         smtp:
           auth: true
           starttls:
             enable: true
+          from: lamiahaded99@gmail.com # أضف هذا السطر
+        debug: true
   servlet:
     multipart:
       max-file-size: 100MB

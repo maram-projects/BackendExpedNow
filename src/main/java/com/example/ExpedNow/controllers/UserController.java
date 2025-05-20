@@ -6,6 +6,7 @@ import com.example.ExpedNow.models.enums.Role;
 import com.example.ExpedNow.services.core.impl.UserServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -13,6 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.security.Principal;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/users")
@@ -30,6 +32,7 @@ public class UserController {
     public ResponseEntity<List<User>> getAllUsers() {
         return ResponseEntity.ok(userService.findAll());
     }
+
 
     @GetMapping("/{id}")
     public ResponseEntity<User> getUserById(@PathVariable String id) {
@@ -76,6 +79,17 @@ public class UserController {
         return userService.assignVehicle(userId, vehicleId);
     }
 
+    @PreAuthorize("hasAuthority('ADMIN')")
+    @PostMapping("/approve-user/{userId}")
+    public ResponseEntity<?> approveUser(@PathVariable String userId) {
+        try {
+            User user = userService.approveUser(userId);
+            return ResponseEntity.ok(user);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
     @PatchMapping("/{userId}/unassign-vehicle")
     public ResponseEntity<?> unassignVehicleFromUser(
             @PathVariable String userId,
@@ -86,4 +100,14 @@ public class UserController {
         String vehicleId = request.get("vehicleId");
         return userService.unassignVehicleFromUser(userId, vehicleId);
     }
+
+    @GetMapping("/delivery-personnel")
+    public ResponseEntity<List<UserDTO>> getAllDeliveryPersonnel() {
+        return ResponseEntity.ok(userService.getAllDeliveryPersons()
+                .stream()
+                .map(userService::convertToDTO)
+                .collect(Collectors.toList()));
+    }
+
+
 }

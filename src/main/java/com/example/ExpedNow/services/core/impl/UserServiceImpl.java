@@ -6,9 +6,11 @@ import com.example.ExpedNow.models.User;
 import com.example.ExpedNow.models.Vehicle;
 import com.example.ExpedNow.models.VerificationToken;
 import com.example.ExpedNow.models.enums.Role;
+import com.example.ExpedNow.repositories.PasswordResetTokenRepository;
 import com.example.ExpedNow.repositories.UserRepository;
 import com.example.ExpedNow.repositories.VehicleRepository;
 import com.example.ExpedNow.repositories.VerificationTokenRepository;
+import com.example.ExpedNow.security.CustomUserDetailsService;
 import com.example.ExpedNow.services.core.UserServiceInterface;
 import com.example.ExpedNow.exception.ResourceNotFoundException;
 import io.jsonwebtoken.Claims;
@@ -21,16 +23,21 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
+
 
 @Service
 @Primary
@@ -42,6 +49,12 @@ public class UserServiceImpl implements UserServiceInterface {
     private final PasswordEncoder passwordEncoder;
     private final JavaMailSender mailSender;
     private final VehicleRepository vehicleRepository;
+
+    private final PasswordResetTokenRepository passwordResetTokenRepository;
+
+
+    private static final int MAX_FAILED_ATTEMPTS = 5;
+    private static final int LOCK_TIME_MINUTES = 30;
     public String getId() {
         return id;
     }
@@ -56,12 +69,13 @@ public class UserServiceImpl implements UserServiceInterface {
     public UserServiceImpl(UserRepository userRepository,
                            VerificationTokenRepository verificationTokenRepository,
                            PasswordEncoder passwordEncoder,
-                           @Autowired(required = false) JavaMailSender mailSender, VehicleRepository vehicleRepository) {
+                           @Autowired(required = false) JavaMailSender mailSender, VehicleRepository vehicleRepository, PasswordResetTokenRepository passwordResetTokenRepository) {
         this.userRepository = userRepository;
         this.verificationTokenRepository = verificationTokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.mailSender = mailSender;
         this.vehicleRepository = vehicleRepository;
+        this.passwordResetTokenRepository = passwordResetTokenRepository;
     }
 
     @Override
@@ -91,38 +105,19 @@ public class UserServiceImpl implements UserServiceInterface {
 
     @Override
     public User registerUser(User user, Set<Role> roles) {
+        // Check if email already exists
         if (userRepository.existsByEmail(user.getEmail())) {
             throw new RuntimeException("Email already exists");
         }
 
+        // Set user properties
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         user.setRoles(roles);
-        user.setVerified(false); // Set user as unverified by default
-        user.setDateOfRegistration(new Date()); // Set registration date
+        user.setVerified(true); // Automatically mark as verified
+        user.setDateOfRegistration(new Date());
 
-        User registeredUser = userRepository.save(user);
-
-        try {
-            String token = UUID.randomUUID().toString();
-            VerificationToken verificationToken = new VerificationToken();
-            verificationToken.setToken(token);
-            verificationToken.setUserId(registeredUser.getId());
-            verificationToken.setExpiryDate(new Date(System.currentTimeMillis() + 24 * 60 * 60 * 1000));
-            verificationTokenRepository.save(verificationToken);
-
-            if (mailSender != null) {
-                sendVerificationEmail(registeredUser, token);
-            } else {
-                logger.warn("JavaMailSender not configured. Skipping email verification.");
-                // For development purposes, auto-verify the user
-                registeredUser.setVerified(true);
-                userRepository.save(registeredUser);
-            }
-        } catch (Exception e) {
-            logger.error("Failed to process verification: " + e.getMessage(), e);
-        }
-
-        return registeredUser;
+        // Save and return the user (no verification token creation)
+        return userRepository.save(user);
     }
 
     @Override
@@ -309,7 +304,7 @@ public class UserServiceImpl implements UserServiceInterface {
 
     @Override
     public List<User> findAll() {
-        return List.of();
+        return userRepository.findAll(); // Utilise le repository pour récupérer tous les utilisateurs
     }
 
     @Override
@@ -414,7 +409,7 @@ public class UserServiceImpl implements UserServiceInterface {
             return ResponseEntity.internalServerError().body("Error unassigning vehicle: " + e.getMessage());
         }
     }
-    private UserDTO convertToDTO(User user) {
+    public UserDTO convertToDTO(User user) {
         if (user == null) {
             return null;
         }
@@ -589,5 +584,186 @@ public class UserServiceImpl implements UserServiceInterface {
         dto.setAvailable(vehicle.isAvailable());
 
         return dto;
+    }
+
+    // In UserServiceImpl.java
+
+    // Add these new methods
+
+    @Override
+    public void createPasswordResetToken(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found"));
+
+        String token = UUID.randomUUID().toString();
+
+        user.setResetToken(token);
+        user.setResetTokenExpiry(LocalDateTime.now().plusHours(24));
+
+        userRepository.save(user);
+        sendPasswordResetEmail(user, token); // Changed from email String to User object
+    }
+
+
+    @Override
+    public boolean validatePasswordResetToken(String token) {
+        User user = userRepository.findByResetToken(token)
+                .orElseThrow(() -> new InvalidTokenException("Invalid token"));
+
+        return user.getResetTokenExpiry().isAfter(LocalDateTime.now());
+    }
+
+    @Override
+    public void resetPassword(String token, String newPassword) {
+        User user = userRepository.findByResetToken(token)
+                .orElseThrow(() -> new InvalidTokenException("Invalid token"));
+
+        if (user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
+            throw new ExpiredTokenException("Token expired");
+        }
+
+        user.setPassword(passwordEncoder.encode(newPassword));
+        user.setResetToken(null);
+        user.setResetTokenExpiry(null);
+        userRepository.save(user);
+    }
+
+    public class InvalidTokenException extends RuntimeException {
+        public InvalidTokenException(String message) {
+            super(message);
+        }
+    }
+
+    public class ExpiredTokenException extends RuntimeException {
+        public ExpiredTokenException(String message) {
+            super(message);
+        }
+    }
+
+    @Override
+    public List<User> findByApprovedFalse() {
+        return userRepository.findByApprovedFalseAndEnabledFalse();
+    }
+
+    @Override
+    public User approveUser(String userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        user.setApproved(true);
+        user.setEnabled(true);
+
+        // Send approval email if needed
+        if (mailSender != null) {
+            sendApprovalEmail(user);
+        }
+
+        return userRepository.save(user);
+    }
+
+    @Override
+    public void rejectUser(String userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        // Send rejection email if needed
+        if (mailSender != null) {
+            sendRejectionEmail(user);
+        }
+
+        userRepository.delete(user);
+    }
+
+    private void sendPasswordResetEmail(User user, String token) {
+        try {
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom("lamiahaded99@gmail.com"); // تأكد من تطابقه مع username
+            message.setTo(user.getEmail());
+            message.setSubject("Password Reset Request");
+            message.setText("To reset your password, please click here: " +
+                    "http://localhost:4200/reset-password?token=" + token);
+
+            mailSender.send(message);
+            logger.info("Password reset email sent to: {}", user.getEmail());
+        } catch (MailException e) {
+            logger.error("Failed to send password reset email", e);
+            throw new RuntimeException("Failed to send email: " + e.getMessage());
+        }
+    }
+    private void sendApprovalEmail(User user) {
+        SimpleMailMessage mailMessage = new SimpleMailMessage();
+        mailMessage.setTo(user.getEmail());
+        mailMessage.setSubject("Account Approved");
+        mailMessage.setText("Your account has been approved. You can now login at: "
+                + "http://localhost:4200/login");
+        mailSender.send(mailMessage);
+    }
+
+    private void sendRejectionEmail(User user) {
+        SimpleMailMessage mailMessage = new SimpleMailMessage();
+        mailMessage.setTo(user.getEmail());
+        mailMessage.setSubject("Account Rejected");
+        mailMessage.setText("Your account registration has been rejected. "
+                + "Please contact support if you believe this is an error.");
+        mailSender.send(mailMessage);
+    }
+
+    // Update the loadUserByUsername method in CustomUserDetailsService to check for approval
+    @Override
+    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
+
+        // Skip verification/approval checks for ADMIN users
+        if (!user.getRoles().contains(Role.ADMIN)) {
+            if (!user.isVerified()) {
+                throw new CustomUserDetailsService.AccountNotVerifiedException("Account not verified. Please check your email.");
+            }
+
+            if (!user.isApproved()) {
+                throw new AccountNotApprovedException("Account not approved by admin yet");
+            }
+        }
+
+        checkAccountStatus(user);
+
+        return new CustomUserDetailsService.CustomUserDetails(
+                user.getId(),
+                user.getEmail(),
+                user.getPassword(),
+                getAuthorities(user),
+                user.isEnabled(),
+                user.isVerified(),
+                user.getFailedLoginAttempts(),
+                user.getLockTime()
+        );
+    }
+    private Collection<? extends GrantedAuthority> getAuthorities(User user) {
+        Collection<GrantedAuthority> authorities = new ArrayList<>();
+
+        if (user.getRoles() != null) {
+            for (Role role : user.getRoles()) {
+                authorities.add(new SimpleGrantedAuthority(role.name()));
+            }
+        }
+
+        return authorities;
+    }
+    // In UserServiceImpl.java
+    private void checkAccountStatus(User user) {
+        if (!user.isVerified()) {
+            throw new CustomUserDetailsService.AccountNotVerifiedException("Account not verified");
+        }
+
+        if (user.getLockTime() != null &&
+                ChronoUnit.MINUTES.between(user.getLockTime(), LocalDateTime.now()) < LOCK_TIME_MINUTES) {
+            throw new CustomUserDetailsService.AccountLockedException("Account temporarily locked. Try again later.");
+        }
+    }
+    // Add this exception class
+    public static class AccountNotApprovedException extends RuntimeException {
+        public AccountNotApprovedException(String message) {
+            super(message);
+        }
     }
 }

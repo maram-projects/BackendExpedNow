@@ -26,4 +26,11 @@ public interface AvailabilityServiceInterface {
     AvailabilitySchedule setWeekdaysInRangeAvailability(String userId, LocalDate startDate, LocalDate endDate, Set<DayOfWeek> daysOfWeek, boolean isWorking, LocalTime startTime, LocalTime endTime);
     AvailabilitySchedule copyMonthlyAvailability(String userId, LocalDate sourceMonthStart, LocalDate targetMonthStart);
     AvailabilitySchedule clearAllMonthlySchedule(String userId);
+
+    /**
+     * Check if a user has an existing availability schedule
+     * @param userId the user ID to check
+     * @return true if the user has a meaningful schedule, false otherwise
+     */
+    boolean hasExistingSchedule(String userId);
 }

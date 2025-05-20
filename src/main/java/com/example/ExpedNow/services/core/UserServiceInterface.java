@@ -5,6 +5,8 @@ import com.example.ExpedNow.models.User;
 import com.example.ExpedNow.models.enums.Role;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 import java.util.Collection;
 import java.util.List;
@@ -56,4 +58,20 @@ public interface UserServiceInterface {
         UserDTO findByAssignedVehicle(String vehicleId);
 
         ResponseEntity<?> unassignVehicleFromUser(String userId, String vehicleId);
-    }
+
+        // Add these new methods
+        void createPasswordResetToken(String email);
+
+        boolean validatePasswordResetToken(String token);
+
+        void resetPassword(String token, String newPassword);
+
+        List<User> findByApprovedFalse();
+
+        User approveUser(String userId);
+
+        void rejectUser(String userId);
+
+        // Update the loadUserByUsername method in CustomUserDetailsService to check for approval
+        UserDetails loadUserByUsername(String email) throws UsernameNotFoundException;
+}

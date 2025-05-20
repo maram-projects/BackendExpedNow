@@ -30,10 +30,16 @@ public interface UserRepository extends MongoRepository<User, String> {
             "{ '$unwind': { path: '$assignedVehicle', preserveNullAndEmptyArrays: true }}"
     })
     User findUserWithVehicle(String userId);
-
+    @Query(value = "{email: ?0}", fields = "{email: 1}")
+    Optional<String> findEmailOnlyByEmail(String email);
 
     Optional<User> findByAssignedVehicleId(String vehicleId);
 
     List<User> findByRolesContainingAndAssignedVehicleIdIsNull(String role);
+    List<User> findByEnabled(boolean enabled);
 
+    // In UserRepository.java
+    List<User> findByApprovedFalseAndEnabledFalse();
+
+    Optional<User> findByResetToken(String token);
 }

@@ -4,6 +4,8 @@ import com.example.ExpedNow.services.auth2.OAuth2UserService;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
+import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.authentication.dao.DaoAuthenticationProvider;
@@ -23,7 +25,8 @@ import java.util.Arrays;
 import java.util.List;
 
 @Configuration
-@EnableMethodSecurity
+@EnableMethodSecurity(prePostEnabled = true)
+
 public class SecurityConfig {
     private final JwtFilter jwtFilter;
     private final UserDetailsService customUserDetailsService;
@@ -64,7 +67,10 @@ public class SecurityConfig {
                         .requestMatchers("/api/users/by-vehicle/**").authenticated()
 
                         // Public endpoints
-                        .requestMatchers("/api/auth/register", "/api/auth/login", "/api/auth/confirm-account").permitAll()
+                        .requestMatchers("/api/auth/register",
+                                "/api/auth/login",
+                                "/api/auth/forgot-password",
+                                "/api/auth/reset-password").permitAll()
                         .requestMatchers("/oauth2/**").permitAll()
                         // WebSocket endpoints
                         .requestMatchers("/ws/**").permitAll()
@@ -121,4 +127,13 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
+
+    @Bean
+    public MethodSecurityExpressionHandler methodSecurityExpressionHandler() {
+        DefaultMethodSecurityExpressionHandler expressionHandler =
+                new DefaultMethodSecurityExpressionHandler();
+        expressionHandler.setDefaultRolePrefix(""); // Remove ROLE_ prefix
+        return expressionHandler;
+    }
+
 }

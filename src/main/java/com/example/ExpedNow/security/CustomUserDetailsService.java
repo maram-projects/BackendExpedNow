@@ -81,9 +81,9 @@ public class CustomUserDetailsService implements UserDetailsService {
     }
 
     private void checkAccountStatus(User user) {
-        if (!user.isVerified()) {
-            throw new AccountNotVerifiedException("Account not verified. Please check your email.");
-        }
+       // if (!user.isVerified()) {
+          //  throw new AccountNotVerifiedException("Account not verified. Please check your email.");
+      //  }
 
         if (user.getLockTime() != null &&
                 ChronoUnit.MINUTES.between(user.getLockTime(), LocalDateTime.now()) < LOCK_TIME_MINUTES) {
@@ -155,9 +155,18 @@ public class CustomUserDetailsService implements UserDetailsService {
         public boolean isEnabled() {
             return enabled && verified;
         }
+        @Override
+        public String toString() {
+            return "CustomUserDetails{" +
+                    "userId='" + userId + '\'' +
+                    ", username='" + username + '\'' +
+                    ", authorities=" + authorities +
+                    '}';
+        }
     }
 
     // Custom exceptions
+    // Remove the checkAccountStatus method but keep these:
     public static class AccountNotVerifiedException extends RuntimeException {
         public AccountNotVerifiedException(String message) {
             super(message);

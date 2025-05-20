@@ -24,9 +24,20 @@ public class User {
     private String lastName;
     private String email;
     private String password;
+    private String resetToken;               // لحفظ رمز إعادة التعيين
+    private LocalDateTime resetTokenExpiry;
+    @Transient
+    private String confirmPassword;
+
     private String phone;
     private String address;
     private Date dateOfRegistration;
+
+    @Builder.Default
+    private boolean approved = false;
+
+    @Builder.Default
+    private boolean enabled = false;
 
     // Enterprise fields
     private String companyName;
@@ -65,22 +76,62 @@ public class User {
 
     // Account status
     @Builder.Default
-    private boolean verified = false;
-    @Builder.Default
-    private boolean enabled = true;
+    private boolean verified = true;
+
     @Builder.Default
     private boolean available = true;
+
     @Builder.Default
-    private int failedLoginAttempts = 0;
+    private int failedLoginAttempts = 0;  // Added initialization
+
     private LocalDateTime lockTime;
 
-
-
-    @Transient // Marks this as NOT a persistent field
+    @Transient
     private Vehicle assignedVehicle;
 
-    public Vehicle getAssignedVehicle() { return assignedVehicle; }
-    public void setAssignedVehicle(Vehicle vehicle) { this.assignedVehicle = vehicle; }
+    // Business methods
+    public void incrementFailedAttempts() {
+        this.failedLoginAttempts++;
+    }
+
+    public void resetFailedAttempts() {
+        this.failedLoginAttempts = 0;
+        this.lockTime = null;
+    }
+
+    public boolean isAvailable() {
+        return this.enabled && this.available;
+    }
+
+    public void addRole(Role role) {
+        this.roles.add(role);
+    }
+
+    public void removeRole(Role role) {
+        this.roles.remove(role);
+    }
+
+    public boolean hasRole(Role role) {
+        return this.roles.contains(role);
+    }
+
+    public void updateRating(double newRating) {
+        if (this.completedDeliveries == 0) {
+            this.rating = newRating;
+        } else {
+            this.rating = ((this.rating * this.completedDeliveries) + newRating) / (this.completedDeliveries + 1);
+        }
+        this.completedDeliveries++;
+    }
+
+    public void markActive() {
+        this.lastActive = new Date();
+    }
+
+    public String getFullName() {
+        return (firstName != null ? firstName : "") + " " + (lastName != null ? lastName : "");
+    }
+
     // Roles
     @Builder.Default
     private Set<Role> roles = new HashSet<>();
@@ -92,24 +143,4 @@ public class User {
     private double successScore;
     private int totalDeliveries;
     private double averageDeliveryTime;
-
-    // Methods remain the same as in your original code
-    public void incrementFailedAttempts() { this.failedLoginAttempts++; }
-    public void resetFailedAttempts() { this.failedLoginAttempts = 0; this.lockTime = null; }
-    public boolean isAvailable() { return this.enabled && this.available; }
-    public void addRole(Role role) { this.roles.add(role); }
-    public void removeRole(Role role) { this.roles.remove(role); }
-    public boolean hasRole(Role role) { return this.roles.contains(role); }
-    public void updateRating(double newRating) {
-        if (this.completedDeliveries == 0) {
-            this.rating = newRating;
-        } else {
-            this.rating = ((this.rating * this.completedDeliveries) + newRating) / (this.completedDeliveries + 1);
-        }
-        this.completedDeliveries++;
-    }
-    public void markActive() { this.lastActive = new Date(); }
-    public String getFullName() { return (firstName != null ? firstName : "") + " " + (lastName != null ? lastName : ""); }
-
-
 }
