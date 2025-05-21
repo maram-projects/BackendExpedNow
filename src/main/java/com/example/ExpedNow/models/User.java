@@ -32,7 +32,7 @@ public class User {
     private String phone;
     private String address;
     private Date dateOfRegistration;
-
+    private double balance = 0.0;
     @Builder.Default
     private boolean approved = false;
 

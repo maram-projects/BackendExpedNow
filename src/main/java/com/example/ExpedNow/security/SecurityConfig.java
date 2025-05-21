@@ -1,6 +1,8 @@
 package com.example.ExpedNow.security;
 
 import com.example.ExpedNow.services.auth2.OAuth2UserService;
+import com.nimbusds.jose.jwk.source.ImmutableSecret;
+import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -15,12 +17,18 @@ import org.springframework.security.config.annotation.web.configurers.AbstractHt
 import org.springframework.security.config.http.SessionCreationPolicy;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
+import javax.crypto.SecretKey;
+import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
 import java.util.List;
 
@@ -65,7 +73,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/auth/by-vehicle/**").permitAll() // أو hasRole حسب احتياجاتك
                         .requestMatchers("/api/auth/assigned-vehicle/**").permitAll()
                         .requestMatchers("/api/users/by-vehicle/**").authenticated()
-
+                        .requestMatchers("/api/discounts/**").hasAnyAuthority("CLIENT", "ENTERPRISE", "ADMIN")
+                        .requestMatchers("/api/discounts/**").authenticated() // Ou hasRole("CLIENT")
                         // Public endpoints
                         .requestMatchers("/api/auth/register",
                                 "/api/auth/login",
@@ -105,7 +114,22 @@ public class SecurityConfig {
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
+    @Bean
+    public JwtDecoder jwtDecoder() {
+        return NimbusJwtDecoder.withSecretKey(secretKey()).build();
+    }
 
+    @Bean
+    public JwtEncoder jwtEncoder() {
+        return new NimbusJwtEncoder(new ImmutableSecret<>(secretKey()));
+    }
+
+
+    @Bean
+    public SecretKey secretKey() {
+        // Use a fixed secret key (store it securely in production)
+        return Keys.hmacShaKeyFor("u2ZL7e0r36gggv3aEBW6anDdkWwtja+/T99c2GPcENw=".getBytes(StandardCharsets.UTF_8));
+    }
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();

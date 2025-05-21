@@ -6,6 +6,7 @@ import org.springframework.data.mongodb.repository.Aggregation;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 
+import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
 import java.util.Optional;
@@ -13,10 +14,35 @@ import java.util.Optional;
 public interface UserRepository extends MongoRepository<User, String> {
 
     Optional<User> findByEmail(String email);
-    Optional<User> findById(String id); // Doit retourner Optional
+    Optional<User> findById(String id);
     boolean existsByEmail(String email);
     List<User> findByRolesInAndEnabled(List<Role> roles, boolean enabled);
     List<User> findAllByRolesContaining(Role role);
+
+    // Add this method for the BonusService
+    @Query("{ 'roles': ?0 }")
+    List<User> findByRole(String role);
+
+    // Add this method for the DiscountService
+    @Aggregation(pipeline = {
+            "{ $match: { 'roles': 'CLIENT', 'enabled': true } }",
+            "{ $lookup: { " +
+                    "from: 'delivery_requests', " +
+                    "let: { userId: '$_id' }, " +
+                    "pipeline: [" +
+                    "{ $match: { " +
+                    "$expr: { $eq: ['$clientId', '$userId'] }, " +
+                    "requestedAt: { $gte: ?1, $lte: ?2 }, " +
+                    "status: 'DELIVERED'" +
+                    "} }" +
+                    "], " +
+                    "as: 'deliveries'" +
+                    "} }",
+            "{ $addFields: { deliveryCount: { $size: '$deliveries' } } }",
+            "{ $match: { deliveryCount: { $gte: ?0 } } }",
+            "{ $project: { deliveries: 0 } }"
+    })
+    List<User> findClientsWithMinDeliveries(int minDeliveries, LocalDateTime startDate, LocalDateTime endDate);
 
     // Fixed aggregation query with proper pipeline
     @Aggregation(pipeline = {

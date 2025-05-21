@@ -51,7 +51,7 @@ spring:
     active: dev
 
 jwt:
-  secret: JyjU9VeyQ379IKLSti+DkuTzGuoSWPnwv2oJr+4d5Jo=
+  secret: u2ZL7e0r36gggv3aEBW6anDdkWwtja+/T99c2GPcENw=
   expirationMs: 86400000
   refreshExpirationMs: 604800000
 file:
