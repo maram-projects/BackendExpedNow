@@ -392,15 +392,19 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
 
     private void validateStatusTransition(DeliveryRequest.DeliveryReqStatus currentStatus, DeliveryRequest.DeliveryReqStatus newStatus) {
         switch (currentStatus) {
+            case ASSIGNED:
+                // Allow transitioning back to PENDING on rejection
+                if (newStatus != DeliveryRequest.DeliveryReqStatus.PENDING &&
+                        newStatus != DeliveryRequest.DeliveryReqStatus.APPROVED &&
+                        newStatus != DeliveryRequest.DeliveryReqStatus.CANCELLED) {
+                    throw new IllegalStateException("Invalid status transition from ASSIGNED to " + newStatus);
+                }
+                break;
             case PENDING:
                 if (newStatus != DeliveryRequest.DeliveryReqStatus.APPROVED && newStatus != DeliveryRequest.DeliveryReqStatus.CANCELLED) {
                     throw new IllegalStateException("Invalid status transition from PENDING to " + newStatus);
                 }
-                break;
-            case ASSIGNED:
-                if (newStatus != DeliveryRequest.DeliveryReqStatus.APPROVED && newStatus != DeliveryRequest.DeliveryReqStatus.CANCELLED) {
-                    throw new IllegalStateException("Invalid status transition from ASSIGNED to " + newStatus);
-                }
+
                 break;
             case APPROVED:
                 if (newStatus != DeliveryRequest.DeliveryReqStatus.IN_TRANSIT && newStatus != DeliveryRequest.DeliveryReqStatus.CANCELLED) {

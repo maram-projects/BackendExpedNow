@@ -26,15 +26,15 @@ spring:
   mail:
     host: smtp.gmail.com
     port: 587
-    username: lamiahaded99@gmail.com # تأكد أنه حساب Gmail صالح
-    password: zznu ywvs nvdc miso    # كلمة مرور التطبيق لا كلمة المرور الأساسية
+    username: lamiahaded99@gmail.com
+    password: zznu ywvs nvdc miso
     properties:
       mail:
         smtp:
           auth: true
           starttls:
             enable: true
-          from: lamiahaded99@gmail.com # أضف هذا السطر
+        from: lamiahaded99@gmail.com
         debug: true
   servlet:
     multipart:
@@ -50,12 +50,25 @@ spring:
   profiles:
     active: dev
 
+# Pricing configuration (top-level)
+pricing:
+  base: 5.0
+  distance-rate: 0.8
+  weight-rate: 0.5
+  urgency-fee: 3.0
+  peak-surcharge: 0.2    # 20%
+  holiday-surcharge: 0.3  # 30%
+  rules:
+    rule1: distance > 10 && weight > 5
+
 jwt:
   secret: u2ZL7e0r36gggv3aEBW6anDdkWwtja+/T99c2GPcENw=
   expirationMs: 86400000
   refreshExpirationMs: 604800000
+
 file:
-  upload-dir: C:\pfe4\uploads
+  upload-dir: C:\\pfe4\\uploads  # Use escaped backslashes for Windows paths
+
 google:
   maps:
     api:
@@ -87,6 +100,7 @@ logging:
         angus:
           mail: DEBUG
 
+# Maven configuration (if needed)
 mvn:
   spring-boot:
     run:

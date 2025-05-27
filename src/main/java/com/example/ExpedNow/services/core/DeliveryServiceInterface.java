@@ -1,6 +1,5 @@
 package com.example.ExpedNow.services.core;
 
-
 import com.example.ExpedNow.dto.DeliveryResponseDTO;
 import com.example.ExpedNow.models.DeliveryRequest;
 
@@ -18,12 +17,15 @@ public interface DeliveryServiceInterface {
 
     DeliveryRequest updateDeliveryStatus(String id, DeliveryRequest.DeliveryReqStatus status);
 
-    void cancelDelivery(String id);
+    void cancelDelivery(String id); // للإدارة
+
+    void cancelDelivery(String id, String clientId); // للعملاء
 
     DeliveryRequest getDeliveryById(String id);
+
     DeliveryRequest resetDeliveryAssignment(String deliveryId, String deliveryPersonId);
 
-    //List<DeliveryRequest> getAssignedPendingDeliveries(String deliveryPersonId);
-
     List<DeliveryResponseDTO> getAssignedPendingDeliveries(String deliveryPersonId);
-    List<DeliveryResponseDTO> getDeliveryHistory(String deliveryPersonId);}
+
+    List<DeliveryResponseDTO> getDeliveryHistory(String deliveryPersonId);
+}

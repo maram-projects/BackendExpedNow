@@ -71,6 +71,7 @@ public class DiscountService {
     }
 
     // التحقق من صحة كود الخصم
+    // في DiscountServiceImpl
     public Discount validateDiscount(String code, String clientId) {
         Discount discount = discountRepository.findByCode(code)
                 .orElseThrow(() -> new RuntimeException("كود الخصم غير صالح"));

@@ -1,9 +1,14 @@
 package com.example.ExpedNow.dto;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
-import jakarta.validation.constraints.*;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+import jakarta.validation.constraints.FutureOrPresent;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Positive;
+
 import java.util.Date;
 
+// DeliveryRequestDTO.java
 public record DeliveryRequestDTO(
         @NotBlank String pickupAddress,
         @NotBlank String deliveryAddress,
@@ -18,5 +23,10 @@ public record DeliveryRequestDTO(
         Double pickupLatitude, // Optional
         Double pickupLongitude, // Optional
         Double deliveryLatitude, // Optional
-        Double deliveryLongitude // Optional
-) {}
+        Double deliveryLongitude, // Optional
+        String clientId
+) {
+        // إضافة هذا لتجاهل الحقول غير المعرفة
+        @JsonIgnoreProperties(ignoreUnknown = true)
+        public DeliveryRequestDTO {}
+}

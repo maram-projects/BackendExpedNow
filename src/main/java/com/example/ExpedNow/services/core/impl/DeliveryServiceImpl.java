@@ -3,6 +3,7 @@ package com.example.ExpedNow.services.core.impl;
 import com.example.ExpedNow.dto.DeliveryResponseDTO;
 import com.example.ExpedNow.models.DeliveryRequest;
 import com.example.ExpedNow.repositories.DeliveryReqRepository;
+import com.example.ExpedNow.services.core.DeliveryPricingService;
 import com.example.ExpedNow.services.core.DeliveryServiceInterface;
 import com.example.ExpedNow.services.core.VehicleServiceInterface;
 import com.example.ExpedNow.exception.ResourceNotFoundException;
@@ -11,6 +12,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.Sort;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
@@ -27,7 +29,8 @@ public class DeliveryServiceImpl implements DeliveryServiceInterface {
 
     private final DeliveryReqRepository deliveryRepository;
     private final VehicleServiceInterface vehicleService;
-
+    @Autowired
+    private DeliveryPricingService pricingService;
     @Autowired
     private DeliveryAssignmentServiceImpl deliveryAssignmentService;
 
@@ -38,6 +41,9 @@ public class DeliveryServiceImpl implements DeliveryServiceInterface {
 
     @Override
     public DeliveryRequest createDelivery(DeliveryRequest delivery) {
+        double calculatedPrice = pricingService.calculatePrice(delivery);
+        delivery.setAmount(calculatedPrice);
+        delivery.setFinalAmountAfterDiscount(calculatedPrice);
         // Set created timestamp
         if (delivery.getCreatedAt() == null) {
             delivery.setCreatedAt(LocalDateTime.now());
@@ -112,13 +118,68 @@ public class DeliveryServiceImpl implements DeliveryServiceInterface {
         return deliveryRepository.save(delivery);
     }
 
+    /**
+     * @param id
+     */
+
+
+
+    /**
+     * @param id
+     */
+    // في DeliveryServiceImpl
     @Override
     public void cancelDelivery(String id) {
+        // هذا الإصدار يمكن استخدامه من قبل الأدمن أو النظام بدون التحقق من العميل
         DeliveryRequest delivery = deliveryRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Delivery not found with id: " + id));
+
         delivery.setStatus(DeliveryRequest.DeliveryReqStatus.CANCELLED);
         deliveryRepository.save(delivery);
     }
+
+    @Override
+    public void cancelDelivery(String id, String clientId) {
+        DeliveryRequest delivery = deliveryRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Delivery not found with id: " + id));
+
+        if (!delivery.getClientId().equals(clientId)) {
+            throw new IllegalStateException("Not authorized to cancel this delivery");
+        }
+
+        delivery.setStatus(DeliveryRequest.DeliveryReqStatus.CANCELLED);
+        deliveryRepository.save(delivery);
+    }
+
+
+
+    // في DeliveryServiceImpl.java
+    @Scheduled(cron = "0 0 0 * * ?") // يعمل يومياً عند منتصف الليل
+    public void expireOldDeliveries() {
+        try {
+            LocalDateTime threeDaysAgo = LocalDateTime.now().minusDays(3);
+
+            // أولاً: عد الطلبات المؤهلة للانتهاء
+            long eligibleCount = deliveryRepository.countPendingDeliveriesOlderThan(threeDaysAgo);
+            logger.info("Found {} deliveries eligible for expiration", eligibleCount);
+
+            if (eligibleCount > 0) {
+                // ثانياً: تنفيذ عملية التحديث
+                deliveryRepository.expirePendingDeliveriesOlderThan(
+                        threeDaysAgo,
+                        DeliveryRequest.DeliveryReqStatus.EXPIRED
+                );
+
+                logger.info("Successfully expired {} pending deliveries older than {}", eligibleCount, threeDaysAgo);
+            } else {
+                logger.info("No deliveries found to expire");
+            }
+        } catch (Exception e) {
+            logger.error("Failed to expire old deliveries", e);
+            throw new RuntimeException("Failed to expire deliveries", e);
+        }
+    }
+
 
     @Override
     public DeliveryRequest getDeliveryById(String id) {
@@ -134,10 +195,14 @@ public class DeliveryServiceImpl implements DeliveryServiceInterface {
             throw new IllegalStateException("Not authorized to reject this delivery");
         }
 
+        // Reset assignment fields and status
         delivery.setDeliveryPersonId(null);
         delivery.setAssignedAt(null);
+        delivery.setStatus(DeliveryRequest.DeliveryReqStatus.PENDING); // Add this line
+
         return deliveryRepository.save(delivery);
     }
+
 
     @Override
     public List<DeliveryResponseDTO> getAssignedPendingDeliveries(String deliveryPersonId) {

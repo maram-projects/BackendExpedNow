@@ -79,12 +79,13 @@ public class DeliveryRequest {
     private double deliveryLongitude;
 
     public enum DeliveryReqStatus {
-        PENDING,         // Initial state
-        ASSIGNED,        // Delivery person assigned but not accepted
-        APPROVED,        // Delivery person accepted
+        PENDING,
+        ASSIGNED,
+        APPROVED,
         IN_TRANSIT,
         DELIVERED,
-        CANCELLED
+        CANCELLED,
+        EXPIRED // أضف هذا
     }
 
 

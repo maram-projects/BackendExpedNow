@@ -25,10 +25,20 @@ public class GlobalExceptionHandler {
         });
         return new ResponseEntity<>(errors, HttpStatus.BAD_REQUEST);
     }
+
+    @ExceptionHandler(InvalidRequestException.class)
+    public ResponseEntity<Map<String, String>> handleInvalidRequestException(
+            InvalidRequestException ex) {
+        Map<String, String> error = new HashMap<>();
+        error.put("message", ex.getMessage());
+        return new ResponseEntity<>(error, HttpStatus.BAD_REQUEST);
+    }
+
     @ExceptionHandler(ResourceNotFoundException.class)
     public ResponseEntity<String> handleResourceNotFound(ResourceNotFoundException ex) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(ex.getMessage());
     }
+
     @ExceptionHandler(DateTimeParseException.class)
     public ResponseEntity<Map<String, String>> handleDateTimeParseException(
             DateTimeParseException ex) {

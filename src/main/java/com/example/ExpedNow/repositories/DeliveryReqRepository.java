@@ -4,10 +4,13 @@ import com.example.ExpedNow.models.DeliveryRequest;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
+import org.springframework.data.mongodb.repository.Update;
+import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Repository
 public interface DeliveryReqRepository extends MongoRepository<DeliveryRequest, String> {
 
     List<DeliveryRequest> findByClientId(String clientId);
@@ -44,4 +47,18 @@ public interface DeliveryReqRepository extends MongoRepository<DeliveryRequest, 
 
     @Query("{ 'deliveryPersonId': ?0, 'status': { $in: ['APPROVED', 'REJECTED', 'COMPLETED', 'CANCELLED'] } }")
     List<DeliveryRequest> findDeliveryHistoryByDeliveryPerson(String deliveryPersonId, Sort sort);
+
+    List<DeliveryRequest> findByStatusAndCreatedAtBefore(
+            DeliveryRequest.DeliveryReqStatus status,
+            LocalDateTime date
+    );
+
+    // الطريقة الصحيحة لتحديث حالة الطلبات في MongoDB
+    @Query("{ 'status': 'PENDING', 'createdAt': { $lt: ?0 } }")
+    @Update("{ $set: { 'status': ?1 } }")
+    void expirePendingDeliveriesOlderThan(LocalDateTime cutoffDate, DeliveryRequest.DeliveryReqStatus newStatus);
+
+    // طريقة بديلة إذا كنت تريد معرفة عدد المستندات المحدثة
+    @Query(value = "{ 'status': 'PENDING', 'createdAt': { $lt: ?0 } }", count = true)
+    long countPendingDeliveriesOlderThan(LocalDateTime cutoffDate);
 }

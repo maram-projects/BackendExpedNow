@@ -49,9 +49,12 @@ public class DeliveryController {
         try {
             DeliveryRequest delivery = new DeliveryRequest();
             delivery.setPickupAddress(requestDTO.pickupAddress());
+            delivery.setPickupAddress(requestDTO.pickupAddress());
             delivery.setDeliveryAddress(requestDTO.deliveryAddress());
             delivery.setPackageDescription(requestDTO.packageDescription());
             delivery.setPackageWeight(requestDTO.packageWeight());
+            delivery.setClientId(requestDTO.clientId());  // Get from DTO
+
 
             // Handle package type safely
             if (requestDTO.packageType() != null && !requestDTO.packageType().isEmpty()) {
@@ -107,6 +110,33 @@ public class DeliveryController {
         }
     }
 
+    // للإدارة
+    @DeleteMapping("/admin/{id}")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> adminCancelDelivery(@PathVariable String id) {
+        deliveryService.cancelDelivery(id);
+        return ResponseEntity.noContent().build();
+    }
+
+    // للعملاء
+    @DeleteMapping("/client/{id}")
+    @PreAuthorize("hasRole('CLIENT')")
+    public ResponseEntity<Void> clientCancelDelivery(
+            @PathVariable String id,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        String clientId = ((CustomUserDetailsService.CustomUserDetails) userDetails).getUserId();
+        deliveryService.cancelDelivery(id, clientId);
+        return ResponseEntity.noContent().build();
+    }
+
+    // في DeliveryController.java
+    @PostMapping("/expire-old")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<Void> expireOldDeliveries() {
+        deliveryService.expireOldDeliveries();
+        return ResponseEntity.ok().build();
+    }
     @PostMapping("/{id}/accept")
     @PreAuthorize("hasRole('DELIVERY_PERSON')")
     @Transactional

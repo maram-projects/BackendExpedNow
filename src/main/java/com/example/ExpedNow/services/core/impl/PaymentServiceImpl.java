@@ -28,7 +28,9 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
         // التحقق من وجود طلب التوصيل
         DeliveryRequest delivery = deliveryReqRepository.findById(payment.getDeliveryId())
                 .orElseThrow(() -> new RuntimeException("Delivery request not found"));
-
+// تعيين القيم من طلب التوصيل
+        payment.setAmount(delivery.getAmount());
+        payment.setFinalAmountAfterDiscount(delivery.getFinalAmountAfterDiscount());
         // تعيين القيم الافتراضية
         payment.setPaymentDate(LocalDateTime.now());
         payment.setStatus(PaymentStatus.PENDING);
