@@ -56,15 +56,31 @@ public class VehicleServiceImpl implements VehicleServiceInterface {
         Vehicle vehicle = convertToEntity(vehicleDTO);
 
         if (photo != null && !photo.isEmpty()) {
-            String filename = savePhoto(photo);
-            vehicle.setPhotoPath(filename);
-            System.out.println("Vehicle photo saved with filename: " + filename);
+            try {
+                // Generate unique filename
+                String filename = UUID.randomUUID() + "_" + photo.getOriginalFilename();
+
+                // Save file
+                Path filePath = Paths.get(uploadDir).resolve(filename);
+                Files.copy(photo.getInputStream(), filePath, StandardCopyOption.REPLACE_EXISTING);
+
+                // Set just the filename in entity (not full path)
+                vehicle.setPhotoPath(filename);
+            } catch (IOException e) {
+                throw new RuntimeException("Failed to store file: " + e.getMessage(), e);
+            }
         }
 
         Vehicle savedVehicle = vehicleRepository.save(vehicle);
-        VehicleDTO result = convertToDTO(savedVehicle);
-        System.out.println("Returning vehicle with photo URL: " + result.getVehiclePhotoUrl());
-        return result;
+        return convertToDTO(savedVehicle);
+    }
+
+    private String getPhotoUrl(String filename) {
+        if (filename == null || filename.isEmpty()) {
+            return null;
+        }
+        // Return just the filename, not the full path
+        return filename;
     }
 
     @Override
@@ -234,13 +250,7 @@ public class VehicleServiceImpl implements VehicleServiceInterface {
         }
     }
 
-    private String getPhotoUrl(String filename) {
-        if (filename == null || filename.isEmpty()) {
-            return null;
-        }
-        // Return just the filename, let frontend construct full URL
-        return filename;
-    }
+   
 
 
 }

@@ -34,7 +34,6 @@ import java.util.List;
 
 @Configuration
 @EnableMethodSecurity(prePostEnabled = true)
-
 public class SecurityConfig {
     private final JwtFilter jwtFilter;
     private final UserDetailsService customUserDetailsService;
@@ -70,26 +69,33 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/by-vehicle/**").permitAll() // أو hasRole حسب احتياجاتك
-                        .requestMatchers("/api/auth/assigned-vehicle/**").permitAll()
+                        // Public endpoints - must come first
+                        .requestMatchers(
+                                "/uploads/**",
+                                "/uploads/vehicle-photos/**",
+                                "/api/auth/**",
+                                "/oauth2/**",
+                                "/ws/**",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
+
+                        // Specific authenticated endpoints
                         .requestMatchers("/api/users/by-vehicle/**").authenticated()
                         .requestMatchers("/api/discounts/**").hasAnyAuthority("CLIENT", "ENTERPRISE", "ADMIN")
-                        .requestMatchers("/api/discounts/**").authenticated() // Ou hasRole("CLIENT")
-                        // Public endpoints
-                        .requestMatchers("/api/auth/register",
-                                "/api/auth/login",
-                                "/api/auth/forgot-password",
-                                "/api/auth/reset-password").permitAll()
-                        .requestMatchers("/oauth2/**").permitAll()
-                        // WebSocket endpoints
-                        .requestMatchers("/ws/**").permitAll()
-                        // Swagger/OpenAPI endpoints if you have them
-                        .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
-                        // Secured endpoints
+
+                        // Role-based endpoints
                         .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
-                        .requestMatchers("/api/deliveries/**").hasAnyAuthority("CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN", "DELIVERY_PERSON")
-                        .requestMatchers("/api/deliveriesperson/**").hasAnyAuthority("PROFESSIONAL", "TEMPORARY", "ADMIN", "DELIVERY_PERSON")
+                        .requestMatchers("/api/deliveries/**").hasAnyAuthority(
+                                "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN", "DELIVERY_PERSON"
+                        )
+                        .requestMatchers("/api/deliveriesperson/**").hasAnyAuthority(
+                                "PROFESSIONAL", "TEMPORARY", "ADMIN", "DELIVERY_PERSON"
+                        )
                         .requestMatchers("/api/notifications/**").authenticated()
+
+                        // Default to authenticated
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
@@ -114,6 +120,7 @@ public class SecurityConfig {
                 .addFilterBefore(jwtFilter, UsernamePasswordAuthenticationFilter.class)
                 .build();
     }
+
     @Bean
     public JwtDecoder jwtDecoder() {
         return NimbusJwtDecoder.withSecretKey(secretKey()).build();
@@ -124,23 +131,27 @@ public class SecurityConfig {
         return new NimbusJwtEncoder(new ImmutableSecret<>(secretKey()));
     }
 
-
     @Bean
     public SecretKey secretKey() {
-        // Use a fixed secret key (store it securely in production)
         return Keys.hmacShaKeyFor("u2ZL7e0r36gggv3aEBW6anDdkWwtja+/T99c2GPcENw=".getBytes(StandardCharsets.UTF_8));
     }
+
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:4200")); // Allow Angular app
+        configuration.setAllowedOrigins(List.of("http://localhost:4200"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "Origin", "Accept", "X-Requested-With"));
-        configuration.setExposedHeaders(List.of("Authorization"));
+        configuration.setAllowedHeaders(Arrays.asList("*"));
+        configuration.setExposedHeaders(Arrays.asList(
+                "Authorization",
+                "Content-Type",
+                "Content-Length",
+                "Content-Disposition"
+        ));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 
-        // Add WebSocket-specific headers
+        // WebSocket-specific headers
         configuration.addAllowedHeader("Sec-WebSocket-Protocol");
         configuration.addAllowedHeader("Sec-WebSocket-Version");
         configuration.addAllowedHeader("Sec-WebSocket-Key");
@@ -156,8 +167,7 @@ public class SecurityConfig {
     public MethodSecurityExpressionHandler methodSecurityExpressionHandler() {
         DefaultMethodSecurityExpressionHandler expressionHandler =
                 new DefaultMethodSecurityExpressionHandler();
-        expressionHandler.setDefaultRolePrefix(""); // Remove ROLE_ prefix
+        expressionHandler.setDefaultRolePrefix("");
         return expressionHandler;
     }
-
 }
