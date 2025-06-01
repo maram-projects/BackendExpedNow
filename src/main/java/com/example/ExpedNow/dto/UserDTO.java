@@ -13,7 +13,7 @@ public class UserDTO {
     private String lastName;
     private String password;
     private String confirmPassword;
-
+    private String userType;
     private String email;
     private String phone;
     private String address;
@@ -56,11 +56,11 @@ public class UserDTO {
 
     private VehicleDTO assignedVehicle;
 
-
     // Account status
     private boolean verified;
     private boolean enabled;
     private boolean available;
+    private boolean approved; // Add this missing field
 
     // Performance metrics
     private double rating;
@@ -76,7 +76,6 @@ public class UserDTO {
     public String getPassword() { return password; }
     public void setPassword(String password) { this.password = password; }
 
-
     public VehicleDTO getAssignedVehicle() { return assignedVehicle; }
     public void setAssignedVehicle(VehicleDTO vehicle) { this.assignedVehicle = vehicle; }
 
@@ -87,5 +86,22 @@ public class UserDTO {
 
     public void setConfirmPassword(String confirmPassword) {
         this.confirmPassword = confirmPassword;
+    }
+
+    public String getUserType() {
+        return userType;
+    }
+
+    public void setUserType(String userType) {
+        this.userType = userType;
+    }
+
+    // Getter and setter for approved field
+    public boolean isApproved() {
+        return approved;
+    }
+
+    public void setApproved(boolean approved) {
+        this.approved = approved;
     }
 }

@@ -70,6 +70,8 @@ public interface UserServiceInterface {
 
         User approveUser(String userId);
 
+        User disableUser(String userId);
+
         void rejectUser(String userId);
 
         // Update the loadUserByUsername method in CustomUserDetailsService to check for approval

@@ -2,6 +2,7 @@ package com.example.ExpedNow.models;
 
 import com.example.ExpedNow.models.enums.Role;
 import com.example.ExpedNow.models.enums.VehicleType;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.*;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.annotation.Transient;
@@ -17,6 +18,8 @@ import java.util.Set;
 @AllArgsConstructor
 @Builder
 @Document(collection = "users")
+@JsonIgnoreProperties(ignoreUnknown = true)
+
 public class User {
     @Id
     private String id;
@@ -28,13 +31,15 @@ public class User {
     private LocalDateTime resetTokenExpiry;
     @Transient
     private String confirmPassword;
-
+    private LocalDateTime tokenExpiryDate;
     private String phone;
     private String address;
     private Date dateOfRegistration;
     private double balance = 0.0;
     @Builder.Default
     private boolean approved = false;
+    @Transient // This annotation means the field won't be persisted in the database
+    private String userType;
 
     @Builder.Default
     private boolean enabled = false;
@@ -143,4 +148,29 @@ public class User {
     private double successScore;
     private int totalDeliveries;
     private double averageDeliveryTime;
+
+
+    public String getResetToken() {
+        return resetToken;
+    }
+
+    public void setResetToken(String resetToken) {
+        this.resetToken = resetToken;
+    }
+
+    public LocalDateTime getTokenExpiryDate() {
+        return tokenExpiryDate;
+    }
+
+    public void setTokenExpiryDate(LocalDateTime tokenExpiryDate) {
+        this.tokenExpiryDate = tokenExpiryDate;
+    }
+
+    public String getUserType() {
+        return userType;
+    }
+
+    public void setUserType(String userType) {
+        this.userType = userType;
+    }
 }

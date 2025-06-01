@@ -205,12 +205,15 @@ public class UserServiceImpl implements UserServiceInterface {
     }
 
     // In UserServiceImpl.java - Update getUserIdFromToken
+    // Replace the deprecated JWT parsing code in getUserIdFromToken method
     @Override
     public String getUserIdFromToken(String authHeader) {
         String token = authHeader.replace("Bearer ", "");
 
-        Claims claims = Jwts.parser()
-                .setSigningKey(jwtSecret)
+        // Updated JWT parsing using the new API
+        Claims claims = Jwts.parserBuilder()
+                .setSigningKey(jwtSecret.getBytes()) // Convert string to bytes
+                .build()
                 .parseClaimsJws(token)
                 .getBody();
 
@@ -309,7 +312,7 @@ public class UserServiceImpl implements UserServiceInterface {
 
     @Override
     public User save(User user) {
-        return null;
+        return userRepository.save(user);
     }
 
     @Override
@@ -464,6 +467,8 @@ public class UserServiceImpl implements UserServiceInterface {
         dto.setVerified(user.isVerified());
         dto.setEnabled(user.isEnabled());
         dto.setAvailable(user.isAvailable());
+        dto.setApproved(user.isApproved());
+        dto.setEnabled(user.isEnabled());
 
         // Performance metrics
         dto.setRating(user.getRating());
@@ -652,12 +657,23 @@ public class UserServiceImpl implements UserServiceInterface {
 
         user.setApproved(true);
         user.setEnabled(true);
+        user.setVerified(true);
 
         // Send approval email if needed
         if (mailSender != null) {
             sendApprovalEmail(user);
         }
 
+        return userRepository.save(user);
+    }
+
+
+    @Override
+    public User disableUser(String userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found"));
+
+        user.setEnabled(false);
         return userRepository.save(user);
     }
 
@@ -671,6 +687,7 @@ public class UserServiceImpl implements UserServiceInterface {
             sendRejectionEmail(user);
         }
 
+        // Actually delete the user
         userRepository.delete(user);
     }
 

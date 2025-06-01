@@ -11,8 +11,11 @@ import com.example.ExpedNow.security.JwtUtil;
 import com.example.ExpedNow.services.core.impl.UserServiceImpl;
 import com.example.ExpedNow.services.core.impl.VehicleServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.mail.SimpleMailMessage;
+import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -20,6 +23,7 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.oauth2.core.user.OAuth2User;
 import org.springframework.web.bind.annotation.*;
 
@@ -38,19 +42,32 @@ public class AuthController {
     private final UserServiceImpl userService;
     private final UserRepository userRepository;
     private final JwtUtil jwtUtil;
+    private final PasswordEncoder passwordEncoder;
+    private final JavaMailSender mailSender;
+
+    @Value("${spring.mail.username}")
+    private String fromEmail;
+
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
 
     @Autowired
     private VehicleServiceImpl vehicleService;
 
     // Inject authentication manager directly instead of through SecurityConfig
+
     public AuthController(AuthenticationManager authenticationManager,
                           UserServiceImpl userService,
                           UserRepository userRepository,
-                          JwtUtil jwtUtil) {
+                          JwtUtil jwtUtil,
+                          PasswordEncoder passwordEncoder,
+                          JavaMailSender mailSender) {
         this.authenticationManager = authenticationManager;
         this.userService = userService;
         this.userRepository = userRepository;
         this.jwtUtil = jwtUtil;
+        this.passwordEncoder = passwordEncoder;
+        this.mailSender = mailSender;
     }
 
     @PostMapping("/register")
@@ -133,19 +150,42 @@ public class AuthController {
     // Add these new endpoints for password reset
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
+        String email = request.get("email");
+        if (email == null || email.isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Email is required"));
+        }
+
         try {
-            String email = request.get("email");
-            if (email == null || email.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Email is required"));
+            Optional<User> userOptional = userRepository.findByEmail(email);
+            if (userOptional.isEmpty()) {
+                // For security reasons, don't reveal if the email exists or not
+                return ResponseEntity.ok(Map.of("message", "If an account exists, a password reset email has been sent"));
             }
 
-            userService.createPasswordResetToken(email);
+            User user = userOptional.get();
+
+            // Generate token
+            String resetToken = UUID.randomUUID().toString();
+            user.setResetToken(resetToken);
+            user.setTokenExpiryDate(LocalDateTime.now().plusHours(1)); // Token valid for 1 hour
+            userRepository.save(user);
+
+            // Send email
+            String resetLink = frontendUrl + "/reset-password?token=" + resetToken;
+
+            SimpleMailMessage message = new SimpleMailMessage();
+            message.setFrom(fromEmail);
+            message.setTo(user.getEmail());
+            message.setSubject("Password Reset Request");
+            message.setText("To reset your password, click the link below:\n" + resetLink +
+                    "\n\nThis link will expire in 1 hour." +
+                    "\n\nIf you didn't request a password reset, please ignore this email.");
+
+            mailSender.send(message);
+
             return ResponseEntity.ok(Map.of("message", "Password reset email sent if account exists"));
-        } catch (UsernameNotFoundException e) {
-            // Don't reveal if email doesn't exist (security best practice)
-            return ResponseEntity.ok(Map.of("message", "If an account exists, a password reset email has been sent"));
         } catch (Exception e) {
-            return ResponseEntity.internalServerError()
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Failed to process password reset: " + e.getMessage()));
         }
     }
@@ -156,14 +196,40 @@ public class AuthController {
             String newPassword = request.get("newPassword");
             String confirmPassword = request.get("confirmPassword");
 
+            if (token == null || token.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Reset token is required"));
+            }
+
+            if (newPassword == null || newPassword.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "New password is required"));
+            }
+
             if (!newPassword.equals(confirmPassword)) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Passwords do not match"));
             }
 
-            userService.resetPassword(token, newPassword);
+            Optional<User> userOptional = userRepository.findByResetToken(token);
+            if (userOptional.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid or expired reset token"));
+            }
+
+            User user = userOptional.get();
+
+            // Check if token is expired
+            if (user.getTokenExpiryDate() == null || user.getTokenExpiryDate().isBefore(LocalDateTime.now())) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Reset token has expired"));
+            }
+
+            // Update password
+            user.setPassword(passwordEncoder.encode(newPassword));
+            user.setResetToken(null);
+            user.setTokenExpiryDate(null);
+            userRepository.save(user);
+
             return ResponseEntity.ok(Map.of("message", "Password reset successfully"));
         } catch (Exception e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Failed to reset password: " + e.getMessage()));
         }
     }
 
