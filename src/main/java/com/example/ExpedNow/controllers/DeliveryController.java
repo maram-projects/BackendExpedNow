@@ -322,5 +322,9 @@ public class DeliveryController {
                 delivery.getDeliveryLongitude()
         );
     }
-
+    @GetMapping("/{deliveryId}")
+    public ResponseEntity<DeliveryRequest> getDeliveryById(@PathVariable String deliveryId) {
+        DeliveryRequest delivery = deliveryService.getDeliveryById(deliveryId);
+        return ResponseEntity.ok(delivery);
+    }
 }

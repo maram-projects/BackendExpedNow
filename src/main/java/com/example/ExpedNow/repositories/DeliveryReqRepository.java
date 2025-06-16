@@ -9,6 +9,7 @@ import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface DeliveryReqRepository extends MongoRepository<DeliveryRequest, String> {
@@ -61,4 +62,7 @@ public interface DeliveryReqRepository extends MongoRepository<DeliveryRequest, 
     // طريقة بديلة إذا كنت تريد معرفة عدد المستندات المحدثة
     @Query(value = "{ 'status': 'PENDING', 'createdAt': { $lt: ?0 } }", count = true)
     long countPendingDeliveriesOlderThan(LocalDateTime cutoffDate);
+
+    Optional<DeliveryRequest> findById(String id);
+
 }

@@ -139,7 +139,17 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(List.of("http://localhost:4200"));
+
+        // Use allowedOriginPatterns instead of allowedOrigins when allowCredentials is true
+        configuration.setAllowedOriginPatterns(List.of("http://localhost:4200"));
+
+        // Or if you need multiple origins, list them explicitly:
+        // configuration.setAllowedOriginPatterns(List.of(
+        //     "http://localhost:4200",
+        //     "http://localhost:3000",
+        //     "https://yourdomain.com"
+        // ));
+
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setExposedHeaders(Arrays.asList(

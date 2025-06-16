@@ -2,6 +2,7 @@ package com.example.ExpedNow.models;
 
 import com.example.ExpedNow.models.enums.PaymentMethod;
 import com.example.ExpedNow.models.enums.PaymentStatus;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
@@ -9,6 +10,7 @@ import org.springframework.data.mongodb.core.mapping.Field;
 import org.springframework.data.mongodb.core.mapping.FieldType;
 import java.time.LocalDateTime;
 
+@JsonIgnoreProperties(ignoreUnknown = true)
 @Document(collection = "payments")
 @Data
 public class Payment {
@@ -20,6 +22,7 @@ public class Payment {
 
     private double amount;     // المبلغ
     private double finalAmountAfterDiscount; // المبلغ بعد الخصم
+    private String currency;   // العملة (TND, USD, EUR, etc.) - الإضافة الجديدة
 
     @Field(targetType = FieldType.STRING)
     private PaymentMethod method; // طريقة الدفع
@@ -43,4 +46,19 @@ public class Payment {
     // خصومات إذا وجدت
     private String discountId;   // رابط مع نموذج الخصم إذا استخدم العميل خصم
     private double discountAmount; // قيمة الخصم
+
+    // Additional fields needed by the service
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+    private String clientSecret; // For Stripe payments
+    private String discountCode; // Discount code used
+
+    // Helper method to get payment method (since your field is named 'method')
+    public PaymentMethod getPaymentMethod() {
+        return this.method;
+    }
+
+    public void setPaymentMethod(PaymentMethod paymentMethod) {
+        this.method = paymentMethod;
+    }
 }

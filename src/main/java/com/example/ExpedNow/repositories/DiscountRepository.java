@@ -26,5 +26,9 @@ public interface DiscountRepository extends MongoRepository<Discount, String> {
 
     List<Discount> findByType(DiscountType type);
 
+    // For statistics
+    long countByValidUntilAfterAndUsed(LocalDateTime date, Boolean used);
+    long countByUsed(Boolean used);
+    long countByValidUntilBeforeAndUsed(LocalDateTime date, Boolean used);
     List<Discount> findByValidUntilBeforeAndUsed(LocalDateTime date, boolean used);
 }
