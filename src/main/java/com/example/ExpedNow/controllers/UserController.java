@@ -152,12 +152,14 @@ public class UserController {
     @PatchMapping("/{userId}/assign-vehicle")
     public ResponseEntity<?> assignVehicleToUser(
             @PathVariable String userId,
-            @RequestBody Map<String, String> request) {
-        if (!request.containsKey("vehicleId")) {
+            @RequestBody Map<String, String> payload) {
+
+        if (!payload.containsKey("vehicleId")) {
             return ResponseEntity.badRequest().body("Missing vehicleId in request");
         }
-        String vehicleId = request.get("vehicleId");
-        return userService.assignVehicle(userId, vehicleId);
+
+        String vehicleId = payload.get("vehicleId");
+        return userService.assignVehicleToUser(userId, vehicleId);
     }
 
     @PreAuthorize("hasAuthority('ADMIN')")

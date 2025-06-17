@@ -104,23 +104,30 @@ public class DeliveryPricingServiceImpl implements DeliveryPricingService {
     }
 
     private void validateDeliveryRequest(DeliveryRequest request) {
+        logger.info("Validating delivery request: {}", request);
         if (request == null) {
+            logger.error("Delivery request is null");
             throw new InvalidRequestException("Delivery request cannot be null");
         }
 
-        // Validate coordinate ranges for latitude and longitude
+        logger.info("Validating coordinates - pickupLat: {}, pickupLong: {}, deliveryLat: {}, deliveryLong: {}",
+                request.getPickupLatitude(), request.getPickupLongitude(),
+                request.getDeliveryLatitude(), request.getDeliveryLongitude());
+
         if (!isValidLatitude(request.getPickupLatitude()) ||
                 !isValidLongitude(request.getPickupLongitude()) ||
                 !isValidLatitude(request.getDeliveryLatitude()) ||
                 !isValidLongitude(request.getDeliveryLongitude())) {
+            logger.error("Invalid coordinates detected");
             throw new InvalidRequestException("Invalid location coordinates");
         }
 
+        logger.info("Validating package weight: {}", request.getPackageWeight());
         if (request.getPackageWeight() <= 0) {
+            logger.error("Invalid package weight: {}", request.getPackageWeight());
             throw new InvalidRequestException("Package weight must be positive");
         }
     }
-
     private boolean isValidLatitude(double latitude) {
         return !Double.isNaN(latitude) && !Double.isInfinite(latitude) && latitude >= -90.0 && latitude <= 90.0;
     }
@@ -130,12 +137,19 @@ public class DeliveryPricingServiceImpl implements DeliveryPricingService {
     }
 
     private double calculateDistance(DeliveryRequest request) {
-        return distanceCalculator.calculateDistanceKm(
-                request.getPickupLatitude(),
-                request.getPickupLongitude(),
-                request.getDeliveryLatitude(),
-                request.getDeliveryLongitude()
-        );
+        try {
+            double distance = distanceCalculator.calculateDistanceKm(
+                    request.getPickupLatitude(),
+                    request.getPickupLongitude(),
+                    request.getDeliveryLatitude(),
+                    request.getDeliveryLongitude()
+            );
+            logger.info("Calculated distance: {} km", distance);
+            return distance;
+        } catch (Exception e) {
+            logger.error("Error calculating distance", e);
+            throw new InvalidRequestException("Failed to calculate distance between locations");
+        }
     }
 
     private double calculateBaseCost(DeliveryRequest request, double distance) {

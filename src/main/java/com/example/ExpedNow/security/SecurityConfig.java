@@ -93,6 +93,8 @@ public class SecurityConfig {
                         .requestMatchers("/api/deliveriesperson/**").hasAnyAuthority(
                                 "PROFESSIONAL", "TEMPORARY", "ADMIN", "DELIVERY_PERSON"
                         )
+                        .requestMatchers("/api/pricing/**").permitAll() // or .authenticated()
+
                         .requestMatchers("/api/notifications/**").authenticated()
 
                         // Default to authenticated

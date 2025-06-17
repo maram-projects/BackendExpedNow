@@ -2,12 +2,17 @@ package com.example.ExpedNow.controllers;
 
 import com.example.ExpedNow.dto.DeliveryRequestDTO;
 import com.example.ExpedNow.dto.PricingDetailsResponse;
+import com.example.ExpedNow.exception.InvalidRequestException;
 import com.example.ExpedNow.models.DeliveryRequest;
 import com.example.ExpedNow.models.enums.PackageType;
 import com.example.ExpedNow.services.core.DeliveryPricingService;
+import jakarta.validation.Valid;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.Instant;
@@ -19,24 +24,41 @@ import java.util.Date;
 @RequestMapping("/api/pricing")
 public class PricingController {
 
+    private static final Logger logger = LoggerFactory.getLogger(PricingController.class);
+
     @Autowired
     private DeliveryPricingService pricingService;
 
     @PostMapping("/calculate")
-    public ResponseEntity<?> calculatePrice(@RequestBody DeliveryRequestDTO deliveryRequest) {
+    public ResponseEntity<?> calculatePrice(
+            @Valid @RequestBody DeliveryRequestDTO deliveryRequest,
+            BindingResult bindingResult) {
+
+        if (bindingResult.hasErrors()) {
+            return ResponseEntity.badRequest().body("Invalid request data");
+        }
         try {
-            // Convert DTO to Entity
+            logger.info("Received pricing request: {}", deliveryRequest);
+
+            // Validate required fields
+            if (deliveryRequest.pickupLatitude() == null || deliveryRequest.deliveryLatitude() == null) {
+                throw new InvalidRequestException("Location coordinates are required");
+            }
+
+            if (deliveryRequest.packageWeight() <= 0) {
+                throw new InvalidRequestException("Package weight must be positive");
+            }
+
             DeliveryRequest request = convertToEntity(deliveryRequest);
-
-            // Get detailed pricing response
             PricingDetailsResponse details = pricingService.calculateDetailedPrice(request);
-
             return ResponseEntity.ok(details);
-        } catch (IllegalArgumentException e) {
+
+        } catch (InvalidRequestException e) {
+            logger.error("Validation error: {}", e.getMessage());
             return ResponseEntity.badRequest().body(e.getMessage());
         } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body("Error calculating price: " + e.getMessage());
+            logger.error("Server error calculating price", e);
+            return ResponseEntity.internalServerError().body("Error calculating price");
         }
     }
 

@@ -51,7 +51,8 @@ public class UserServiceImpl implements UserServiceInterface {
     private final VehicleRepository vehicleRepository;
 
     private final PasswordResetTokenRepository passwordResetTokenRepository;
-
+    @Value("${spring.mail.enabled:false}")
+    private boolean emailEnabled;
 
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final int LOCK_TIME_MINUTES = 30;
@@ -326,7 +327,13 @@ public class UserServiceImpl implements UserServiceInterface {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
 
-            if (!user.getRoles().contains(Role.ROLE_DELIVERY_PERSON)) {
+            // Check if user is a delivery person (support multiple role names)
+            boolean isDeliveryPerson = user.getRoles().stream()
+                    .anyMatch(role -> role == Role.ROLE_DELIVERY_PERSON ||
+                            role == Role.ROLE_PROFESSIONAL ||
+                            role == Role.ROLE_TEMPORARY);
+
+            if (!isDeliveryPerson) {
                 return ResponseEntity.badRequest()
                         .body(Collections.singletonMap("error", "User is not a delivery person"));
             }
@@ -339,14 +346,20 @@ public class UserServiceImpl implements UserServiceInterface {
                         .body(Collections.singletonMap("error", "Vehicle is already assigned"));
             }
 
+            // Assign vehicle to user
             user.setAssignedVehicleId(vehicleId);
+            User updatedUser = userRepository.save(user);
+
+            // Set vehicle as unavailable
             vehicle.setAvailable(false);
+            Vehicle updatedVehicle = vehicleRepository.save(vehicle);
 
-            userRepository.save(user);
-            vehicleRepository.save(vehicle);
+            // Return both user and vehicle in consistent format
+            Map<String, Object> response = new HashMap<>();
+            response.put("user", convertToDTO(updatedUser));
+            response.put("vehicle", convertVehicleToDTO(updatedVehicle));
 
-            return ResponseEntity.ok()
-                    .body(Collections.singletonMap("message", "Vehicle assigned successfully"));
+            return ResponseEntity.ok(response);
         } catch (ResourceNotFoundException ex) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
                     .body(Collections.singletonMap("error", ex.getMessage()));
@@ -356,7 +369,6 @@ public class UserServiceImpl implements UserServiceInterface {
                     .body(Collections.singletonMap("error", "Failed to assign vehicle"));
         }
     }
-
 
 
     @Override
@@ -691,21 +703,27 @@ public class UserServiceImpl implements UserServiceInterface {
         userRepository.delete(user);
     }
 
-    private void sendPasswordResetEmail(User user, String token) {
-        try {
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom("lamiahaded99@gmail.com"); // تأكد من تطابقه مع username
-            message.setTo(user.getEmail());
-            message.setSubject("Password Reset Request");
-            message.setText("To reset your password, please click here: " +
-                    "http://localhost:4200/reset-password?token=" + token);
+    public void sendPasswordResetEmail(User user, String token) {
+        String resetLink = "http://localhost:4200/reset-password?token=" + token;
 
-            mailSender.send(message);
-            logger.info("Password reset email sent to: {}", user.getEmail());
-        } catch (MailException e) {
-            logger.error("Failed to send password reset email", e);
-            throw new RuntimeException("Failed to send email: " + e.getMessage());
+        if (emailEnabled && mailSender != null) {
+            try {
+                SimpleMailMessage message = new SimpleMailMessage();
+                message.setTo(user.getEmail());
+                message.setSubject("Password Reset Request");
+                message.setText("To reset your password, please click here: " + resetLink);
+                mailSender.send(message);
+            } catch (Exception e) {
+                logger.error("Failed to send email", e);
+            }
         }
+
+        // Always log the reset link for development
+        logger.info("Password reset link for {}: {}", user.getEmail(), resetLink);
+        System.out.println("\n=== DEV MODE: Password reset link ===");
+        System.out.println("Email: " + user.getEmail());
+        System.out.println("Link: " + resetLink);
+        System.out.println("==============================\n");
     }
     private void sendApprovalEmail(User user) {
         SimpleMailMessage mailMessage = new SimpleMailMessage();
@@ -783,4 +801,8 @@ public class UserServiceImpl implements UserServiceInterface {
             super(message);
         }
     }
+
+
+
+
 }
