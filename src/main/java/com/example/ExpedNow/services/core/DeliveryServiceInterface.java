@@ -2,6 +2,7 @@ package com.example.ExpedNow.services.core;
 
 import com.example.ExpedNow.dto.DeliveryResponseDTO;
 import com.example.ExpedNow.models.DeliveryRequest;
+import com.example.ExpedNow.models.enums.PaymentStatus;
 
 import java.util.List;
 
@@ -12,6 +13,7 @@ public interface DeliveryServiceInterface {
     List<DeliveryRequest> getAllDeliveries();
 
     List<DeliveryRequest> getClientDeliveries(String clientId);
+
 
     List<DeliveryRequest> getPendingDeliveries();
 
@@ -28,4 +30,5 @@ public interface DeliveryServiceInterface {
     List<DeliveryResponseDTO> getAssignedPendingDeliveries(String deliveryPersonId);
 
     List<DeliveryResponseDTO> getDeliveryHistory(String deliveryPersonId);
+    DeliveryRequest updateDeliveryPaymentStatus(String deliveryId, String paymentId, PaymentStatus paymentStatus);
 }

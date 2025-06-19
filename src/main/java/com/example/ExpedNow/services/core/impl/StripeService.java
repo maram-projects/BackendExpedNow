@@ -2,11 +2,13 @@ package com.example.ExpedNow.services.core.impl;
 
 import com.example.ExpedNow.config.StripeConfig;
 import com.example.ExpedNow.models.Payment;
+import com.stripe.Stripe;
 import com.stripe.exception.StripeException;
 import com.stripe.model.PaymentIntent;
 import com.stripe.model.Refund;
 import com.stripe.param.PaymentIntentCreateParams;
 import com.stripe.param.RefundCreateParams;
+import jakarta.annotation.PostConstruct;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.slf4j.Logger;
@@ -20,37 +22,41 @@ public class StripeService {
     @Autowired
     private StripeConfig stripeConfig;
 
+
+
     /**
      * Create a payment intent with Stripe
      */
     public PaymentIntent createPaymentIntent(Payment payment) throws StripeException {
-        try {
-            // Convert amount to cents (Stripe uses cents)
-            long amountInCents = Math.round(payment.getFinalAmountAfterDiscount() * 100);
+        double amountToCharge = payment.getFinalAmountAfterDiscount() > 0 ?
+                payment.getFinalAmountAfterDiscount() : payment.getAmount();
 
-            PaymentIntentCreateParams params = PaymentIntentCreateParams.builder()
-                    .setAmount(amountInCents)
-                    .setCurrency(stripeConfig.getCurrency()) // Use configured currency
-                    .setAutomaticPaymentMethods(
-                            PaymentIntentCreateParams.AutomaticPaymentMethods.builder()
-                                    .setEnabled(true)
-                                    .build()
-                    )
-                    .putMetadata("payment_id", payment.getId())
-                    .putMetadata("delivery_id", payment.getDeliveryId())
-                    .putMetadata("client_id", payment.getClientId())
-                    .setDescription("Payment for delivery request: " + payment.getDeliveryId())
-                    .build();
+        long amountInCents = Math.round(amountToCharge * 100);
+        String currency = payment.getCurrency().toLowerCase(); // Use currency from payment
 
-            PaymentIntent paymentIntent = PaymentIntent.create(params);
-            logger.info("Created PaymentIntent: {} for amount: {}", paymentIntent.getId(), amountInCents);
-            return paymentIntent;
-        } catch (StripeException e) {
-            logger.error("Error creating PaymentIntent: {}", e.getMessage());
-            throw e;
+        PaymentIntentCreateParams.Builder paramsBuilder = PaymentIntentCreateParams.builder()
+                .setAmount(amountInCents)
+                .setCurrency(currency)  // Use dynamic currency
+                .setAutomaticPaymentMethods(
+                        PaymentIntentCreateParams.AutomaticPaymentMethods.builder()
+                                .setEnabled(true)
+                                .build()
+                );
+
+
+        // Add metadata to the PaymentIntent
+        if (payment.getId() != null) {
+            paramsBuilder.putMetadata("payment_id", payment.getId());
         }
-    }
+        if (payment.getClientId() != null) {
+            paramsBuilder.putMetadata("client_id", payment.getClientId());
+        }
+        if (payment.getDeliveryId() != null) {
+            paramsBuilder.putMetadata("delivery_id", payment.getDeliveryId());
+        }
 
+        return PaymentIntent.create(paramsBuilder.build());
+    }
     /**
      * Confirm a payment intent
      */

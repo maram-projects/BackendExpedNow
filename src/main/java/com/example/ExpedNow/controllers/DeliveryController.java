@@ -3,9 +3,12 @@ package com.example.ExpedNow.controllers;
 import com.example.ExpedNow.dto.DeliveryRequestDTO;
 import com.example.ExpedNow.dto.DeliveryResponseDTO;
 import com.example.ExpedNow.dto.StatusUpdateRequest;
+import com.example.ExpedNow.exception.ResourceNotFoundException;
 import com.example.ExpedNow.models.DeliveryRequest;
 import com.example.ExpedNow.models.Mission;
 import com.example.ExpedNow.models.enums.PackageType;
+import com.example.ExpedNow.models.enums.PaymentMethod;
+import com.example.ExpedNow.models.enums.PaymentStatus;
 import com.example.ExpedNow.security.CustomUserDetailsService;
 import com.example.ExpedNow.services.core.MissionServiceInterface;
 import com.example.ExpedNow.services.core.impl.DeliveryServiceImpl;
@@ -40,6 +43,66 @@ public class DeliveryController {
         this.missionService = missionService;
     }
 
+    @PatchMapping("/{deliveryId}/payment-status")
+    public ResponseEntity<Map<String, Object>> updateDeliveryPaymentStatus(
+            @PathVariable String deliveryId,
+            @RequestBody Map<String, String> paymentUpdate) {
+
+        try {
+            // Validate input
+            if (!paymentUpdate.containsKey("paymentId") || !paymentUpdate.containsKey("paymentStatus")) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("success", false);
+                errorResponse.put("message", "Missing required fields: paymentId or paymentStatus");
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+
+            // Parse payment status
+            PaymentStatus paymentStatus;
+            try {
+                paymentStatus = PaymentStatus.valueOf(paymentUpdate.get("paymentStatus"));
+            } catch (IllegalArgumentException e) {
+                Map<String, Object> errorResponse = new HashMap<>();
+                errorResponse.put("success", false);
+                errorResponse.put("message", "Invalid payment status: " + paymentUpdate.get("paymentStatus"));
+                return ResponseEntity.badRequest().body(errorResponse);
+            }
+
+            DeliveryRequest delivery = deliveryService.updateDeliveryPaymentStatus(
+                    deliveryId,
+                    paymentUpdate.get("paymentId"),
+                    paymentStatus
+            );
+
+            // Also update payment method if provided
+            if (paymentUpdate.containsKey("paymentMethod")) {
+                try {
+                    PaymentMethod paymentMethod = PaymentMethod.valueOf(paymentUpdate.get("paymentMethod"));
+                    delivery.setPreferredPaymentMethod(paymentMethod);
+                } catch (IllegalArgumentException e) {
+                    // Log but don't fail the request
+                    logger.warn("Invalid payment method provided: " + paymentUpdate.get("paymentMethod"));
+                }
+            }
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("data", delivery);
+            return ResponseEntity.ok(response);
+
+        } catch (ResourceNotFoundException e) {
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+        } catch (Exception e) {
+            logger.error("Error updating delivery payment status", e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", "Internal server error");
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
     @PostMapping("/request")
     @PreAuthorize("hasRole('CLIENT') or hasRole('INDIVIDUAL') or hasRole('ENTERPRISE')")
     public ResponseEntity<?> createDeliveryRequest(

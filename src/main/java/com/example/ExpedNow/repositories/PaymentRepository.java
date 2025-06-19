@@ -24,7 +24,6 @@ public interface PaymentRepository extends MongoRepository<Payment, String> {
     List<Payment> findByMethod(PaymentMethod method); // Note: field name is 'method' in your model
 
     // Transaction ID methods for Stripe integration
-    Optional<Payment> findByTransactionId(String transactionId);
 
     // Combined finder methods
     Optional<Payment> findByIdAndStatus(String id, PaymentStatus status);
@@ -89,4 +88,11 @@ public interface PaymentRepository extends MongoRepository<Payment, String> {
             "] }")
     Page<Payment> findWithFilters(PaymentStatus status, PaymentMethod method,
                                   String clientId, String deliveryId, Pageable pageable);
+
+    @Query("{ 'metadata.transactionId': ?0 }")
+    Optional<Payment> findByMetadataTransactionId(String transactionId);
+
+    Optional<Payment> findByTransactionId(String transactionId);
+    @Query("{ 'transactionId': ?0 }")
+    Optional<Payment> findByStripePaymentIntentId(String paymentIntentId);
 }

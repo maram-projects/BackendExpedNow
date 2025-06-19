@@ -53,11 +53,11 @@ spring:
     active: dev
 
 stripe:
-  api-key: ${STRIPE_SECRET_KEY:}
+  api-key: ${STRIPE_SECRET_KEY:}  # Fallback to .env if not set here
   publishable-key: ${STRIPE_PUBLISHABLE_KEY:}
   webhook:
     secret: ${STRIPE_WEBHOOK_SECRET:}
-  currency: tnd
+  currency: usd
 
 app:
   frontend:

@@ -17,6 +17,8 @@ public interface PaymentServiceInterface {
     String getPaymentClientSecret(String paymentId);
     Payment refundPayment(String paymentId, Double amount);
     Payment confirmPayment(String transactionId, double amount);
+
+
     Payment failPayment(String transactionId);
     Payment updatePaymentStatus(String paymentId, String status);
     Payment cancelPayment(String paymentId);
@@ -53,4 +55,7 @@ public interface PaymentServiceInterface {
      * Get payment statistics
      */
     Map<String, Object> getPaymentStats();
+
+    Payment confirmPaymentByIntent(String paymentIntentId, double amount);
+
 }

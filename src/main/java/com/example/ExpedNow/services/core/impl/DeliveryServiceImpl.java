@@ -2,6 +2,7 @@
 
     import com.example.ExpedNow.dto.DeliveryResponseDTO;
     import com.example.ExpedNow.models.DeliveryRequest;
+    import com.example.ExpedNow.models.enums.PaymentStatus;
     import com.example.ExpedNow.repositories.DeliveryReqRepository;
     import com.example.ExpedNow.services.core.DeliveryPricingService;
     import com.example.ExpedNow.services.core.DeliveryServiceInterface;
@@ -105,6 +106,18 @@
             return deliveryRepository.findByClientId(clientId);
         }
 
+        @Override
+        public DeliveryRequest updateDeliveryPaymentStatus(String deliveryId, String paymentId, PaymentStatus paymentStatus) {
+            DeliveryRequest delivery = deliveryRepository.findById(deliveryId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Delivery not found with id: " + deliveryId));
+
+            // Update the payment-related fields in the delivery
+            delivery.setPaymentId(paymentId);
+            delivery.setPaymentStatus(paymentStatus);
+            delivery.setUpdatedAt(LocalDateTime.now());
+
+            return deliveryRepository.save(delivery);
+        }
         @Override
         public List<DeliveryRequest> getPendingDeliveries() {
             return deliveryRepository.findByStatus(DeliveryRequest.DeliveryReqStatus.PENDING);

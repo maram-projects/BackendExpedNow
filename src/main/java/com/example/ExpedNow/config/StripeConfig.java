@@ -1,5 +1,8 @@
 package com.example.ExpedNow.config;
 
+import com.stripe.Stripe;
+import io.github.cdimascio.dotenv.Dotenv;
+import jakarta.annotation.PostConstruct;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 import org.springframework.context.annotation.Configuration;
 
@@ -9,8 +12,20 @@ public class StripeConfig {
 
     private String apiKey;
     private String publishableKey;
-    private String currency = "tnd"; // Default to Tunisian Dinar
+    private String currency = "usd"; // Default to Tunisian Dinar
     private Webhook webhook = new Webhook();
+    @PostConstruct
+    public void init() {
+        // Load from .env (if not set in application.yml)
+        if (this.apiKey == null) {
+            Dotenv dotenv = Dotenv.configure().ignoreIfMissing().load();
+            this.apiKey = dotenv.get("STRIPE_SECRET_KEY");
+        }
+
+        // Initialize Stripe
+        Stripe.apiKey = this.apiKey;
+        System.out.println("Stripe initialized with key: " + (this.apiKey != null));
+    }
 
     // Getters and Setters
     public String getApiKey() {

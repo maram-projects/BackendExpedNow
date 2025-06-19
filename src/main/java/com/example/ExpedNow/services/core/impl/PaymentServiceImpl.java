@@ -20,7 +20,6 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -46,51 +45,29 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
     @Override
     public Payment createPayment(Payment payment) {
         try {
-            logger.info("Creating payment with data: {}", payment);
-
             // Set initial values
             payment.setCreatedAt(LocalDateTime.now());
             payment.setStatus(PaymentStatus.PENDING);
 
-            logger.info("Validating payment method: {}", payment.getPaymentMethod());
-
-            // Validate payment method
-            if (!isPaymentMethodSupported(payment.getPaymentMethod())) {
-                throw new IllegalArgumentException("Payment method not supported: " + payment.getPaymentMethod());
-            }
-
-            logger.info("Applying discount if needed...");
-            // Apply discount if discount code is provided
-            if (payment.getDiscountCode() != null && !payment.getDiscountCode().isEmpty()) {
-                payment = applyDiscount(payment, payment.getDiscountCode());
-            } else {
-                // Set final amount to original amount if no discount
-                payment.setFinalAmountAfterDiscount(payment.getAmount());
-            }
-
-            logger.info("Saving payment to database...");
-            // Save payment to database
+            // Save payment first to get ID
             Payment savedPayment = paymentRepository.save(payment);
-            logger.info("Created payment with ID: {} for delivery: {}", savedPayment.getId(), savedPayment.getDeliveryId());
 
-            // Create Stripe PaymentIntent only for card payments
+            // Create Stripe PaymentIntent for card payments
             if (payment.getPaymentMethod() == PaymentMethod.CREDIT_CARD) {
                 try {
-                    logger.info("Creating Stripe PaymentIntent...");
                     PaymentIntent paymentIntent = stripeService.createPaymentIntent(savedPayment);
                     savedPayment.setTransactionId(paymentIntent.getId());
                     savedPayment.setClientSecret(paymentIntent.getClientSecret());
                     savedPayment = paymentRepository.save(savedPayment);
-                    logger.info("Stripe PaymentIntent created successfully: {}", paymentIntent.getId());
                 } catch (StripeException e) {
-                    logger.error("Error creating Stripe PaymentIntent for payment {}: {}", savedPayment.getId(), e.getMessage());
-                    throw new RuntimeException("Failed to create payment intent: " + e.getMessage());
+                    logger.error("Error creating Stripe PaymentIntent", e);
+                    // Don't fail - we can try again later
                 }
             }
 
             return savedPayment;
         } catch (Exception e) {
-            logger.error("Error creating payment: {}", e.getMessage(), e); // Add stack trace
+            logger.error("Error creating payment", e);
             throw new RuntimeException("Failed to create payment: " + e.getMessage());
         }
     }
@@ -193,36 +170,90 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
     @Override
     public Payment confirmPayment(String transactionId, double amount) {
         try {
-            // Find payment by transaction ID
+            // First try to find by transactionId
             Optional<Payment> paymentOpt = paymentRepository.findByTransactionId(transactionId);
-            if (paymentOpt.isPresent()) {
-                Payment payment = paymentOpt.get();
-                payment.setStatus(PaymentStatus.COMPLETED);
-                payment.setUpdatedAt(LocalDateTime.now());
 
-                // If discount was applied, mark it as used
-                if (payment.getDiscountCode() != null && !payment.getDiscountCode().isEmpty()) {
-                    try {
-                        discountService.useDiscount(payment.getDiscountCode(), payment.getClientId(), payment.getDeliveryId());
-                        logger.info("Discount {} used for payment {}", payment.getDiscountCode(), payment.getId());
-                    } catch (Exception e) {
-                        logger.warn("Error marking discount as used for payment {}: {}", payment.getId(), e.getMessage());
-                    }
+            if (paymentOpt.isEmpty()) {
+                // If not found, try to find by payment_id in Stripe metadata
+                PaymentIntent paymentIntent = stripeService.retrievePaymentIntent(transactionId);
+                String paymentId = paymentIntent.getMetadata().get("payment_id");
+
+                if (paymentId != null) {
+                    paymentOpt = paymentRepository.findById(paymentId);
                 }
 
-                Payment savedPayment = paymentRepository.save(payment);
-                logger.info("Confirmed payment: {} with amount: {}", transactionId, amount);
-                return savedPayment;
-            } else {
-                logger.warn("Payment not found for transaction ID: {}", transactionId);
-                throw new IllegalArgumentException("Payment not found for transaction ID: " + transactionId);
+                if (paymentOpt.isEmpty()) {
+                    // Last resort - create new payment record from Stripe data
+                    Payment newPayment = new Payment();
+                    newPayment.setTransactionId(transactionId);
+                    newPayment.setAmount(amount);
+                    newPayment.setStatus(PaymentStatus.COMPLETED);
+                    newPayment.setPaymentMethod(PaymentMethod.CREDIT_CARD);
+
+                    // Set metadata fields if available
+                    if (paymentIntent.getMetadata() != null) {
+                        newPayment.setClientId(paymentIntent.getMetadata().get("client_id"));
+                        newPayment.setDeliveryId(paymentIntent.getMetadata().get("delivery_id"));
+                    }
+
+                    return paymentRepository.save(newPayment);
+                }
             }
+
+            Payment payment = paymentOpt.get();
+            payment.setStatus(PaymentStatus.COMPLETED);
+            payment.setUpdatedAt(LocalDateTime.now());
+            payment.setAmount(amount); // Update with actual charged amount
+
+            return paymentRepository.save(payment);
         } catch (Exception e) {
-            logger.error("Error confirming payment {}: {}", transactionId, e.getMessage());
+            logger.error("Error confirming payment", e);
             throw new RuntimeException("Failed to confirm payment: " + e.getMessage());
         }
     }
 
+    @Override
+    public Payment confirmPaymentByIntent(String paymentIntentId, double amount) {
+        try {
+            // First try to find by payment intent ID
+            Optional<Payment> paymentOpt = paymentRepository.findByTransactionId(paymentIntentId);
+
+            if (paymentOpt.isEmpty()) {
+                // If not found, create a new payment record
+                Payment newPayment = new Payment();
+                newPayment.setTransactionId(paymentIntentId);
+                newPayment.setAmount(amount);
+                newPayment.setStatus(PaymentStatus.COMPLETED);
+                newPayment.setPaymentMethod(PaymentMethod.CREDIT_CARD);
+                newPayment.setCreatedAt(LocalDateTime.now());
+                newPayment.setUpdatedAt(LocalDateTime.now());
+
+                // Try to get additional info from Stripe
+                try {
+                    PaymentIntent paymentIntent = stripeService.retrievePaymentIntent(paymentIntentId);
+                    if (paymentIntent.getMetadata() != null) {
+                        newPayment.setClientId(paymentIntent.getMetadata().get("client_id"));
+                        newPayment.setDeliveryId(paymentIntent.getMetadata().get("delivery_id"));
+                    }
+                } catch (StripeException e) {
+                    logger.warn("Could not retrieve payment intent details from Stripe", e);
+                }
+
+                return paymentRepository.save(newPayment);
+            }
+
+            // Update existing payment
+            Payment payment = paymentOpt.get();
+            payment.setStatus(PaymentStatus.COMPLETED);
+            payment.setAmount(amount);
+            payment.setUpdatedAt(LocalDateTime.now());
+
+            return paymentRepository.save(payment);
+        } catch (Exception e) {
+            logger.error("Error confirming payment by intent", e);
+            throw new RuntimeException("Failed to confirm payment by intent: " + e.getMessage());
+        }
+    }
     @Override
     public Payment failPayment(String transactionId) {
         try {

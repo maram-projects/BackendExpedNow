@@ -4,6 +4,7 @@ import com.example.ExpedNow.models.Payment;
 import com.example.ExpedNow.models.enums.PaymentMethod;
 import com.example.ExpedNow.models.enums.PaymentStatus;
 import com.example.ExpedNow.services.core.PaymentServiceInterface;
+import com.example.ExpedNow.services.core.DeliveryServiceInterface; // Add this import
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +29,8 @@ public class PaymentController {
 
     @Autowired
     private PaymentServiceInterface paymentService;
+    @Autowired
+    private DeliveryServiceInterface deliveryService; // Fix the type here
 
     // CREATE PAYMENT
     @PostMapping
@@ -68,6 +71,7 @@ public class PaymentController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
+
     // GET PAYMENT BY ID
     @GetMapping("/{paymentId}")
     public ResponseEntity<Map<String, Object>> getPaymentById(@PathVariable String paymentId) {
@@ -91,6 +95,74 @@ public class PaymentController {
             errorResponse.put("success", false);
             errorResponse.put("message", "Failed to retrieve payment: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    @GetMapping("/{paymentId}/status")
+    public ResponseEntity<Map<String, Object>> getPaymentStatus(@PathVariable String paymentId) {
+        try {
+            Payment payment = paymentService.getPaymentById(paymentId);
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("status", payment.getStatus());
+            response.put("updatedAt", payment.getUpdatedAt());
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            logger.error("Payment not found: {}", e.getMessage());
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(errorResponse);
+        } catch (Exception e) {
+            logger.error("Error retrieving payment status: {}", e.getMessage());
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", "Failed to retrieve payment status: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+    // CONFIRM PAYMENT - Single method with proper mapping
+    @PostMapping("/confirm")
+    public ResponseEntity<Map<String, Object>> confirmPayment(
+            @RequestParam String transactionId,
+            @RequestParam double amount) {
+        try {
+            // Use the correct method name from your PaymentServiceInterface
+            Payment confirmedPayment = paymentService.confirmPayment(transactionId, amount);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Payment confirmed successfully");
+            response.put("data", confirmedPayment);
+
+            // Update associated delivery status if deliveryId exists
+            if (confirmedPayment.getDeliveryId() != null) {
+                try {
+                    deliveryService.updateDeliveryPaymentStatus(
+                            confirmedPayment.getDeliveryId(),
+                            confirmedPayment.getId(),
+                            PaymentStatus.COMPLETED
+                    );
+
+                    logger.info("Updated delivery {} payment status to COMPLETED",
+                            confirmedPayment.getDeliveryId());
+                } catch (Exception e) {
+                    logger.error("Failed to update delivery payment status", e);
+                    // Don't fail the whole request - just log the error
+                }
+            }
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Error confirming payment", e);
+
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(errorResponse);
         }
     }
 
@@ -260,36 +332,6 @@ public class PaymentController {
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);
             errorResponse.put("message", "Failed to retrieve client secret: " + e.getMessage());
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
-        }
-    }
-
-    // CONFIRM PAYMENT
-    @PostMapping("/confirm")
-    public ResponseEntity<Map<String, Object>> confirmPayment(
-            @RequestParam String transactionId,
-            @RequestParam double amount) {
-        try {
-            Payment confirmedPayment = paymentService.confirmPayment(transactionId, amount);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "Payment confirmed successfully");
-            response.put("data", confirmedPayment);
-
-            logger.info("Payment confirmed successfully: {}", transactionId);
-            return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
-            logger.error("Invalid payment confirmation: {}", e.getMessage());
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("success", false);
-            errorResponse.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
-        } catch (Exception e) {
-            logger.error("Error confirming payment: {}", e.getMessage());
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("success", false);
-            errorResponse.put("message", "Failed to confirm payment: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
@@ -539,6 +581,4 @@ public class PaymentController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
-
-
 }
