@@ -6,6 +6,7 @@ import com.example.ExpedNow.models.enums.PaymentMethod;
 import com.example.ExpedNow.models.enums.PaymentStatus;
 import com.example.ExpedNow.repositories.PaymentRepository;
 import com.example.ExpedNow.services.core.PaymentServiceInterface;
+import com.example.ExpedNow.services.core.DeliveryServiceInterface;
 import com.stripe.exception.StripeException;
 import com.stripe.model.PaymentIntent;
 import org.slf4j.Logger;
@@ -41,6 +42,9 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
 
     @Autowired
     private DiscountService discountService; // Assuming you have this service
+
+    @Autowired
+    private DeliveryServiceInterface deliveryService; // Added missing dependency
 
     @Override
     public Payment createPayment(Payment payment) {
@@ -175,6 +179,7 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
         if (amount <= 0) {
             throw new IllegalArgumentException("Amount must be positive");
         }
+
         try {
             // First try to find by transactionId
             Optional<Payment> paymentOpt = paymentRepository.findByTransactionId(transactionId);
@@ -183,18 +188,20 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
                 // If not found, try to find by payment_id in Stripe metadata
                 PaymentIntent paymentIntent = stripeService.retrievePaymentIntent(transactionId);
                 String paymentId = paymentIntent.getMetadata().get("payment_id");
+                String deliveryId = paymentIntent.getMetadata().get("delivery_id");
 
                 if (paymentId != null) {
                     paymentOpt = paymentRepository.findById(paymentId);
                 }
 
                 if (paymentOpt.isEmpty()) {
-                    // Last resort - create new payment record from Stripe data
+                    // Create new payment record from Stripe data
                     Payment newPayment = new Payment();
                     newPayment.setTransactionId(transactionId);
                     newPayment.setAmount(amount);
                     newPayment.setStatus(PaymentStatus.COMPLETED);
                     newPayment.setPaymentMethod(PaymentMethod.CREDIT_CARD);
+                    newPayment.setPaymentDate(LocalDateTime.now());
 
                     // Set metadata fields if available
                     if (paymentIntent.getMetadata() != null) {
@@ -202,16 +209,39 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
                         newPayment.setDeliveryId(paymentIntent.getMetadata().get("delivery_id"));
                     }
 
-                    return paymentRepository.save(newPayment);
+                    Payment savedPayment = paymentRepository.save(newPayment);
+
+                    // Update delivery status if deliveryId exists
+                    if (deliveryId != null && !deliveryId.isEmpty()) {
+                        deliveryService.updateDeliveryPaymentStatus(
+                                deliveryId,
+                                savedPayment.getId(),
+                                PaymentStatus.COMPLETED
+                        );
+                    }
+
+                    return savedPayment;
                 }
             }
 
             Payment payment = paymentOpt.get();
             payment.setStatus(PaymentStatus.COMPLETED);
             payment.setUpdatedAt(LocalDateTime.now());
-            payment.setAmount(amount); // Update with actual charged amount
+            payment.setAmount(amount);
+            payment.setPaymentDate(LocalDateTime.now());
 
-            return paymentRepository.save(payment);
+            Payment savedPayment = paymentRepository.save(payment);
+
+            // Update delivery status if deliveryId exists
+            if (payment.getDeliveryId() != null && !payment.getDeliveryId().isEmpty()) {
+                deliveryService.updateDeliveryPaymentStatus(
+                        payment.getDeliveryId(),
+                        savedPayment.getId(),
+                        PaymentStatus.COMPLETED
+                );
+            }
+
+            return savedPayment;
         } catch (Exception e) {
             logger.error("Error confirming payment", e);
             throw new RuntimeException("Failed to confirm payment: " + e.getMessage());
@@ -220,46 +250,10 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
 
     @Override
     public Payment confirmPaymentByIntent(String paymentIntentId, double amount) {
-        try {
-            // First try to find by payment intent ID
-            Optional<Payment> paymentOpt = paymentRepository.findByTransactionId(paymentIntentId);
-
-            if (paymentOpt.isEmpty()) {
-                // If not found, create a new payment record
-                Payment newPayment = new Payment();
-                newPayment.setTransactionId(paymentIntentId);
-                newPayment.setAmount(amount);
-                newPayment.setStatus(PaymentStatus.COMPLETED);
-                newPayment.setPaymentMethod(PaymentMethod.CREDIT_CARD);
-                newPayment.setCreatedAt(LocalDateTime.now());
-                newPayment.setUpdatedAt(LocalDateTime.now());
-
-                // Try to get additional info from Stripe
-                try {
-                    PaymentIntent paymentIntent = stripeService.retrievePaymentIntent(paymentIntentId);
-                    if (paymentIntent.getMetadata() != null) {
-                        newPayment.setClientId(paymentIntent.getMetadata().get("client_id"));
-                        newPayment.setDeliveryId(paymentIntent.getMetadata().get("delivery_id"));
-                    }
-                } catch (StripeException e) {
-                    logger.warn("Could not retrieve payment intent details from Stripe", e);
-                }
-
-                return paymentRepository.save(newPayment);
-            }
-
-            // Update existing payment
-            Payment payment = paymentOpt.get();
-            payment.setStatus(PaymentStatus.COMPLETED);
-            payment.setAmount(amount);
-            payment.setUpdatedAt(LocalDateTime.now());
-
-            return paymentRepository.save(payment);
-        } catch (Exception e) {
-            logger.error("Error confirming payment by intent", e);
-            throw new RuntimeException("Failed to confirm payment by intent: " + e.getMessage());
-        }
+        // This method is similar to confirmPayment but specifically for PaymentIntent IDs
+        return confirmPayment(paymentIntentId, amount);
     }
+
     @Override
     public Payment failPayment(String transactionId) {
         try {

@@ -1,6 +1,9 @@
 package com.example.ExpedNow.controllers;
 
 import com.example.ExpedNow.config.StripeConfig;
+import com.example.ExpedNow.models.Payment;
+import com.example.ExpedNow.models.enums.PaymentStatus;
+import com.example.ExpedNow.services.core.DeliveryServiceInterface;
 import com.example.ExpedNow.services.core.PaymentServiceInterface;
 import com.stripe.exception.SignatureVerificationException;
 import com.stripe.model.Event;
@@ -20,6 +23,7 @@ import org.springframework.web.bind.annotation.*;
 public class StripeWebhookController {
 
     private static final Logger logger = LoggerFactory.getLogger(StripeWebhookController.class);
+    private DeliveryServiceInterface deliveryService;  // Add this field
 
     @Autowired
     private StripeConfig stripeConfig;
@@ -95,19 +99,24 @@ public class StripeWebhookController {
                 String deliveryId = paymentIntent.getMetadata().get("delivery_id");
 
                 // Confirm payment in our system
-                paymentService.confirmPayment(paymentIntent.getId(), amount);
+                Payment confirmedPayment = paymentService.confirmPayment(paymentIntent.getId(), amount);
+
+                // Update delivery status if deliveryId exists
+                if (deliveryId != null && !deliveryId.isEmpty()) {
+                    deliveryService.updateDeliveryPaymentStatus(
+                            deliveryId,
+                            paymentIntent.getId(),
+                            PaymentStatus.COMPLETED
+                    );
+                }
 
                 logger.info("Payment succeeded - PaymentIntent: {}, Amount: ${}, PaymentId: {}, DeliveryId: {}",
                         paymentIntent.getId(), amount, paymentId, deliveryId);
-            } else {
-                logger.warn("Received payment_intent.succeeded event but object is not PaymentIntent");
             }
         } catch (Exception e) {
             logger.error("Error handling payment success for event {}: {}", event.getId(), e.getMessage());
-            // Don't rethrow - we don't want to cause webhook retries for our internal errors
         }
     }
-
     private void handlePaymentIntentFailed(Event event) {
         try {
             StripeObject stripeObject = event.getDataObjectDeserializer().getObject().orElse(null);

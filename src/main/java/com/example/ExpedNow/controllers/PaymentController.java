@@ -126,10 +126,6 @@ public class PaymentController {
 
         logger.info("Received confirmPayment request with body: {}", requestBody);
 
-        // Add debugging to see what's being received
-        logger.info("Received request body: {}", requestBody);
-        logger.info("Request body keys: {}", requestBody != null ? requestBody.keySet() : "null");
-
         // 1. Request validation
         if (requestBody == null) {
             return buildErrorResponse("Request body cannot be null", HttpStatus.BAD_REQUEST);
@@ -140,15 +136,9 @@ public class PaymentController {
         double amount;
 
         try {
-            // Debug the transactionId extraction
-            Object transactionIdObj = requestBody.get("transactionId");
-            logger.info("transactionId object: {}, type: {}",
-                    transactionIdObj,
-                    transactionIdObj != null ? transactionIdObj.getClass().getSimpleName() : "null");
-
-            transactionId = Optional.ofNullable(transactionIdObj)
+            transactionId = Optional.ofNullable(requestBody.get("transactionId"))
                     .map(Object::toString)
-                    .filter(s -> !s.trim().isEmpty()) // Also check for empty strings
+                    .filter(s -> !s.trim().isEmpty())
                     .orElseThrow(() -> new IllegalArgumentException("transactionId is required and cannot be empty"));
 
             Object amountObj = requestBody.get("amount");
@@ -170,30 +160,12 @@ public class PaymentController {
             return buildErrorResponse(e.getMessage(), HttpStatus.BAD_REQUEST);
         }
 
-        // Rest of your existing code...
         try {
             logger.info("Confirming payment - transactionId: {}, amount: {}", transactionId, amount);
 
             Payment confirmedPayment = paymentService.confirmPayment(transactionId, amount);
 
-            // 4. Update associated delivery
-            if (confirmedPayment.getDeliveryId() != null) {
-                try {
-                    deliveryService.updateDeliveryPaymentStatus(
-                            confirmedPayment.getDeliveryId(),
-                            confirmedPayment.getId(),
-                            PaymentStatus.COMPLETED
-                    );
-                    logger.info("Updated delivery {} payment status to COMPLETED",
-                            confirmedPayment.getDeliveryId());
-                } catch (Exception e) {
-                    logger.error("Failed to update delivery status for payment {}: {}",
-                            confirmedPayment.getId(), e.getMessage());
-                    // Continue even if delivery update fails
-                }
-            }
-
-            // 5. Build success response with data wrapper
+            // 4. Build success response with data wrapper
             Map<String, Object> response = new LinkedHashMap<>();
             response.put("success", true);
             response.put("message", "Payment confirmed successfully");
