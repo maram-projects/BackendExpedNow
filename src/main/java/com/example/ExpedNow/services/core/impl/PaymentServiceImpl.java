@@ -169,6 +169,12 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
 
     @Override
     public Payment confirmPayment(String transactionId, double amount) {
+        if (transactionId == null || transactionId.isEmpty()) {
+            throw new IllegalArgumentException("Transaction ID cannot be null or empty");
+        }
+        if (amount <= 0) {
+            throw new IllegalArgumentException("Amount must be positive");
+        }
         try {
             // First try to find by transactionId
             Optional<Payment> paymentOpt = paymentRepository.findByTransactionId(transactionId);

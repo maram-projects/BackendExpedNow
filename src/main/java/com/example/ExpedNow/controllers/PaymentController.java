@@ -17,9 +17,8 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.time.LocalDateTime;
+import java.util.*;
 
 @RestController
 @RequestMapping("/api/payments")
@@ -121,22 +120,63 @@ public class PaymentController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
-
-    // CONFIRM PAYMENT - Single method with proper mapping
     @PostMapping("/confirm")
     public ResponseEntity<Map<String, Object>> confirmPayment(
-            @RequestParam String transactionId,
-            @RequestParam double amount) {
+            @RequestBody Map<String, Object> requestBody) {
+
+        logger.info("Received confirmPayment request with body: {}", requestBody);
+
+        // Add debugging to see what's being received
+        logger.info("Received request body: {}", requestBody);
+        logger.info("Request body keys: {}", requestBody != null ? requestBody.keySet() : "null");
+
+        // 1. Request validation
+        if (requestBody == null) {
+            return buildErrorResponse("Request body cannot be null", HttpStatus.BAD_REQUEST);
+        }
+
+        // 2. Parameter extraction with validation
+        String transactionId;
+        double amount;
+
         try {
-            // Use the correct method name from your PaymentServiceInterface
+            // Debug the transactionId extraction
+            Object transactionIdObj = requestBody.get("transactionId");
+            logger.info("transactionId object: {}, type: {}",
+                    transactionIdObj,
+                    transactionIdObj != null ? transactionIdObj.getClass().getSimpleName() : "null");
+
+            transactionId = Optional.ofNullable(transactionIdObj)
+                    .map(Object::toString)
+                    .filter(s -> !s.trim().isEmpty()) // Also check for empty strings
+                    .orElseThrow(() -> new IllegalArgumentException("transactionId is required and cannot be empty"));
+
+            Object amountObj = requestBody.get("amount");
+            if (amountObj == null) {
+                throw new IllegalArgumentException("amount is required");
+            }
+
+            try {
+                amount = Double.parseDouble(amountObj.toString());
+            } catch (NumberFormatException e) {
+                throw new IllegalArgumentException("amount must be a valid number");
+            }
+
+            if (amount <= 0) {
+                throw new IllegalArgumentException("amount must be positive");
+            }
+        } catch (IllegalArgumentException e) {
+            logger.warn("Invalid payment confirmation request: {}", e.getMessage());
+            return buildErrorResponse(e.getMessage(), HttpStatus.BAD_REQUEST);
+        }
+
+        // Rest of your existing code...
+        try {
+            logger.info("Confirming payment - transactionId: {}, amount: {}", transactionId, amount);
+
             Payment confirmedPayment = paymentService.confirmPayment(transactionId, amount);
 
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "Payment confirmed successfully");
-            response.put("data", confirmedPayment);
-
-            // Update associated delivery status if deliveryId exists
+            // 4. Update associated delivery
             if (confirmedPayment.getDeliveryId() != null) {
                 try {
                     deliveryService.updateDeliveryPaymentStatus(
@@ -144,28 +184,53 @@ public class PaymentController {
                             confirmedPayment.getId(),
                             PaymentStatus.COMPLETED
                     );
-
                     logger.info("Updated delivery {} payment status to COMPLETED",
                             confirmedPayment.getDeliveryId());
                 } catch (Exception e) {
-                    logger.error("Failed to update delivery payment status", e);
-                    // Don't fail the whole request - just log the error
+                    logger.error("Failed to update delivery status for payment {}: {}",
+                            confirmedPayment.getId(), e.getMessage());
+                    // Continue even if delivery update fails
                 }
             }
 
+            // 5. Build success response with data wrapper
+            Map<String, Object> response = new LinkedHashMap<>();
+            response.put("success", true);
+            response.put("message", "Payment confirmed successfully");
+
+            // Wrap the payment details in a "data" object
+            Map<String, Object> data = new LinkedHashMap<>();
+            data.put("id", confirmedPayment.getId());
+            data.put("transactionId", confirmedPayment.getTransactionId());
+            data.put("amount", confirmedPayment.getAmount());
+            data.put("status", confirmedPayment.getStatus());
+            if (confirmedPayment.getDeliveryId() != null) {
+                data.put("deliveryId", confirmedPayment.getDeliveryId());
+            }
+
+            response.put("data", data);
+            response.put("timestamp", LocalDateTime.now().toString());
+
             return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            logger.error("Payment confirmation failed - validation error: {}", e.getMessage());
+            return buildErrorResponse(e.getMessage(), HttpStatus.BAD_REQUEST);
         } catch (Exception e) {
-            logger.error("Error confirming payment", e);
-
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("success", false);
-            errorResponse.put("message", e.getMessage());
-
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(errorResponse);
+            logger.error("Payment confirmation failed - server error: {}", e.getMessage(), e);
+            return buildErrorResponse("Failed to confirm payment: " + e.getMessage(),
+                    HttpStatus.INTERNAL_SERVER_ERROR);
         }
     }
 
+    // Helper method for error responses
+    private ResponseEntity<Map<String, Object>> buildErrorResponse(String message, HttpStatus status) {
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("success", false);
+        response.put("message", message);
+        response.put("timestamp", LocalDateTime.now().toString());
+        return ResponseEntity.status(status).body(response);
+    }
     // GET ALL PAYMENTS WITH PAGINATION AND FILTERS
     @GetMapping
     public ResponseEntity<Map<String, Object>> getAllPayments(

@@ -111,10 +111,15 @@
             DeliveryRequest delivery = deliveryRepository.findById(deliveryId)
                     .orElseThrow(() -> new ResourceNotFoundException("Delivery not found with id: " + deliveryId));
 
-            // Update the payment-related fields in the delivery
+            // Update payment-related fields
             delivery.setPaymentId(paymentId);
             delivery.setPaymentStatus(paymentStatus);
             delivery.setUpdatedAt(LocalDateTime.now());
+
+            // Update delivery status if payment is completed
+            if (paymentStatus == PaymentStatus.COMPLETED) {
+                delivery.setStatus(DeliveryRequest.DeliveryReqStatus.APPROVED);
+            }
 
             return deliveryRepository.save(delivery);
         }
