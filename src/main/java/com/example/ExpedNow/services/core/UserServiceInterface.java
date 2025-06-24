@@ -1,6 +1,7 @@
 package com.example.ExpedNow.services.core;
 
 import com.example.ExpedNow.dto.UserDTO;
+import com.example.ExpedNow.exception.ResourceNotFoundException;
 import com.example.ExpedNow.models.User;
 import com.example.ExpedNow.models.enums.Role;
 import org.springframework.http.ResponseEntity;
@@ -73,6 +74,8 @@ public interface UserServiceInterface {
         User disableUser(String userId);
 
         void rejectUser(String userId);
+
+
 
         // Update the loadUserByUsername method in CustomUserDetailsService to check for approval
         UserDetails loadUserByUsername(String email) throws UsernameNotFoundException;

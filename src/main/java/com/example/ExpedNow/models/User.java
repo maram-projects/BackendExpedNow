@@ -173,4 +173,9 @@ public class User {
     public void setUserType(String userType) {
         this.userType = userType;
     }
+
+    // In User.java
+    public Vehicle getAssignedVehicle() {
+        return this.assignedVehicle;
+    }
 }

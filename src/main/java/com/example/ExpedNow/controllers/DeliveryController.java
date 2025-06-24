@@ -3,14 +3,17 @@ package com.example.ExpedNow.controllers;
 import com.example.ExpedNow.dto.DeliveryRequestDTO;
 import com.example.ExpedNow.dto.DeliveryResponseDTO;
 import com.example.ExpedNow.dto.StatusUpdateRequest;
+import com.example.ExpedNow.dto.UserDTO;
 import com.example.ExpedNow.exception.ResourceNotFoundException;
 import com.example.ExpedNow.models.DeliveryRequest;
 import com.example.ExpedNow.models.Mission;
+import com.example.ExpedNow.models.User;
 import com.example.ExpedNow.models.enums.PackageType;
 import com.example.ExpedNow.models.enums.PaymentMethod;
 import com.example.ExpedNow.models.enums.PaymentStatus;
 import com.example.ExpedNow.security.CustomUserDetailsService;
 import com.example.ExpedNow.services.core.MissionServiceInterface;
+import com.example.ExpedNow.services.core.UserServiceInterface;
 import com.example.ExpedNow.services.core.impl.DeliveryServiceImpl;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
@@ -35,14 +38,46 @@ public class DeliveryController {
     private static final Logger logger = LoggerFactory.getLogger(DeliveryController.class);
     private final DeliveryServiceImpl deliveryService;
     private final MissionServiceInterface missionService;
-
+    private final UserServiceInterface userService;
     // التصحيح: حقن MissionService في الكونستركتور
     public DeliveryController(DeliveryServiceImpl deliveryService,
-                              MissionServiceInterface missionService) {
+                              MissionServiceInterface missionService, UserServiceInterface userService) {
         this.deliveryService = deliveryService;
         this.missionService = missionService;
+        this.userService = userService;
     }
 
+    @GetMapping("/{deliveryId}/with-assigned")
+    public ResponseEntity<Map<String, Object>> getDeliveryWithAssignedPerson(@PathVariable String deliveryId) {
+        try {
+            DeliveryRequest delivery = deliveryService.getDeliveryById(deliveryId);
+            Map<String, Object> response = new HashMap<>();
+            response.put("delivery", convertToDto(delivery));
+
+            if (delivery.getDeliveryPersonId() != null) {
+                User deliveryPersonDTO = userService.findById(delivery.getDeliveryPersonId());
+
+                Map<String, Object> personInfo = new HashMap<>();
+                personInfo.put("id", deliveryPersonDTO.getId());
+                personInfo.put("fullName", deliveryPersonDTO.getFirstName() + " " + deliveryPersonDTO.getLastName());
+                personInfo.put("phone", deliveryPersonDTO.getPhone());
+
+                if (deliveryPersonDTO.getAssignedVehicle() != null) {
+                    Map<String, String> vehicleInfo = new HashMap<>();
+                    // Use correct getters from Vehicle class
+                    vehicleInfo.put("model", deliveryPersonDTO.getAssignedVehicle().getModel());
+                    vehicleInfo.put("licensePlate", deliveryPersonDTO.getAssignedVehicle().getLicensePlate());
+                    personInfo.put("vehicle", vehicleInfo);
+                }
+
+                response.put("assignedDeliveryPerson", personInfo);
+            }
+
+            return ResponseEntity.ok(response);
+        } catch (ResourceNotFoundException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
+        }
+    }
     @PatchMapping("/{deliveryId}/payment-status")
     public ResponseEntity<Map<String, Object>> updateDeliveryPaymentStatus(
             @PathVariable String deliveryId,
