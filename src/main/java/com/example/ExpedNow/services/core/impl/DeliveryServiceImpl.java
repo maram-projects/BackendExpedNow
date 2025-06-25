@@ -1,11 +1,16 @@
     package com.example.ExpedNow.services.core.impl;
 
     import com.example.ExpedNow.dto.DeliveryResponseDTO;
+    import com.example.ExpedNow.dto.UserDTO;
+    import com.example.ExpedNow.dto.VehicleDTO;
     import com.example.ExpedNow.models.DeliveryRequest;
+    import com.example.ExpedNow.models.User;
+    import com.example.ExpedNow.models.Vehicle;
     import com.example.ExpedNow.models.enums.PaymentStatus;
     import com.example.ExpedNow.repositories.DeliveryReqRepository;
     import com.example.ExpedNow.services.core.DeliveryPricingService;
     import com.example.ExpedNow.services.core.DeliveryServiceInterface;
+    import com.example.ExpedNow.services.core.UserServiceInterface;
     import com.example.ExpedNow.services.core.VehicleServiceInterface;
     import com.example.ExpedNow.exception.ResourceNotFoundException;
     import org.slf4j.Logger;
@@ -27,6 +32,7 @@
     @Primary
     public class DeliveryServiceImpl implements DeliveryServiceInterface {
         private static final Logger logger = LoggerFactory.getLogger(DeliveryServiceImpl.class);
+        private final UserServiceInterface userService; // أضف هذا
 
         private final DeliveryReqRepository deliveryRepository;
         private final VehicleServiceInterface vehicleService;
@@ -35,7 +41,8 @@
         @Autowired
         private DeliveryAssignmentServiceImpl deliveryAssignmentService;
 
-        public DeliveryServiceImpl(DeliveryReqRepository deliveryRepository, VehicleServiceInterface vehicleService) {
+        public DeliveryServiceImpl(UserServiceInterface userService, DeliveryReqRepository deliveryRepository, VehicleServiceInterface vehicleService) {
+            this.userService = userService;
             this.deliveryRepository = deliveryRepository;
             this.vehicleService = vehicleService;
         }
@@ -199,6 +206,8 @@
         }
 
 
+
+
         @Override
         public DeliveryRequest getDeliveryById(String id) {
             return deliveryRepository.findById(id)
@@ -238,6 +247,8 @@
         }
 
         private DeliveryResponseDTO convertToDto(DeliveryRequest delivery) {
+
+
             // Convert all LocalDateTime fields to Date with proper timezone handling
             Date scheduledDate = delivery.getScheduledDate() != null ?
                     Date.from(delivery.getScheduledDate().atZone(ZoneId.systemDefault()).toInstant()) : null;
@@ -251,6 +262,11 @@
                     Date.from(delivery.getStartedAt().atZone(ZoneId.systemDefault()).toInstant()) : null;
             Date completedAt = delivery.getCompletedAt() != null ?
                     Date.from(delivery.getCompletedAt().atZone(ZoneId.systemDefault()).toInstant()) : null;
+            UserDTO deliveryPersonDto = null;
+            if (delivery.getDeliveryPersonId() != null) {
+                User deliveryPerson = userService.findById(delivery.getDeliveryPersonId());
+                deliveryPersonDto = userService.convertToDTO(deliveryPerson);
+            }
 
             return new DeliveryResponseDTO(
                     delivery.getId(),
@@ -271,7 +287,11 @@
                     delivery.getPickupLatitude(),
                     delivery.getPickupLongitude(),
                     delivery.getDeliveryLatitude(),
-                    delivery.getDeliveryLongitude()
+                    delivery.getDeliveryLongitude(),
+                    delivery.getRating(),
+                    delivery.isRated(),
+                    null,   // deliveryPerson (to be set in getDeliveryWithDetails)
+                    null    // assignedVehicle (to be set in getDeliveryWithDetails)
             );
         }
         @Override
@@ -286,5 +306,111 @@
             return deliveries.stream()
                     .map(this::convertToDto)
                     .collect(Collectors.toList());
+        }
+
+
+
+        @Override
+        public void rateDelivery(String deliveryId, double rating, String clientId) {
+            DeliveryRequest delivery = deliveryRepository.findById(deliveryId)
+                    .orElseThrow(() -> new ResourceNotFoundException("Delivery not found"));
+
+            if (!clientId.equals(delivery.getClientId())) {
+                throw new IllegalArgumentException("Not authorized to rate this delivery");
+            }
+
+            if (delivery.getStatus() != DeliveryRequest.DeliveryReqStatus.DELIVERED) {
+                throw new IllegalStateException("Delivery not completed yet");
+            }
+
+            if (delivery.isRated()) {
+                throw new IllegalStateException("Delivery already rated");
+            }
+
+            if (rating < 1 || rating > 5) {
+                throw new IllegalArgumentException("Rating must be between 1 and 5");
+            }
+
+            // Update delivery
+            delivery.setRating(rating);
+            delivery.setRated(true);
+            delivery.setStatus(DeliveryRequest.DeliveryReqStatus.RATED);
+            deliveryRepository.save(delivery);
+
+            // Update delivery person
+            if (delivery.getDeliveryPersonId() != null) {
+                User deliveryPerson = userService.findById(delivery.getDeliveryPersonId());
+                deliveryPerson.updateRating(rating);
+                userService.save(deliveryPerson);
+            }
+        }
+
+        @Override
+        public DeliveryResponseDTO getDeliveryWithDetails(String deliveryId) {
+            DeliveryRequest delivery = getDeliveryById(deliveryId);
+            DeliveryResponseDTO baseDto = convertToDto(delivery);
+
+            UserDTO deliveryPersonDto = null;
+            VehicleDTO vehicleDto = null;
+
+            if (delivery.getDeliveryPersonId() != null) {
+                User deliveryPerson = userService.findById(delivery.getDeliveryPersonId());
+                deliveryPersonDto = userService.convertToDTO(deliveryPerson);
+
+                if (deliveryPerson.getAssignedVehicle() != null) {
+                    vehicleDto = convertVehicleToDTO(deliveryPerson.getAssignedVehicle());
+                }
+            }
+
+            // Create a new DTO with updated values
+            return new DeliveryResponseDTO(
+                    baseDto.id(),
+                    baseDto.pickupAddress(),
+                    baseDto.deliveryAddress(),
+                    baseDto.packageDescription(),
+                    baseDto.packageWeight(),
+                    baseDto.vehicleId(),
+                    baseDto.scheduledDate(),
+                    baseDto.additionalInstructions(),
+                    baseDto.status(),
+                    baseDto.createdAt(),
+                    baseDto.clientId(),
+                    baseDto.updatedAt(),
+                    baseDto.assignedAt(),
+                    baseDto.startedAt(),
+                    baseDto.completedAt(),
+                    baseDto.pickupLatitude(),
+                    baseDto.pickupLongitude(),
+                    baseDto.deliveryLatitude(),
+                    baseDto.deliveryLongitude(),
+                    baseDto.rating(),
+                    baseDto.rated(),
+                    deliveryPersonDto,
+                    vehicleDto
+            );
+        }
+
+        private VehicleDTO convertVehicleToDTO(Vehicle vehicle) {
+            if (vehicle == null) return null;
+
+            VehicleDTO dto = new VehicleDTO();
+            dto.setId(vehicle.getId());
+            dto.setVehicleType(vehicle.getVehicleType());
+            dto.setVehicleBrand(vehicle.getMake());
+            dto.setVehicleModel(vehicle.getModel());
+            dto.setVehicleYear(vehicle.getYear());
+            dto.setVehiclePlateNumber(vehicle.getLicensePlate());
+            dto.setVehicleCapacityKg(vehicle.getMaxLoad());
+            dto.setVehiclePhotoUrl(vehicle.getPhotoPath());
+            dto.setAvailable(vehicle.isAvailable());
+
+            // Set default values for unused fields
+            dto.setVehicleColor("N/A");
+            dto.setVehicleVolumeM3(0.0);
+            dto.setVehicleHasFridge(false);
+            dto.setVehicleInsuranceExpiry(new Date());
+            dto.setVehicleInspectionExpiry(new Date());
+
+            return dto;
         }
     }

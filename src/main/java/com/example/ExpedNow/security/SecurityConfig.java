@@ -6,6 +6,7 @@ import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.access.expression.method.DefaultMethodSecurityExpressionHandler;
 import org.springframework.security.access.expression.method.MethodSecurityExpressionHandler;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -94,6 +95,9 @@ public class SecurityConfig {
                                 "PROFESSIONAL", "TEMPORARY", "ADMIN", "DELIVERY_PERSON"
                         )
                         .requestMatchers("/api/pricing/**").permitAll() // or .authenticated()
+                        .requestMatchers(HttpMethod.POST, "/api/deliveries/*/rate").hasAnyAuthority(
+                                "ROLE_CLIENT", "ROLE_INDIVIDUAL", "ROLE_ENTERPRISE"
+                        )
 
                         .requestMatchers("/api/notifications/**").authenticated()
 

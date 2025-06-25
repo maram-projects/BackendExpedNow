@@ -252,7 +252,8 @@ public class UserController {
         dto.setSuccessScore(user.getSuccessScore());
         dto.setTotalDeliveries(user.getTotalDeliveries());
         dto.setAverageDeliveryTime(user.getAverageDeliveryTime());
-
+        dto.setRating(user.getRating());
+        dto.setRatingCount(user.getRatingCount());
         // Roles - convert Set<Role> to Set<String>
         if (user.getRoles() != null) {
             dto.setRoles(user.getRoles().stream()

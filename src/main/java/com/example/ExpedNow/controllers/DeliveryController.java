@@ -1,9 +1,6 @@
 package com.example.ExpedNow.controllers;
 
-import com.example.ExpedNow.dto.DeliveryRequestDTO;
-import com.example.ExpedNow.dto.DeliveryResponseDTO;
-import com.example.ExpedNow.dto.StatusUpdateRequest;
-import com.example.ExpedNow.dto.UserDTO;
+import com.example.ExpedNow.dto.*;
 import com.example.ExpedNow.exception.ResourceNotFoundException;
 import com.example.ExpedNow.models.DeliveryRequest;
 import com.example.ExpedNow.models.Mission;
@@ -55,18 +52,25 @@ public class DeliveryController {
             response.put("delivery", convertToDto(delivery));
 
             if (delivery.getDeliveryPersonId() != null) {
-                User deliveryPersonDTO = userService.findById(delivery.getDeliveryPersonId());
+                // Use the new method that fetches vehicle info
+                User deliveryPerson = userService.findByIdWithVehicle(delivery.getDeliveryPersonId());
 
                 Map<String, Object> personInfo = new HashMap<>();
-                personInfo.put("id", deliveryPersonDTO.getId());
-                personInfo.put("fullName", deliveryPersonDTO.getFirstName() + " " + deliveryPersonDTO.getLastName());
-                personInfo.put("phone", deliveryPersonDTO.getPhone());
+                personInfo.put("id", deliveryPerson.getId());
+                personInfo.put("fullName", deliveryPerson.getFirstName() + " " + deliveryPerson.getLastName());
+                personInfo.put("phone", deliveryPerson.getPhone());
 
-                if (deliveryPersonDTO.getAssignedVehicle() != null) {
-                    Map<String, String> vehicleInfo = new HashMap<>();
-                    // Use correct getters from Vehicle class
-                    vehicleInfo.put("model", deliveryPersonDTO.getAssignedVehicle().getModel());
-                    vehicleInfo.put("licensePlate", deliveryPersonDTO.getAssignedVehicle().getLicensePlate());
+                // Add rating information
+                personInfo.put("rating", deliveryPerson.getRating());
+                personInfo.put("ratingCount", deliveryPerson.getRatingCount());
+                personInfo.put("completedDeliveries", deliveryPerson.getCompletedDeliveries());
+
+                // Vehicle information
+                if (deliveryPerson.getAssignedVehicle() != null) {
+                    Map<String, Object> vehicleInfo = new HashMap<>();
+                    vehicleInfo.put("model", deliveryPerson.getAssignedVehicle().getModel());
+                    vehicleInfo.put("licensePlate", deliveryPerson.getAssignedVehicle().getLicensePlate());
+                    vehicleInfo.put("type", deliveryPerson.getAssignedVehicle().getVehicleType());
                     personInfo.put("vehicle", vehicleInfo);
                 }
 
@@ -78,6 +82,7 @@ public class DeliveryController {
             return ResponseEntity.status(HttpStatus.NOT_FOUND).body(Map.of("error", e.getMessage()));
         }
     }
+
     @PatchMapping("/{deliveryId}/payment-status")
     public ResponseEntity<Map<String, Object>> updateDeliveryPaymentStatus(
             @PathVariable String deliveryId,
@@ -417,12 +422,38 @@ public class DeliveryController {
                 delivery.getPickupLatitude(),
                 delivery.getPickupLongitude(),
                 delivery.getDeliveryLatitude(),
-                delivery.getDeliveryLongitude()
+                delivery.getDeliveryLongitude(),
+                delivery.getRating(),
+                delivery.isRated(),
+                null,   // deliveryPerson (to be set in getDeliveryWithDetails)
+                null    // assignedVehicle (to be set in getDeliveryWithDetails
         );
     }
     @GetMapping("/{deliveryId}")
     public ResponseEntity<DeliveryRequest> getDeliveryById(@PathVariable String deliveryId) {
         DeliveryRequest delivery = deliveryService.getDeliveryById(deliveryId);
         return ResponseEntity.ok(delivery);
+    }
+
+
+    @PostMapping("/{deliveryId}/rate")
+    @PreAuthorize("hasAnyAuthority('ROLE_CLIENT','ROLE_INDIVIDUAL','ROLE_ENTERPRISE')")
+    public ResponseEntity<?> rateDelivery(
+            @PathVariable String deliveryId,
+            @RequestBody RatingRequest ratingRequest,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        String clientId = ((CustomUserDetailsService.CustomUserDetails) userDetails).getUserId();
+        try {
+            deliveryService.rateDelivery(deliveryId, ratingRequest.rating(), clientId);
+            return ResponseEntity.ok().build();
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/with-details")
+    public DeliveryResponseDTO getDeliveryWithDetails(@PathVariable String id) {
+        return deliveryService.getDeliveryWithDetails(id);
     }
 }

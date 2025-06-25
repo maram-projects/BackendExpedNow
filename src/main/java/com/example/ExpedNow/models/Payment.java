@@ -2,6 +2,7 @@ package com.example.ExpedNow.models;
 
 import com.example.ExpedNow.models.enums.PaymentMethod;
 import com.example.ExpedNow.models.enums.PaymentStatus;
+import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
@@ -32,7 +33,6 @@ public class Payment {
 
     // معلومات إضافية حسب طريقة الدفع
     private String transactionId; // رقم المعاملة من البنك أو بوابة الدفع
-    private LocalDateTime paymentDate; // تاريخ الدفع
     private String receiptUrl; // رابط الإيصال
 
     // معلومات خاصة بالبطاقة (إذا كانت طريقة الدفع بالبطاقة)
@@ -48,10 +48,18 @@ public class Payment {
     private double discountAmount; // قيمة الخصم
 
     // Additional fields needed by the service
-    private LocalDateTime createdAt;
-    private LocalDateTime updatedAt;
     private String clientSecret; // For Stripe payments
     private String discountCode; // Discount code used
+
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+    private LocalDateTime paymentDate;
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+    private LocalDateTime createdAt;
+
+    @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
+    private LocalDateTime updatedAt;
 
     // Helper method to get payment method (since your field is named 'method')
     public PaymentMethod getPaymentMethod() {

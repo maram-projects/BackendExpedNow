@@ -250,7 +250,11 @@ public class VehicleServiceImpl implements VehicleServiceInterface {
         }
     }
 
-   
 
+    @Override
+    public Vehicle findById(String id) {
+        return vehicleRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found with id: " + id));
+    }
 
 }

@@ -1,6 +1,7 @@
 package com.example.ExpedNow.services.core;
 
 import com.example.ExpedNow.dto.VehicleDTO;
+import com.example.ExpedNow.models.Vehicle;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
@@ -18,6 +19,8 @@ public interface VehicleServiceInterface {
     void deleteVehicle(String id);
 
     List<VehicleDTO> getAvailableVehicles();
+    Vehicle findById(String id);
+
 
     void setVehicleUnavailable(String vehicleId);
 }

@@ -42,6 +42,8 @@ public interface UserServiceInterface {
 
         List<User> getAllDeliveryPersons();
 
+        User findByIdWithVehicle(String id);
+
         List<UserDTO> findAvailableDrivers();
 
         List<User> findAll();
@@ -75,8 +77,7 @@ public interface UserServiceInterface {
 
         void rejectUser(String userId);
 
-
-
+        UserDTO convertToDTO(User user);
         // Update the loadUserByUsername method in CustomUserDetailsService to check for approval
         UserDetails loadUserByUsername(String email) throws UsernameNotFoundException;
 }

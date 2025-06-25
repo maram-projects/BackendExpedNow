@@ -2,6 +2,7 @@ package com.example.ExpedNow.services.core;
 
 import com.example.ExpedNow.dto.DeliveryResponseDTO;
 import com.example.ExpedNow.models.DeliveryRequest;
+import com.example.ExpedNow.models.Vehicle;
 import com.example.ExpedNow.models.enums.PaymentStatus;
 
 import java.util.List;
@@ -31,4 +32,9 @@ public interface DeliveryServiceInterface {
 
     List<DeliveryResponseDTO> getDeliveryHistory(String deliveryPersonId);
     DeliveryRequest updateDeliveryPaymentStatus(String deliveryId, String paymentId, PaymentStatus paymentStatus);
+
+    // Add this method
+    void rateDelivery(String deliveryId, double rating, String clientId);
+
+    DeliveryResponseDTO getDeliveryWithDetails(String deliveryId);
 }

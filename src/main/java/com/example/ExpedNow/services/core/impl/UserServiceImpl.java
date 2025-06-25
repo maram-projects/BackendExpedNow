@@ -23,7 +23,6 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Primary;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
-import org.springframework.mail.MailException;
 import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.security.core.GrantedAuthority;
@@ -32,7 +31,9 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -49,6 +50,7 @@ public class UserServiceImpl implements UserServiceInterface {
     private final PasswordEncoder passwordEncoder;
     private final JavaMailSender mailSender;
     private final VehicleRepository vehicleRepository;
+    private final MongoTemplate mongoTemplate; // Add this
 
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     @Value("${spring.mail.enabled:false}")
@@ -70,12 +72,13 @@ public class UserServiceImpl implements UserServiceInterface {
     public UserServiceImpl(UserRepository userRepository,
                            VerificationTokenRepository verificationTokenRepository,
                            PasswordEncoder passwordEncoder,
-                           @Autowired(required = false) JavaMailSender mailSender, VehicleRepository vehicleRepository, PasswordResetTokenRepository passwordResetTokenRepository) {
+                           @Autowired(required = false) JavaMailSender mailSender, VehicleRepository vehicleRepository, MongoTemplate mongoTemplate, PasswordResetTokenRepository passwordResetTokenRepository) {
         this.userRepository = userRepository;
         this.verificationTokenRepository = verificationTokenRepository;
         this.passwordEncoder = passwordEncoder;
         this.mailSender = mailSender;
         this.vehicleRepository = vehicleRepository;
+        this.mongoTemplate = mongoTemplate;
         this.passwordResetTokenRepository = passwordResetTokenRepository;
     }
 
@@ -296,7 +299,18 @@ public class UserServiceImpl implements UserServiceInterface {
         return userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + id));
     }
+    @Override
+    public User findByIdWithVehicle(String id) {
+        // Create query to fetch user with vehicle populated
+        Query query = new Query(Criteria.where("id").is(id));
+        query.fields().include("assignedVehicle");
 
+        User user = mongoTemplate.findOne(query, User.class);
+        if (user == null) {
+            throw new ResourceNotFoundException("User not found with ID: " + id);
+        }
+        return user;
+    }
     @Override
     public List<UserDTO> findAvailableDrivers() {
         // Use the Role enum instead of a string

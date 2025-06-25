@@ -1,5 +1,6 @@
 package com.example.ExpedNow.dto;
 
+import com.example.ExpedNow.models.User;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import java.util.Date;
 
@@ -28,5 +29,10 @@ public record DeliveryResponseDTO(
         Double pickupLatitude,
         Double pickupLongitude,
         Double deliveryLatitude,
-        Double deliveryLongitude
+        Double deliveryLongitude,
+        Double rating,
+        boolean rated,
+        UserDTO deliveryPerson,  // أضف هذا
+        VehicleDTO assignedVehicle
 ) {}
+

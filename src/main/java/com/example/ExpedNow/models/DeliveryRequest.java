@@ -51,6 +51,8 @@ public class DeliveryRequest {
     private DeliveryReqStatus status = DeliveryReqStatus.PENDING;
 
 
+    private Double rating;
+    private boolean rated = false;
 
     private String deliveryPersonId;
 
@@ -85,7 +87,8 @@ public class DeliveryRequest {
         IN_TRANSIT,
         DELIVERED,
         CANCELLED,
-        EXPIRED // أضف هذا
+        EXPIRED,
+        RATED // أضف هذا
     }
 
 

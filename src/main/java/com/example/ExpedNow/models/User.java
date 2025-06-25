@@ -19,7 +19,6 @@ import java.util.Set;
 @Builder
 @Document(collection = "users")
 @JsonIgnoreProperties(ignoreUnknown = true)
-
 public class User {
     @Id
     private String id;
@@ -27,18 +26,24 @@ public class User {
     private String lastName;
     private String email;
     private String password;
-    private String resetToken;               // لحفظ رمز إعادة التعيين
+    private String resetToken;
     private LocalDateTime resetTokenExpiry;
+
     @Transient
     private String confirmPassword;
+
     private LocalDateTime tokenExpiryDate;
     private String phone;
     private String address;
     private Date dateOfRegistration;
+
+    @Builder.Default
     private double balance = 0.0;
+
     @Builder.Default
     private boolean approved = false;
-    @Transient // This annotation means the field won't be persisted in the database
+
+    @Transient
     private String userType;
 
     @Builder.Default
@@ -87,7 +92,7 @@ public class User {
     private boolean available = true;
 
     @Builder.Default
-    private int failedLoginAttempts = 0;  // Added initialization
+    private int failedLoginAttempts = 0;
 
     private LocalDateTime lockTime;
 
@@ -120,13 +125,14 @@ public class User {
         return this.roles.contains(role);
     }
 
+    // التصحيح: دالة التقييم الجديدة
     public void updateRating(double newRating) {
-        if (this.completedDeliveries == 0) {
+        if (this.ratingCount == 0) {
             this.rating = newRating;
         } else {
-            this.rating = ((this.rating * this.completedDeliveries) + newRating) / (this.completedDeliveries + 1);
+            this.rating = ((this.rating * this.ratingCount) + newRating) / (this.ratingCount + 1);
         }
-        this.completedDeliveries++;
+        this.ratingCount++;
     }
 
     public void markActive() {
@@ -143,13 +149,14 @@ public class User {
 
     // Performance metrics
     private double rating;
+    private int ratingCount; // الحقل الجديد
     private int completedDeliveries;
     private Date lastActive;
     private double successScore;
     private int totalDeliveries;
     private double averageDeliveryTime;
 
-
+    // Getters and Setters
     public String getResetToken() {
         return resetToken;
     }
@@ -174,7 +181,6 @@ public class User {
         this.userType = userType;
     }
 
-    // In User.java
     public Vehicle getAssignedVehicle() {
         return this.assignedVehicle;
     }
