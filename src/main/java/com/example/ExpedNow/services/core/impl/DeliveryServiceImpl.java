@@ -123,10 +123,7 @@
             delivery.setPaymentStatus(paymentStatus);
             delivery.setUpdatedAt(LocalDateTime.now());
 
-            // Update delivery status if payment is completed
-            if (paymentStatus == PaymentStatus.COMPLETED) {
-                delivery.setStatus(DeliveryRequest.DeliveryReqStatus.APPROVED);
-            }
+
 
             return deliveryRepository.save(delivery);
         }

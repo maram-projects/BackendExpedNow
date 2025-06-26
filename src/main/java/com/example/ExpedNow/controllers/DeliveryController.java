@@ -52,13 +52,16 @@ public class DeliveryController {
             response.put("delivery", convertToDto(delivery));
 
             if (delivery.getDeliveryPersonId() != null) {
-                // Use the new method that fetches vehicle info
-                User deliveryPerson = userService.findByIdWithVehicle(delivery.getDeliveryPersonId());
+                User deliveryPerson = userService.findById(delivery.getDeliveryPersonId());
 
                 Map<String, Object> personInfo = new HashMap<>();
                 personInfo.put("id", deliveryPerson.getId());
-                personInfo.put("fullName", deliveryPerson.getFirstName() + " " + deliveryPerson.getLastName());
-                personInfo.put("phone", deliveryPerson.getPhone());
+                // Ensure these fields aren't null
+                personInfo.put("firstName", deliveryPerson.getFirstName() != null ? deliveryPerson.getFirstName() : "");
+                personInfo.put("lastName", deliveryPerson.getLastName() != null ? deliveryPerson.getLastName() : "");
+                personInfo.put("fullName", deliveryPerson.getFullName()); // Add getFullName() method if needed
+                personInfo.put("phone", deliveryPerson.getPhone() != null ? deliveryPerson.getPhone() : "");
+                personInfo.put("email", deliveryPerson.getEmail());
 
                 // Add rating information
                 personInfo.put("rating", deliveryPerson.getRating());
@@ -435,18 +438,40 @@ public class DeliveryController {
         return ResponseEntity.ok(delivery);
     }
 
-
     @PostMapping("/{deliveryId}/rate")
     @PreAuthorize("hasAnyAuthority('ROLE_CLIENT','ROLE_INDIVIDUAL','ROLE_ENTERPRISE')")
     public ResponseEntity<?> rateDelivery(
             @PathVariable String deliveryId,
-            @RequestBody RatingRequest ratingRequest,
+            @Valid @RequestBody RatingRequest ratingRequest,
             @AuthenticationPrincipal UserDetails userDetails) {
-
-        String clientId = ((CustomUserDetailsService.CustomUserDetails) userDetails).getUserId();
         try {
+            String clientId = ((CustomUserDetailsService.CustomUserDetails) userDetails).getUserId();
+
+            // Get the delivery
+            DeliveryRequest delivery = deliveryService.getDeliveryById(deliveryId);
+
+            // Validate delivery status
+            if (delivery.getStatus() != DeliveryRequest.DeliveryReqStatus.DELIVERED) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Delivery not completed yet"));
+            }
+
+            // Validate client is the owner
+            if (!delivery.getClientId().equals(clientId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Not authorized to rate this delivery"));
+            }
+
+            // Validate not already rated
+            if (delivery.isRated()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Delivery already rated"));
+            }
+
+            // Process the rating
             deliveryService.rateDelivery(deliveryId, ratingRequest.rating(), clientId);
             return ResponseEntity.ok().build();
+
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

@@ -173,7 +173,8 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
 
     @Override
     public Payment confirmPayment(String transactionId, double amount) {
-        if (transactionId == null || transactionId.isEmpty()) {
+        // Input validation
+        if (transactionId == null || transactionId.trim().isEmpty()) {
             throw new IllegalArgumentException("Transaction ID cannot be null or empty");
         }
         if (amount <= 0) {
@@ -181,72 +182,169 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
         }
 
         try {
-            // First try to find by transactionId
-            Optional<Payment> paymentOpt = paymentRepository.findByTransactionId(transactionId);
-
-            if (paymentOpt.isEmpty()) {
-                // If not found, try to find by payment_id in Stripe metadata
-                PaymentIntent paymentIntent = stripeService.retrievePaymentIntent(transactionId);
-                String paymentId = paymentIntent.getMetadata().get("payment_id");
-                String deliveryId = paymentIntent.getMetadata().get("delivery_id");
-
-                if (paymentId != null) {
-                    paymentOpt = paymentRepository.findById(paymentId);
-                }
-
-                if (paymentOpt.isEmpty()) {
-                    // Create new payment record from Stripe data
-                    Payment newPayment = new Payment();
-                    newPayment.setTransactionId(transactionId);
-                    newPayment.setAmount(amount);
-                    newPayment.setStatus(PaymentStatus.COMPLETED);
-                    newPayment.setPaymentMethod(PaymentMethod.CREDIT_CARD);
-                    newPayment.setPaymentDate(LocalDateTime.now());
-
-                    // Set metadata fields if available
-                    if (paymentIntent.getMetadata() != null) {
-                        newPayment.setClientId(paymentIntent.getMetadata().get("client_id"));
-                        newPayment.setDeliveryId(paymentIntent.getMetadata().get("delivery_id"));
-                    }
-
-                    Payment savedPayment = paymentRepository.save(newPayment);
-
-                    // Update delivery status if deliveryId exists
-                    if (deliveryId != null && !deliveryId.isEmpty()) {
-                        deliveryService.updateDeliveryPaymentStatus(
-                                deliveryId,
-                                savedPayment.getId(),
-                                PaymentStatus.COMPLETED
-                        );
-                    }
-
-                    return savedPayment;
-                }
+            // Retrieve payment intent from Stripe once
+            PaymentIntent paymentIntent = stripeService.retrievePaymentIntent(transactionId);
+            if (paymentIntent == null) {
+                throw new IllegalStateException("PaymentIntent not found for transaction ID: " + transactionId);
             }
 
-            Payment payment = paymentOpt.get();
-            payment.setStatus(PaymentStatus.COMPLETED);
-            payment.setUpdatedAt(LocalDateTime.now());
-            payment.setAmount(amount);
-            payment.setPaymentDate(LocalDateTime.now());
+            // Convert Stripe amount (cents) to dollars
+            double stripeAmount = paymentIntent.getAmount() / 100.0;
 
+            // Validate amount consistency (optional - depends on your business logic)
+            if (Math.abs(stripeAmount - amount) > 0.01) { // Allow small floating-point differences
+                logger.warn("Amount mismatch for transaction {}: provided={}, stripe={}",
+                        transactionId, amount, stripeAmount);
+            }
+
+            // Use the amount from Stripe as the authoritative source
+            double finalAmount = stripeAmount;
+
+            // Extract metadata once
+            Map<String, String> metadata = paymentIntent.getMetadata();
+            String paymentId = metadata != null ? metadata.get("payment_id") : null;
+            String deliveryIdFromMetadata = metadata != null ? metadata.get("delivery_id") : null;
+            String clientIdFromMetadata = metadata != null ? metadata.get("client_id") : null;
+
+            // Try to find existing payment
+            Payment payment = findExistingPayment(transactionId, paymentId);
+
+            if (payment == null) {
+                // Create new payment record from Stripe data
+                payment = createPaymentFromStripeData(transactionId, finalAmount,
+                        clientIdFromMetadata, deliveryIdFromMetadata);
+                logger.info("Created new payment record from Stripe data: {}", payment.getId());
+            } else {
+                // Update existing payment
+                updateExistingPayment(payment, finalAmount);
+                logger.info("Updated existing payment: {}", payment.getId());
+            }
+
+            // Save the payment
             Payment savedPayment = paymentRepository.save(payment);
 
-            // Update delivery status if deliveryId exists
-            if (payment.getDeliveryId() != null && !payment.getDeliveryId().isEmpty()) {
-                deliveryService.updateDeliveryPaymentStatus(
-                        payment.getDeliveryId(),
-                        savedPayment.getId(),
-                        PaymentStatus.COMPLETED
-                );
-            }
+            // Update delivery status if needed
+            updateDeliveryStatusIfNeeded(savedPayment, deliveryIdFromMetadata);
 
+            logger.info("Payment confirmation completed successfully for transaction: {}", transactionId);
             return savedPayment;
+
+        } catch (StripeException e) {
+            logger.error("Stripe error while confirming payment {}: {}", transactionId, e.getMessage(), e);
+            throw new RuntimeException("Failed to retrieve payment information from Stripe: " + e.getMessage(), e);
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            logger.error("Validation error while confirming payment {}: {}", transactionId, e.getMessage(), e);
+            throw e; // Re-throw validation errors as-is
         } catch (Exception e) {
-            logger.error("Error confirming payment", e);
-            throw new RuntimeException("Failed to confirm payment: " + e.getMessage());
+            logger.error("Unexpected error confirming payment {}: {}", transactionId, e.getMessage(), e);
+            throw new RuntimeException("Failed to confirm payment: " + e.getMessage(), e);
         }
     }
+    private Payment createPaymentFromStripeData(String transactionId, double amount,
+                                                String clientId, String deliveryId) {
+        Payment newPayment = new Payment();
+        newPayment.setTransactionId(transactionId);
+        newPayment.setAmount(amount);
+        newPayment.setFinalAmountAfterDiscount(amount); // Set final amount initially
+        newPayment.setStatus(PaymentStatus.COMPLETED);
+        newPayment.setPaymentMethod(PaymentMethod.CREDIT_CARD);
+        newPayment.setPaymentDate(LocalDateTime.now());
+        newPayment.setCreatedAt(LocalDateTime.now());
+        newPayment.setUpdatedAt(LocalDateTime.now());
+
+        // Set metadata fields if available
+        if (clientId != null && !clientId.trim().isEmpty()) {
+            newPayment.setClientId(clientId);
+        }
+        if (deliveryId != null && !deliveryId.trim().isEmpty()) {
+            newPayment.setDeliveryId(deliveryId);
+        }
+
+        return newPayment;
+    }
+
+
+    /**
+     * Updates delivery status if delivery ID is available
+     */
+    private void updateDeliveryStatusIfNeeded(Payment payment, String deliveryIdFromMetadata) {
+        try {
+            String deliveryId = payment.getDeliveryId();
+
+            // Use delivery ID from metadata if payment doesn't have one
+            if ((deliveryId == null || deliveryId.trim().isEmpty()) &&
+                    deliveryIdFromMetadata != null && !deliveryIdFromMetadata.trim().isEmpty()) {
+                deliveryId = deliveryIdFromMetadata;
+                payment.setDeliveryId(deliveryId); // Update payment with delivery ID
+            }
+
+            if (deliveryId != null && !deliveryId.trim().isEmpty()) {
+                deliveryService.updateDeliveryPaymentStatus(
+                        deliveryId,
+                        payment.getId(),
+                        PaymentStatus.COMPLETED
+                );
+                logger.info("Updated delivery status for delivery: {}", deliveryId);
+            }
+        } catch (Exception e) {
+            // Log error but don't fail the payment confirmation
+            logger.error("Failed to update delivery status for payment {}: {}",
+                    payment.getId(), e.getMessage(), e);
+        }
+    }
+    /**
+     * Updates an existing payment with confirmation data
+     */
+    private void updateExistingPayment(Payment payment, double amount) {
+        // Only update if the payment is not already completed to avoid overwriting
+        if (payment.getStatus() != PaymentStatus.COMPLETED) {
+            payment.setStatus(PaymentStatus.COMPLETED);
+            payment.setPaymentDate(LocalDateTime.now());
+        }
+
+        payment.setUpdatedAt(LocalDateTime.now());
+
+        // Update amount if it's different (handle cases where amount might have changed)
+        if (Math.abs(payment.getAmount() - amount) > 0.01) {
+            logger.info("Updating payment amount from {} to {} for payment {}",
+                    payment.getAmount(), amount, payment.getId());
+            payment.setAmount(amount);
+
+            // Recalculate final amount if no discount was applied
+            if (payment.getDiscountAmount() == 0) {
+                payment.setFinalAmountAfterDiscount(amount);
+            } else {
+                // Keep existing discount but ensure final amount is not negative
+                double finalAmount = amount - payment.getDiscountAmount();
+                payment.setFinalAmountAfterDiscount(Math.max(0, finalAmount));
+            }
+        }
+    }
+
+
+
+    /**
+     * Attempts to find an existing payment by transaction ID first, then by payment ID
+     */
+    private Payment findExistingPayment(String transactionId, String paymentId) {
+        // First try to find by transactionId
+        Optional<Payment> paymentOpt = paymentRepository.findByTransactionId(transactionId);
+
+        if (paymentOpt.isPresent()) {
+            return paymentOpt.get();
+        }
+
+        // If not found and we have a payment ID from metadata, try that
+        if (paymentId != null && !paymentId.trim().isEmpty()) {
+            paymentOpt = paymentRepository.findById(paymentId);
+            if (paymentOpt.isPresent()) {
+                return paymentOpt.get();
+            }
+        }
+
+        return null; // No existing payment found
+    }
+
 
     @Override
     public Payment confirmPaymentByIntent(String paymentIntentId, double amount) {

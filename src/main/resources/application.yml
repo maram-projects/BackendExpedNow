@@ -64,7 +64,7 @@ app:
     url: http://localhost:4200
 
 jwt:
-  secret: u2ZL7e0r36gggv3aEBW6anDdkWwtja+/T99c2GPcENw=
+  secret: hzIOh5KpmuK48srRGTg3ip+5dqRxzCkyWTu0PxOfMGI=
   expirationMs: 86400000
   refreshExpirationMs: 604800000
 
