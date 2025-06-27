@@ -410,4 +410,18 @@
 
             return dto;
         }
+
+        // In DeliveryServiceImpl.java
+        @Override
+        public int countTodayCompletedDeliveries(String deliveryPersonId) {
+            LocalDateTime startOfDay = LocalDateTime.now().withHour(0).withMinute(0).withSecond(0);
+            LocalDateTime endOfDay = LocalDateTime.now().withHour(23).withMinute(59).withSecond(59);
+
+            return deliveryRepository.countByDeliveryPersonIdAndStatusAndCompletedAtBetween(
+                    deliveryPersonId,
+                    DeliveryRequest.DeliveryReqStatus.DELIVERED,
+                    startOfDay,
+                    endOfDay
+            );
+        }
     }

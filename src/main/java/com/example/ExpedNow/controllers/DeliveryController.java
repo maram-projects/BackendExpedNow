@@ -481,4 +481,16 @@ public class DeliveryController {
     public DeliveryResponseDTO getDeliveryWithDetails(@PathVariable String id) {
         return deliveryService.getDeliveryWithDetails(id);
     }
+
+
+    // In your DeliveryController.java
+    @GetMapping("/today-completed")
+    @PreAuthorize("hasRole('DELIVERY_PERSON')")
+    public ResponseEntity<Integer> getTodayCompletedDeliveries(
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        String deliveryPersonId = ((CustomUserDetailsService.CustomUserDetails) userDetails).getUserId();
+        int count = deliveryService.countTodayCompletedDeliveries(deliveryPersonId);
+        return ResponseEntity.ok(count);
+    }
 }

@@ -18,7 +18,8 @@ public class Payment {
     @Id
     private String id;
 
-    private String deliveryId; // الرابط مع طلب التوصيل
+    private String deliveryId;
+
     private String clientId;   // العميل الذي قام بالدفع
 
     private double amount;     // المبلغ
@@ -50,7 +51,9 @@ public class Payment {
     // Additional fields needed by the service
     private String clientSecret; // For Stripe payments
     private String discountCode; // Discount code used
-
+    private String deliveryPersonId; // رقم الموصل المسؤول عن التوصيل
+    private Double deliveryPersonShare; // حصة الموصل من المبلغ (مثلا 70%)
+    private Boolean deliveryPersonPaid = false; // هل تم دفع حصة الموصل
 
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
     private LocalDateTime paymentDate;
@@ -65,7 +68,13 @@ public class Payment {
     public PaymentMethod getPaymentMethod() {
         return this.method;
     }
+    public String getClientId() {
+        return clientId;
+    }
 
+    public void setClientId(String clientId) {
+        this.clientId = clientId;
+    }
     public void setPaymentMethod(PaymentMethod paymentMethod) {
         this.method = paymentMethod;
     }

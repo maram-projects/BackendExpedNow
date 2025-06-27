@@ -37,4 +37,7 @@ public interface DeliveryServiceInterface {
     void rateDelivery(String deliveryId, double rating, String clientId);
 
     DeliveryResponseDTO getDeliveryWithDetails(String deliveryId);
+
+    // In DeliveryServiceImpl.java
+    int countTodayCompletedDeliveries(String deliveryPersonId);
 }

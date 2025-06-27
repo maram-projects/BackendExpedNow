@@ -15,6 +15,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
@@ -47,9 +48,8 @@ public class AvailabilityController {
     // Basic CRUD operations
 
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or #scheduleDTO.userId == authentication.principal.id")
-    public ResponseEntity<?> createOrUpdateSchedule(@RequestBody @Valid AvailabilityDTO scheduleDTO,
-                                                    Authentication authentication) {
+    @PreAuthorize("@securityService.canAccessAvailability(authentication, #scheduleDTO.userId)")
+    public ResponseEntity<?> createOrUpdateSchedule(@RequestBody @Valid AvailabilityDTO scheduleDTO, Authentication authentication) {
         try {
             // Log the operation
             String currentUser = authentication.getName();
@@ -61,7 +61,8 @@ public class AvailabilityController {
                     isAdmin ? "creating/updating" : "updating own",
                     scheduleDTO.getUserId());
 
-            AvailabilitySchedule savedSchedule = availabilityService.saveSchedule(scheduleDTO);
+            // Pass the isAdmin flag to the service
+            AvailabilitySchedule savedSchedule = availabilityService.saveSchedule(scheduleDTO, isAdmin);
 
             return ResponseEntity.ok(Map.of(
                     "success", true,
@@ -74,6 +75,10 @@ public class AvailabilityController {
         } catch (IllegalArgumentException e) {
             return ResponseEntity.status(HttpStatus.BAD_REQUEST)
                     .body(Map.of("success", false, "message", e.getMessage()));
+        } catch (AccessDeniedException e) {
+            // Handle access denied exception specifically
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .body(Map.of("success", false, "message", e.getMessage()));
         } catch (Exception e) {
             logger.error("Error saving schedule for user {}: {}", scheduleDTO.getUserId(), e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
@@ -81,11 +86,12 @@ public class AvailabilityController {
         }
     }
 
-
     @GetMapping("/{userId}")
     @PreAuthorize("@securityService.canAccessAvailability(authentication, #userId)")
     public ResponseEntity<?> getSchedule(@PathVariable String userId,
                                          Authentication authentication) {
+        logger.info("Fetching schedule for user: {}", userId); // Add this
+
         try {
             AvailabilityDTO schedule = availabilityService.getScheduleForUser(userId);
 
@@ -105,7 +111,6 @@ public class AvailabilityController {
         }
     }
 
-    // Admin specific endpoint to create schedule for delivery person
     @PostMapping("/admin/create-for-delivery-person/{deliveryPersonId}")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> adminCreateScheduleForDeliveryPerson(
@@ -149,7 +154,8 @@ public class AvailabilityController {
                 logger.info("No existing schedule found for delivery person {}, creating new one", deliveryPersonId);
             }
 
-            AvailabilitySchedule savedSchedule = availabilityService.saveSchedule(scheduleDTO);
+            // Pass true for isAdmin since this is an admin operation
+            AvailabilitySchedule savedSchedule = availabilityService.saveSchedule(scheduleDTO, true);
 
             logger.info("Admin {} created schedule for delivery person {}",
                     authentication.getName(), deliveryPersonId);
@@ -323,7 +329,7 @@ public class AvailabilityController {
     // Weekly schedule operations
 
     @PutMapping("/{userId}/day/{day}")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.id")
+    @PreAuthorize("@securityService.canAccessAvailability(authentication, #userId)")
     public ResponseEntity<AvailabilitySchedule> updateDayAvailability(
             @PathVariable String userId,
             @PathVariable DayOfWeek day,
@@ -350,7 +356,7 @@ public class AvailabilityController {
     // Date-specific operations
 
     @PutMapping("/{userId}/date/{date}")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.id")
+    @PreAuthorize("@securityService.canAccessAvailability(authentication, #userId)")
     public ResponseEntity<AvailabilitySchedule> updateDateAvailability(
             @PathVariable String userId,
             @PathVariable @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
@@ -365,7 +371,7 @@ public class AvailabilityController {
     }
 
     @PutMapping("/{userId}/daterange")
-    @PreAuthorize("hasRole('ADMIN') or #userId == authentication.principal.id")
+    @PreAuthorize("@securityService.canAccessAvailability(authentication, #userId)")
     public ResponseEntity<?> updateDateRangeAvailability(
             @PathVariable String userId,
             @RequestParam @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate startDate,

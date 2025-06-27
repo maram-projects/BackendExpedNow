@@ -2,6 +2,7 @@ package com.example.ExpedNow.services.core;
 
 import com.example.ExpedNow.dto.AvailabilityDTO;
 import com.example.ExpedNow.models.AvailabilitySchedule;
+import org.springframework.security.access.AccessDeniedException;
 
 import java.time.DayOfWeek;
 import java.time.LocalDate;
@@ -11,7 +12,6 @@ import java.util.List;
 import java.util.Set;
 
 public interface AvailabilityServiceInterface {
-    AvailabilitySchedule saveSchedule(AvailabilityDTO scheduleDTO);
     AvailabilityDTO getScheduleForUser(String userId);
     boolean isUserAvailableAt(String userId, DayOfWeek day, LocalTime time);
     boolean isUserAvailableAt(String userId, LocalDate date, LocalTime time);
@@ -26,8 +26,7 @@ public interface AvailabilityServiceInterface {
     AvailabilitySchedule setWeekdaysInRangeAvailability(String userId, LocalDate startDate, LocalDate endDate, Set<DayOfWeek> daysOfWeek, boolean isWorking, LocalTime startTime, LocalTime endTime);
     AvailabilitySchedule copyMonthlyAvailability(String userId, LocalDate sourceMonthStart, LocalDate targetMonthStart);
     AvailabilitySchedule clearAllMonthlySchedule(String userId);
-
-    /**
+    AvailabilitySchedule saveSchedule(AvailabilityDTO scheduleDTO, boolean isAdmin) throws AccessDeniedException;    /**
      * Check if a user has an existing availability schedule
      * @param userId the user ID to check
      * @return true if the user has a meaningful schedule, false otherwise

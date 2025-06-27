@@ -20,6 +20,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.*;
+import org.springframework.security.access.AccessDeniedException;
 import java.util.stream.Collectors;
 
 @Service
@@ -37,9 +38,9 @@ public class AvailabilityServiceImpl implements AvailabilityServiceInterface {
     }
 
     @Override
-    public AvailabilitySchedule saveSchedule(AvailabilityDTO scheduleDTO) {
+    public AvailabilitySchedule saveSchedule(AvailabilityDTO scheduleDTO, boolean isAdmin) {
         // Log the incoming user ID for debugging
-        logger.info("Saving schedule for user ID: {}", scheduleDTO.getUserId());
+        logger.info("Saving schedule for user ID: {} (Admin: {})", scheduleDTO.getUserId(), isAdmin);
 
         // Validate schedule
         if (scheduleDTO.getUserId() == null || scheduleDTO.getUserId().isEmpty()) {
@@ -74,51 +75,128 @@ public class AvailabilityServiceImpl implements AvailabilityServiceInterface {
             });
         }
 
-        // Try to find user by email first (if userId looks like an email)
+        // Handle email lookup and user validation
+        String actualUserId = scheduleDTO.getUserId();
         if (scheduleDTO.getUserId().contains("@")) {
             Optional<User> userByEmail = userRepository.findByEmail(scheduleDTO.getUserId());
             if (userByEmail.isPresent()) {
-                // If user is found by email, use their ID instead
-                scheduleDTO.setUserId(userByEmail.get().getId());
+                actualUserId = userByEmail.get().getId();
+                scheduleDTO.setUserId(actualUserId);
             } else if (!userRepository.existsById(scheduleDTO.getUserId())) {
                 throw new ResourceNotFoundException("User not found with email: " + scheduleDTO.getUserId());
             }
         } else if (!userRepository.existsById(scheduleDTO.getUserId())) {
-            // If userId doesn't look like email, verify it exists as a user ID
             throw new ResourceNotFoundException("User not found with ID: " + scheduleDTO.getUserId());
         }
 
-        // Convert DTO to entity
-        AvailabilitySchedule schedule = convertToEntity(scheduleDTO);
+        // Check if schedule exists
+        Optional<AvailabilitySchedule> existingScheduleOpt =
+                availabilityRepository.findByUserId(actualUserId);
+
+        // ACCESS CONTROL: CREATE operation - Only allowed for admins
+        if (existingScheduleOpt.isEmpty() && !isAdmin) {
+            throw new AccessDeniedException("Only admins can create new schedules");
+        }
+
+        AvailabilitySchedule schedule;
+
+        if (existingScheduleOpt.isPresent()) {
+            // UPDATE operation: Update existing schedule
+            schedule = existingScheduleOpt.get();
+            logger.info("Updating existing schedule for user: {}", actualUserId);
+
+            // Update weekly schedule if provided
+            if (scheduleDTO.getWeeklySchedule() != null) {
+                schedule.setWeeklySchedule(convertWeeklySchedule(scheduleDTO.getWeeklySchedule()));
+            }
+
+            // Update monthly schedule if provided
+            if (scheduleDTO.getMonthlySchedule() != null) {
+                schedule.setMonthlySchedule(convertMonthlySchedule(scheduleDTO.getMonthlySchedule()));
+            }
+        } else {
+            // CREATE operation: Only admins can reach this point
+            logger.info("Creating new schedule for user: {}", actualUserId);
+            schedule = convertToEntity(scheduleDTO);
+        }
 
         // Save and return
         return availabilityRepository.save(schedule);
     }
 
+    // Helper method for converting weekly schedule DTO to entity
+    private Map<DayOfWeek, AvailabilitySchedule.DaySchedule> convertWeeklySchedule(
+            Map<DayOfWeek, AvailabilityDTO.DayScheduleDTO> weeklyDTO) {
+
+        Map<DayOfWeek, AvailabilitySchedule.DaySchedule> weeklySchedule = new HashMap<>();
+
+        if (weeklyDTO != null) {
+            for (Map.Entry<DayOfWeek, AvailabilityDTO.DayScheduleDTO> entry : weeklyDTO.entrySet()) {
+                AvailabilityDTO.DayScheduleDTO dayScheduleDTO = entry.getValue();
+                AvailabilitySchedule.DaySchedule daySchedule = new AvailabilitySchedule.DaySchedule(
+                        dayScheduleDTO.isWorking(),
+                        dayScheduleDTO.getStartTime(),
+                        dayScheduleDTO.getEndTime()
+                );
+                weeklySchedule.put(entry.getKey(), daySchedule);
+            }
+        }
+
+        return weeklySchedule;
+    }
+
+    // Helper method for converting monthly schedule DTO to entity
+    private Map<LocalDate, AvailabilitySchedule.DaySchedule> convertMonthlySchedule(
+            Map<LocalDate, AvailabilityDTO.DayScheduleDTO> monthlyDTO) {
+
+        Map<LocalDate, AvailabilitySchedule.DaySchedule> monthlySchedule = new TreeMap<>();
+
+        if (monthlyDTO != null) {
+            for (Map.Entry<LocalDate, AvailabilityDTO.DayScheduleDTO> entry : monthlyDTO.entrySet()) {
+                AvailabilityDTO.DayScheduleDTO dayScheduleDTO = entry.getValue();
+                AvailabilitySchedule.DaySchedule daySchedule = new AvailabilitySchedule.DaySchedule(
+                        dayScheduleDTO.isWorking(),
+                        dayScheduleDTO.getStartTime(),
+                        dayScheduleDTO.getEndTime()
+                );
+                monthlySchedule.put(entry.getKey(), daySchedule);
+            }
+        }
+
+        return monthlySchedule;
+    }
     @Override
     public AvailabilityDTO getScheduleForUser(String userId) {
         // First try to find directly by userId
-        Optional<AvailabilitySchedule> scheduleByUserId = availabilityRepository.findByUserId(userId);
+        List<AvailabilitySchedule> schedules = availabilityRepository.findAllByUserId(userId);
 
         // If not found and userId looks like an email, try finding the user and then their schedule
-        if (scheduleByUserId.isEmpty() && userId.contains("@")) {
+        if (schedules.isEmpty() && userId.contains("@")) {
             Optional<User> userByEmail = userRepository.findByEmail(userId);
             if (userByEmail.isPresent()) {
-                scheduleByUserId = availabilityRepository.findByUserId(userByEmail.get().getId());
+                schedules = availabilityRepository.findAllByUserId(userByEmail.get().getId());
                 logger.info("Found user by email: {}, looking up schedule by ID: {}",
                         userId, userByEmail.get().getId());
             }
         }
 
-        AvailabilitySchedule schedule = scheduleByUserId.orElseGet(() -> {
+        AvailabilitySchedule schedule;
+        if (schedules.isEmpty()) {
             // Create a default schedule if none exists
             logger.info("Creating new availability schedule for user: {}", userId);
-            AvailabilitySchedule newSchedule = new AvailabilitySchedule(userId);
-            return availabilityRepository.save(newSchedule);
-        });
+            schedule = new AvailabilitySchedule(userId);
+            schedule = availabilityRepository.save(schedule);
+        } else if (schedules.size() > 1) {
+            // Handle duplicate schedules - log warning and use first one
+            logger.warn("Multiple schedules found for user {}. Using first one.", userId);
+            schedule = schedules.get(0);
+        } else {
+            schedule = schedules.get(0);
+        }
 
         return convertToDTO(schedule);
     }
+
 
     @Override
     public boolean isUserAvailableAt(String userId, DayOfWeek day, LocalTime time) {

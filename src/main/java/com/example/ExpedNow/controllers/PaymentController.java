@@ -3,6 +3,7 @@ package com.example.ExpedNow.controllers;
 import com.example.ExpedNow.models.Payment;
 import com.example.ExpedNow.models.enums.PaymentMethod;
 import com.example.ExpedNow.models.enums.PaymentStatus;
+import com.example.ExpedNow.services.core.DeliveryPaymentServiceInterface;
 import com.example.ExpedNow.services.core.PaymentServiceInterface;
 import com.example.ExpedNow.services.core.DeliveryServiceInterface; // Add this import
 import jakarta.validation.Valid;
@@ -15,6 +16,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -25,11 +27,16 @@ import java.util.*;
 public class PaymentController {
 
     private static final Logger logger = LoggerFactory.getLogger(PaymentController.class);
+    private final DeliveryPaymentServiceInterface deliveryPaymentService; // أضف هذا السطر
 
     @Autowired
     private PaymentServiceInterface paymentService;
     @Autowired
     private DeliveryServiceInterface deliveryService; // Fix the type here
+
+    public PaymentController(DeliveryPaymentServiceInterface deliveryPaymentService) {
+        this.deliveryPaymentService = deliveryPaymentService;
+    }
 
     // CREATE PAYMENT
     @PostMapping
@@ -120,6 +127,7 @@ public class PaymentController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
+
     @PostMapping("/confirm")
     public ResponseEntity<Map<String, Object>> confirmPayment(
             @RequestBody Map<String, Object> requestBody) {
@@ -203,6 +211,7 @@ public class PaymentController {
         response.put("timestamp", LocalDateTime.now().toString());
         return ResponseEntity.status(status).body(response);
     }
+
     // GET ALL PAYMENTS WITH PAGINATION AND FILTERS
     @GetMapping
     public ResponseEntity<Map<String, Object>> getAllPayments(
@@ -263,33 +272,58 @@ public class PaymentController {
         }
     }
 
-    // GET PAYMENTS BY CLIENT
+    // GET PAYMENTS BY CLIENT - with additional security
+    // GET PAYMENTS BY CLIENT - with debugging
     @GetMapping("/client/{clientId}")
     public ResponseEntity<Map<String, Object>> getPaymentsByClient(@PathVariable String clientId) {
+        logger.info("=== DEBUG: getPaymentsByClient called ===");
+        logger.info("Client ID: {}", clientId);
+
         try {
+            // Check if clientId is valid
+            if (clientId == null || clientId.trim().isEmpty()) {
+                logger.error("Client ID is null or empty");
+                throw new IllegalArgumentException("Client ID cannot be null or empty");
+            }
+
+            logger.info("Calling paymentService.getPaymentsByClient with clientId: {}", clientId);
+
+            // Check if paymentService is injected properly
+            if (paymentService == null) {
+                logger.error("PaymentService is null!");
+                throw new RuntimeException("PaymentService not properly injected");
+            }
+
             List<Payment> payments = paymentService.getPaymentsByClient(clientId);
+            logger.info("Successfully retrieved {} payments for client {}",
+                    payments != null ? payments.size() : 0, clientId);
 
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("data", payments);
-            response.put("count", payments.size());
+            response.put("count", payments != null ? payments.size() : 0);
 
+            logger.info("Returning successful response");
             return ResponseEntity.ok(response);
+
         } catch (IllegalArgumentException e) {
-            logger.error("Invalid client ID: {}", e.getMessage());
+            logger.error("Invalid client ID: {}", e.getMessage(), e);
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);
             errorResponse.put("message", e.getMessage());
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+
         } catch (Exception e) {
-            logger.error("Error retrieving payments for client: {}", e.getMessage());
+            logger.error("Error retrieving payments for client: {}", e.getMessage(), e);
+            logger.error("Exception type: {}", e.getClass().getSimpleName());
+            logger.error("Full stack trace: ", e);
+
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);
             errorResponse.put("message", "Failed to retrieve client payments: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
     }
-
     // GET PAYMENTS BY DELIVERY
     @GetMapping("/delivery/{deliveryId}")
     public ResponseEntity<Map<String, Object>> getPaymentsByDelivery(@PathVariable String deliveryId) {
@@ -616,6 +650,23 @@ public class PaymentController {
             errorResponse.put("success", false);
             errorResponse.put("message", "Failed to process bank transfer payment: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
+        }
+    }
+
+
+    @PostMapping("/{paymentId}/release-to-delivery")
+    public ResponseEntity<?> releaseToDelivery(@PathVariable String paymentId) {
+        try {
+            deliveryPaymentService.processDeliveryPayment(paymentId);
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "تم تحويل الحصة للموصل بنجاح"
+            ));
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body(Map.of(
+                    "success", false,
+                    "message", e.getMessage()
+            ));
         }
     }
 }

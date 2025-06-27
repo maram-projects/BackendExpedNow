@@ -18,7 +18,6 @@ import java.util.Optional;
 public interface PaymentRepository extends MongoRepository<Payment, String> {
 
     // Basic finder methods
-    List<Payment> findByClientId(String clientId);
     List<Payment> findByDeliveryId(String deliveryId);
     List<Payment> findByStatus(PaymentStatus status);
     List<Payment> findByMethod(PaymentMethod method); // Note: field name is 'method' in your model
@@ -95,4 +94,11 @@ public interface PaymentRepository extends MongoRepository<Payment, String> {
     Optional<Payment> findByTransactionId(String transactionId);
     @Query("{ 'transactionId': ?0 }")
     Optional<Payment> findByStripePaymentIntentId(String paymentIntentId);
+
+    List<Payment> findByClientId(String clientId);
+
+    List<Payment> findByDeliveryPersonId(String deliveryPersonId);
+
+    @Query("{ 'deliveryPersonPaid': false, 'status': 'COMPLETED' }")
+    List<Payment> findUnpaidDeliveryPayments();
 }

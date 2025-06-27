@@ -21,10 +21,7 @@ import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
-import java.util.Optional;
+import java.util.*;
 
 @Service
 public class PaymentServiceImpl implements PaymentServiceInterface {
@@ -527,14 +524,22 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
 
     @Override
     public List<Payment> getPaymentsByClient(String clientId) {
+        logger.info("PaymentService.getPaymentsByClient called with clientId: {}", clientId);
+
         try {
-            if (clientId == null || clientId.isEmpty()) {
+            if (clientId == null || clientId.trim().isEmpty()) {
                 throw new IllegalArgumentException("Client ID cannot be null or empty");
             }
-            return paymentRepository.findByClientId(clientId);
+
+            // Make sure your repository method exists and works
+            List<Payment> payments = paymentRepository.findByClientId(clientId);
+            logger.info("Found {} payments for client {}", payments.size(), clientId);
+
+            return payments != null ? payments : new ArrayList<>();
+
         } catch (Exception e) {
-            logger.error("Error getting payments for client {}: {}", clientId, e.getMessage());
-            throw new RuntimeException("Failed to retrieve payments for client: " + e.getMessage());
+            logger.error("Error in PaymentService.getPaymentsByClient: {}", e.getMessage(), e);
+            throw e; // Re-throw to let controller handle it
         }
     }
 
