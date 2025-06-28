@@ -46,33 +46,76 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
     @Override
     public Payment createPayment(Payment payment) {
         try {
-            // Set initial values
+            // 1. Validate input parameters
+            if (payment == null) {
+                throw new IllegalArgumentException("Payment cannot be null");
+            }
+            // Fixed: Check for null before comparing value
+            if (payment.getAmount() == null || payment.getAmount() <= 0) {
+                throw new IllegalArgumentException("Payment amount must be positive");
+            }
+            if (payment.getPaymentMethod() == null) {
+                throw new IllegalArgumentException("Payment method is required");
+            }
+
+            // 2. Set default values
             payment.setCreatedAt(LocalDateTime.now());
             payment.setStatus(PaymentStatus.PENDING);
 
-            // Save payment first to get ID
+            // Ensure final amount is properly set
+            if (payment.getFinalAmountAfterDiscount() == null) {
+                payment.setFinalAmountAfterDiscount(payment.getAmount());
+            }
+
+            // Validate final amount
+            if (payment.getFinalAmountAfterDiscount() <= 0) {
+                throw new IllegalArgumentException("Final payment amount must be positive");
+            }
+
+            // 3. Initial save to generate ID
             Payment savedPayment = paymentRepository.save(payment);
 
-            // Create Stripe PaymentIntent for card payments
+            // 4. Handle credit card payments
             if (payment.getPaymentMethod() == PaymentMethod.CREDIT_CARD) {
                 try {
+                    logger.info("Creating Stripe payment intent for payment: {}", savedPayment.getId());
+
                     PaymentIntent paymentIntent = stripeService.createPaymentIntent(savedPayment);
                     savedPayment.setTransactionId(paymentIntent.getId());
                     savedPayment.setClientSecret(paymentIntent.getClientSecret());
-                    savedPayment = paymentRepository.save(savedPayment);
+
+                    logger.info("Stripe PaymentIntent created: {}", paymentIntent.getId());
+
+                    // Update payment with Stripe details
+                    return paymentRepository.save(savedPayment);
                 } catch (StripeException e) {
-                    logger.error("Error creating Stripe PaymentIntent", e);
-                    // Don't fail - we can try again later
+                    logger.error("Stripe error creating PaymentIntent for payment {}: {}",
+                            savedPayment.getId(), e.getMessage(), e);
+
+                    // Critical: Delete payment record if Stripe fails
+                    paymentRepository.deleteById(savedPayment.getId());
+
+                    throw new RuntimeException("Payment processing failed: " + e.getMessage(), e);
+                } catch (Exception e) {
+                    logger.error("Unexpected error during Stripe processing for payment {}: {}",
+                            savedPayment.getId(), e.getMessage(), e);
+
+                    paymentRepository.deleteById(savedPayment.getId());
+                    throw new RuntimeException("Payment processing failed", e);
                 }
             }
 
+            // 5. Return non-card payments directly
+            logger.info("Created non-card payment: {}", savedPayment.getId());
             return savedPayment;
+        } catch (IllegalArgumentException e) {
+            logger.error("Validation error creating payment: {}", e.getMessage());
+            throw e; // Re-throw validation exceptions
         } catch (Exception e) {
-            logger.error("Error creating payment", e);
-            throw new RuntimeException("Failed to create payment: " + e.getMessage());
+            logger.error("Unexpected error creating payment: {}", e.getMessage(), e);
+            throw new RuntimeException("Payment creation failed: " + e.getMessage(), e);
         }
     }
-
     @Override
     public Payment processPayment(String paymentId, String discountCode) {
         try {
@@ -208,7 +251,7 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
 
             if (payment == null) {
                 // Create new payment record from Stripe data
-                payment = createPaymentFromStripeData(transactionId, finalAmount,
+                payment = createPaymentFromStripeData(transactionId, paymentIntent, finalAmount,
                         clientIdFromMetadata, deliveryIdFromMetadata);
                 logger.info("Created new payment record from Stripe data: {}", payment.getId());
             } else {
@@ -237,19 +280,34 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
             throw new RuntimeException("Failed to confirm payment: " + e.getMessage(), e);
         }
     }
-    private Payment createPaymentFromStripeData(String transactionId, double amount,
+    private Payment createPaymentFromStripeData(String transactionId, PaymentIntent paymentIntent, double amount,
                                                 String clientId, String deliveryId) {
         Payment newPayment = new Payment();
         newPayment.setTransactionId(transactionId);
-        newPayment.setAmount(amount);
-        newPayment.setFinalAmountAfterDiscount(amount); // Set final amount initially
+
+        // Use original amount from metadata if available
+        Map<String, String> metadata = paymentIntent.getMetadata();
+        if (metadata != null && metadata.containsKey("original_amount")) {
+            double originalAmount = Double.parseDouble(metadata.get("original_amount"));
+            String originalCurrency = metadata.get("original_currency");
+
+            newPayment.setAmount(originalAmount);
+            newPayment.setCurrency(originalCurrency);
+            newPayment.setFinalAmountAfterDiscount(originalAmount);
+        } else {
+            // Fallback to Stripe amount (shouldn't happen)
+            newPayment.setAmount(amount);
+            newPayment.setCurrency("usd");
+            newPayment.setFinalAmountAfterDiscount(amount);
+        }
+
         newPayment.setStatus(PaymentStatus.COMPLETED);
         newPayment.setPaymentMethod(PaymentMethod.CREDIT_CARD);
         newPayment.setPaymentDate(LocalDateTime.now());
         newPayment.setCreatedAt(LocalDateTime.now());
         newPayment.setUpdatedAt(LocalDateTime.now());
 
-        // Set metadata fields if available
+        // Set metadata fields
         if (clientId != null && !clientId.trim().isEmpty()) {
             newPayment.setClientId(clientId);
         }
@@ -292,32 +350,17 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
     /**
      * Updates an existing payment with confirmation data
      */
-    private void updateExistingPayment(Payment payment, double amount) {
-        // Only update if the payment is not already completed to avoid overwriting
+    private void updateExistingPayment(Payment payment, double stripeAmount) {
+        // Only update status, not amount
         if (payment.getStatus() != PaymentStatus.COMPLETED) {
             payment.setStatus(PaymentStatus.COMPLETED);
             payment.setPaymentDate(LocalDateTime.now());
         }
-
         payment.setUpdatedAt(LocalDateTime.now());
 
-        // Update amount if it's different (handle cases where amount might have changed)
-        if (Math.abs(payment.getAmount() - amount) > 0.01) {
-            logger.info("Updating payment amount from {} to {} for payment {}",
-                    payment.getAmount(), amount, payment.getId());
-            payment.setAmount(amount);
 
-            // Recalculate final amount if no discount was applied
-            if (payment.getDiscountAmount() == 0) {
-                payment.setFinalAmountAfterDiscount(amount);
-            } else {
-                // Keep existing discount but ensure final amount is not negative
-                double finalAmount = amount - payment.getDiscountAmount();
-                payment.setFinalAmountAfterDiscount(Math.max(0, finalAmount));
-            }
-        }
+        // DO NOT update amount from Stripe
     }
-
 
 
     /**
@@ -640,5 +683,4 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
             payment.setFinalAmountAfterDiscount(payment.getAmount());
             return payment;
         }
-    }
-}
+    }}

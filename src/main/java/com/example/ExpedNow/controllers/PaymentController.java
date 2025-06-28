@@ -42,26 +42,24 @@ public class PaymentController {
     @PostMapping
     public ResponseEntity<Map<String, Object>> createPayment(@Valid @RequestBody Payment payment) {
         try {
-            // Add detailed logging to debug the issue
-            logger.info("Received payment creation request");
-            logger.info("Payment data: {}", payment);
-
             Payment createdPayment = paymentService.createPayment(payment);
 
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("message", "Payment created successfully");
-            response.put("data", createdPayment);
 
-            // Include the clientSecret and paymentId in the response
+            // Add these required fields at the root level
+            response.put("paymentId", createdPayment.getId());
+
             if (createdPayment.getPaymentMethod() == PaymentMethod.CREDIT_CARD) {
                 response.put("clientSecret", createdPayment.getClientSecret());
             }
-            response.put("paymentId", createdPayment.getId());
 
-            logger.info("Payment created successfully with ID: {}", createdPayment.getId());
+            // Keep the full payment in data for reference
+            response.put("data", createdPayment);
+
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
-        } catch (IllegalArgumentException e) {
+        }catch (IllegalArgumentException e) {
             logger.error("Invalid payment data: {}", e.getMessage(), e);
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);

@@ -22,9 +22,10 @@ public class Payment {
 
     private String clientId;   // العميل الذي قام بالدفع
 
-    private double amount;     // المبلغ
-    private double finalAmountAfterDiscount; // المبلغ بعد الخصم
-    private String currency;   // العملة (TND, USD, EUR, etc.) - الإضافة الجديدة
+    // Changed to Double (wrapper class) to allow null values
+    private Double amount;     // المبلغ
+    private Double finalAmountAfterDiscount; // المبلغ بعد الخصم
+    private String currency;   // العملة (TND, USD, EUR, etc.)
 
     @Field(targetType = FieldType.STRING)
     private PaymentMethod method; // طريقة الدفع
@@ -46,7 +47,7 @@ public class Payment {
 
     // خصومات إذا وجدت
     private String discountId;   // رابط مع نموذج الخصم إذا استخدم العميل خصم
-    private double discountAmount; // قيمة الخصم
+    private Double discountAmount; // قيمة الخصم (changed to Double)
 
     // Additional fields needed by the service
     private String clientSecret; // For Stripe payments
@@ -68,6 +69,7 @@ public class Payment {
     public PaymentMethod getPaymentMethod() {
         return this.method;
     }
+
     public String getClientId() {
         return clientId;
     }
@@ -75,6 +77,7 @@ public class Payment {
     public void setClientId(String clientId) {
         this.clientId = clientId;
     }
+
     public void setPaymentMethod(PaymentMethod paymentMethod) {
         this.method = paymentMethod;
     }

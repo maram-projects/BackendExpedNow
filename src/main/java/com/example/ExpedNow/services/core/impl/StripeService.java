@@ -28,38 +28,125 @@ public class StripeService {
      * Create a payment intent with Stripe
      */
     public PaymentIntent createPaymentIntent(Payment payment) throws StripeException {
-        double amountToCharge = payment.getFinalAmountAfterDiscount() > 0 ?
-                payment.getFinalAmountAfterDiscount() : payment.getAmount();
+        // Validate input payment object
+        if (payment == null) {
+            throw new IllegalArgumentException("Payment cannot be null");
+        }
 
-        long amountInCents = Math.round(amountToCharge * 100);
-        String currency = payment.getCurrency().toLowerCase(); // Use currency from payment
+        // Validate that amount is not null
+        if (payment.getAmount() == null) {
+            throw new IllegalArgumentException("Payment amount cannot be null");
+        }
 
+        // Use safe amount retrieval with default to original amount
+        Double amountToCharge = payment.getFinalAmountAfterDiscount() != null ?
+                payment.getFinalAmountAfterDiscount() :
+                payment.getAmount();
+
+        // Additional null check for amountToCharge (shouldn't happen but for safety)
+        if (amountToCharge == null || amountToCharge <= 0) {
+            throw new IllegalArgumentException("Payment amount must be positive");
+        }
+
+        // Normalize currency
+        String currency = payment.getCurrency() != null ?
+                payment.getCurrency().toLowerCase() :
+                "tnd";
+
+        logger.info("Creating payment intent for {} {}. Original amount: {} {}",
+                amountToCharge, currency,
+                payment.getAmount(), payment.getCurrency());
+
+        // Validate minimum amount in TND BEFORE conversion
+        if ("tnd".equals(currency)) {
+            double minTnd = 1.56; // $0.50 USD equivalent
+            if (amountToCharge < minTnd) {
+                String errorMsg = String.format(
+                        "Amount too small. Minimum charge is %.2f TND (≈$0.50 USD). Provided: %.2f TND",
+                        minTnd, amountToCharge
+                );
+                logger.warn(errorMsg);
+                throw new IllegalArgumentException(errorMsg);
+            }
+        }
+
+        // Convert TND to USD for Stripe
+        double convertedAmount = amountToCharge;
+        if ("tnd".equals(currency)) {
+            double exchangeRate = getExchangeRate(); // Could implement dynamic rates later
+            convertedAmount = amountToCharge * exchangeRate;
+            currency = "usd";
+            logger.debug("Converted {} TND to {} USD (rate: {})",
+                    amountToCharge, convertedAmount, exchangeRate);
+        }
+
+        // Convert to cents and validate USD minimum
+        long amountInCents = Math.round(convertedAmount * 100);
+        if ("usd".equals(currency) && amountInCents < 50) {
+            String errorMsg = String.format(
+                    "Amount too small. Minimum charge is $0.50 USD. Converted amount: $%.2f USD",
+                    convertedAmount
+            );
+            logger.warn(errorMsg);
+            throw new IllegalArgumentException(errorMsg);
+        }
+
+        logger.info("Creating PaymentIntent for {} {} ({} cents)",
+                convertedAmount, currency, amountInCents);
+
+        // Build PaymentIntent parameters
         PaymentIntentCreateParams.Builder paramsBuilder = PaymentIntentCreateParams.builder()
                 .setAmount(amountInCents)
-                .setCurrency(currency)  // Use dynamic currency
+                .setCurrency(currency)
                 .setAutomaticPaymentMethods(
                         PaymentIntentCreateParams.AutomaticPaymentMethods.builder()
                                 .setEnabled(true)
                                 .build()
-                );
+                )
+                .putMetadata("original_amount", String.valueOf(amountToCharge))
+                .putMetadata("original_currency", payment.getCurrency());
 
+        // Add optional metadata
+        addMetadata(paramsBuilder, payment);
 
-        // Add metadata to the PaymentIntent
+        // Create and return PaymentIntent
+        try {
+            PaymentIntent paymentIntent = PaymentIntent.create(paramsBuilder.build());
+            logger.info("Created PaymentIntent: {} for payment: {}",
+                    paymentIntent.getId(), payment.getId());
+            return paymentIntent;
+        } catch (StripeException e) {
+            logger.error("Stripe API error creating PaymentIntent: {}", e.getMessage(), e);
+            throw e;
+        } catch (Exception e) {
+            logger.error("Unexpected error creating PaymentIntent: {}", e.getMessage(), e);
+            throw new RuntimeException("PaymentIntent creation failed", e);
+        }
+    }
+    // Helper method to safely add metadata
+    private void addMetadata(PaymentIntentCreateParams.Builder builder, Payment payment) {
         if (payment.getId() != null) {
-            paramsBuilder.putMetadata("payment_id", payment.getId());
+            builder.putMetadata("payment_id", payment.getId());
         }
         if (payment.getClientId() != null) {
-            paramsBuilder.putMetadata("client_id", payment.getClientId());
+            builder.putMetadata("client_id", payment.getClientId());
         }
         if (payment.getDeliveryId() != null) {
-            paramsBuilder.putMetadata("delivery_id", payment.getDeliveryId());
+            builder.putMetadata("delivery_id", payment.getDeliveryId());
         }
-
-        return PaymentIntent.create(paramsBuilder.build());
+        if (payment.getDiscountCode() != null) {
+            builder.putMetadata("discount_code", payment.getDiscountCode());
+        }
     }
-    /**
-     * Confirm a payment intent
-     */
+
+    // Could be extended to fetch real-time rates
+    private double getExchangeRate() {
+        // In production, implement:
+        // 1. Cached rate from financial API
+        // 2. Fallback to default
+        return 0.32;
+    }
+
     public PaymentIntent confirmPaymentIntent(String paymentIntentId) throws StripeException {
         try {
             PaymentIntent paymentIntent = PaymentIntent.retrieve(paymentIntentId);

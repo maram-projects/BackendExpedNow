@@ -12,19 +12,31 @@ public class StripeConfig {
 
     private String apiKey;
     private String publishableKey;
-    private String currency = "usd"; // Default to Tunisian Dinar
+    private String currency = "usd"; // Default to USD
     private Webhook webhook = new Webhook();
+
     @PostConstruct
     public void init() {
-        // Load from .env (if not set in application.yml)
-        if (this.apiKey == null) {
-            Dotenv dotenv = Dotenv.configure().ignoreIfMissing().load();
+        // Load from .env as fallback (if not set in application.yml)
+        Dotenv dotenv = Dotenv.configure().ignoreIfMissing().load();
+
+        if (this.apiKey == null || this.apiKey.isEmpty()) {
             this.apiKey = dotenv.get("STRIPE_SECRET_KEY");
+        }
+
+        if (this.publishableKey == null || this.publishableKey.isEmpty()) {
+            this.publishableKey = dotenv.get("STRIPE_PUBLISHABLE_KEY");
+        }
+
+        // Load webhook secret from .env if not already set
+        if (this.webhook.getSecret() == null || this.webhook.getSecret().isEmpty()) {
+            this.webhook.setSecret(dotenv.get("STRIPE_WEBHOOK_SECRET"));
         }
 
         // Initialize Stripe
         Stripe.apiKey = this.apiKey;
         System.out.println("Stripe initialized with key: " + (this.apiKey != null));
+        System.out.println("Stripe webhook secret loaded: " + (this.webhook.getSecret() != null && !this.webhook.getSecret().isEmpty()));
     }
 
     // Getters and Setters
