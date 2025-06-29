@@ -4,6 +4,7 @@ import com.example.ExpedNow.services.auth2.OAuth2UserService;
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import io.jsonwebtoken.security.Keys;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -79,7 +80,11 @@ public class SecurityConfig {
                                 "/ws/**",
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
-                                "/swagger-ui.html"
+                                "/swagger-ui.html",
+                                "/topic/**",      // Add these if you use STOMP topics
+                                "/app/**",        // Add these if you use STOMP message mapping
+                                "/user/**",       // Add these for user-specific queues
+                                "/queue/**"
                         ).permitAll()
 
                         // Pricing endpoints
@@ -175,47 +180,41 @@ public class SecurityConfig {
         return new NimbusJwtEncoder(new ImmutableSecret<>(secretKey()));
     }
 
+    @Value("${jwt.secret}")
+    private String jwtSecret;
+
     @Bean
     public SecretKey secretKey() {
-        return Keys.hmacShaKeyFor("u2ZL7e0r36gggv3aEBW6anDdkWwtja+/T99c2GPcENw=".getBytes(StandardCharsets.UTF_8));
+        return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
     }
 
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
 
-        // Use allowedOriginPatterns instead of allowedOrigins when allowCredentials is true
-        configuration.setAllowedOriginPatterns(List.of("http://localhost:4200"));
-
-        // Or if you need multiple origins, list them explicitly:
-        // configuration.setAllowedOriginPatterns(List.of(
-        //     "http://localhost:4200",
-        //     "http://localhost:3000",
-        //     "https://yourdomain.com"
-        // ));
-
+        // Autoriser les origines et méthodes
+        configuration.setAllowedOriginPatterns(List.of("*"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-        configuration.setAllowedHeaders(Arrays.asList("*"));
-        configuration.setExposedHeaders(Arrays.asList(
+
+        // Headers autorisés CRITIQUES pour WebSocket
+        configuration.setAllowedHeaders(Arrays.asList(
                 "Authorization",
                 "Content-Type",
-                "Content-Length",
-                "Content-Disposition"
+                "token",
+                "Sec-WebSocket-Protocol",
+                "Sec-WebSocket-Version",
+                "Sec-WebSocket-Key",
+                "Connection",
+                "Upgrade"
         ));
-        configuration.setAllowCredentials(true);
-        configuration.setMaxAge(3600L);
 
-        // WebSocket-specific headers
-        configuration.addAllowedHeader("Sec-WebSocket-Protocol");
-        configuration.addAllowedHeader("Sec-WebSocket-Version");
-        configuration.addAllowedHeader("Sec-WebSocket-Key");
-        configuration.addAllowedHeader("Connection");
-        configuration.addAllowedHeader("Upgrade");
+        configuration.setAllowCredentials(true);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
+
 
     @Bean
     public MethodSecurityExpressionHandler methodSecurityExpressionHandler() {

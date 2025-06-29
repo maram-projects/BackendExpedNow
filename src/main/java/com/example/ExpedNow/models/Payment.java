@@ -21,6 +21,9 @@ public class Payment {
     private String deliveryId;
 
     private String clientId;   // العميل الذي قام بالدفع
+    private Double convertedAmount;   // Amount in Stripe currency (USD)
+    private Double exchangeRate;      // Exchange rate used
+    private String convertedCurrency; // Currency sent to Stripe (USD)
 
     // Changed to Double (wrapper class) to allow null values
     private Double amount;     // المبلغ

@@ -22,7 +22,10 @@ public class StripeService {
     @Autowired
     private StripeConfig stripeConfig;
 
-
+    @PostConstruct
+    public void init() {
+        Stripe.apiKey = stripeConfig.getApiKey();
+    }
 
     /**
      * Create a payment intent with Stripe
@@ -72,17 +75,26 @@ public class StripeService {
 
         // Convert TND to USD for Stripe
         double convertedAmount = amountToCharge;
+        String stripeCurrency = currency;
+        double exchangeRate = 1.0; // Default rate for non-TND currencies
+
         if ("tnd".equals(currency)) {
-            double exchangeRate = getExchangeRate(); // Could implement dynamic rates later
+            exchangeRate = getExchangeRate(); // Get the actual exchange rate
             convertedAmount = amountToCharge * exchangeRate;
-            currency = "usd";
+            stripeCurrency = "usd";
+
+            // Update payment object with conversion details
+            payment.setConvertedAmount(convertedAmount);
+            payment.setExchangeRate(exchangeRate);
+            payment.setConvertedCurrency(stripeCurrency);
+
             logger.debug("Converted {} TND to {} USD (rate: {})",
                     amountToCharge, convertedAmount, exchangeRate);
         }
 
         // Convert to cents and validate USD minimum
         long amountInCents = Math.round(convertedAmount * 100);
-        if ("usd".equals(currency) && amountInCents < 50) {
+        if ("usd".equals(stripeCurrency) && amountInCents < 50) {
             String errorMsg = String.format(
                     "Amount too small. Minimum charge is $0.50 USD. Converted amount: $%.2f USD",
                     convertedAmount
@@ -92,19 +104,26 @@ public class StripeService {
         }
 
         logger.info("Creating PaymentIntent for {} {} ({} cents)",
-                convertedAmount, currency, amountInCents);
+                convertedAmount, stripeCurrency, amountInCents);
 
         // Build PaymentIntent parameters
         PaymentIntentCreateParams.Builder paramsBuilder = PaymentIntentCreateParams.builder()
                 .setAmount(amountInCents)
-                .setCurrency(currency)
+                .setCurrency(stripeCurrency)
                 .setAutomaticPaymentMethods(
                         PaymentIntentCreateParams.AutomaticPaymentMethods.builder()
                                 .setEnabled(true)
                                 .build()
                 )
                 .putMetadata("original_amount", String.valueOf(amountToCharge))
-                .putMetadata("original_currency", payment.getCurrency());
+                .putMetadata("original_currency", payment.getCurrency() != null ? payment.getCurrency() : "tnd");
+
+        // Add conversion metadata if currency was converted
+        if ("tnd".equals(currency)) {
+            paramsBuilder.putMetadata("converted_amount", String.valueOf(convertedAmount));
+            paramsBuilder.putMetadata("exchange_rate", String.valueOf(exchangeRate));
+            paramsBuilder.putMetadata("converted_currency", stripeCurrency);
+        }
 
         // Add optional metadata
         addMetadata(paramsBuilder, payment);
@@ -112,8 +131,10 @@ public class StripeService {
         // Create and return PaymentIntent
         try {
             PaymentIntent paymentIntent = PaymentIntent.create(paramsBuilder.build());
-            logger.info("Created PaymentIntent: {} for payment: {}",
-                    paymentIntent.getId(), payment.getId());
+            logger.info("Created PaymentIntent: {} for payment: {} (Original: {} {}, Charged: {} {})",
+                    paymentIntent.getId(), payment.getId(),
+                    amountToCharge, currency.toUpperCase(),
+                    convertedAmount, stripeCurrency.toUpperCase());
             return paymentIntent;
         } catch (StripeException e) {
             logger.error("Stripe API error creating PaymentIntent: {}", e.getMessage(), e);
@@ -123,16 +144,17 @@ public class StripeService {
             throw new RuntimeException("PaymentIntent creation failed", e);
         }
     }
+
     // Helper method to safely add metadata
     private void addMetadata(PaymentIntentCreateParams.Builder builder, Payment payment) {
         if (payment.getId() != null) {
-            builder.putMetadata("payment_id", payment.getId());
+            builder.putMetadata("payment_id", String.valueOf(payment.getId()));
         }
         if (payment.getClientId() != null) {
-            builder.putMetadata("client_id", payment.getClientId());
+            builder.putMetadata("client_id", String.valueOf(payment.getClientId()));
         }
         if (payment.getDeliveryId() != null) {
-            builder.putMetadata("delivery_id", payment.getDeliveryId());
+            builder.putMetadata("delivery_id", String.valueOf(payment.getDeliveryId()));
         }
         if (payment.getDiscountCode() != null) {
             builder.putMetadata("discount_code", payment.getDiscountCode());
@@ -172,18 +194,29 @@ public class StripeService {
     }
 
     /**
-     * Create a refund
+     * Create a refund with currency conversion handling
      */
-    public Refund createRefund(String paymentIntentId, Double amount) throws StripeException {
+    public Refund createRefund(String paymentIntentId, Double amount, String originalCurrency) throws StripeException {
         try {
             RefundCreateParams.Builder paramsBuilder = RefundCreateParams.builder()
                     .setPaymentIntent(paymentIntentId);
 
             // If amount is specified, refund that amount (in cents)
             if (amount != null) {
-                long amountInCents = Math.round(amount * 100);
+                double refundAmount = amount;
+
+                // Convert TND to USD if necessary (same as payment creation)
+                if ("tnd".equalsIgnoreCase(originalCurrency)) {
+                    double exchangeRate = getExchangeRate();
+                    refundAmount = amount * exchangeRate;
+                    logger.debug("Converting refund amount {} TND to {} USD (rate: {})",
+                            amount, refundAmount, exchangeRate);
+                }
+
+                long amountInCents = Math.round(refundAmount * 100);
                 paramsBuilder.setAmount(amountInCents);
-                logger.info("Creating partial refund of {} cents for PaymentIntent: {}", amountInCents, paymentIntentId);
+                logger.info("Creating partial refund of {} cents (original: {} {}) for PaymentIntent: {}",
+                        amountInCents, amount, originalCurrency != null ? originalCurrency : "TND", paymentIntentId);
             } else {
                 logger.info("Creating full refund for PaymentIntent: {}", paymentIntentId);
             }
@@ -195,6 +228,13 @@ public class StripeService {
             logger.error("Error creating refund for PaymentIntent {}: {}", paymentIntentId, e.getMessage());
             throw e;
         }
+    }
+
+    /**
+     * Create a refund (overloaded method for backward compatibility)
+     */
+    public Refund createRefund(String paymentIntentId, Double amount) throws StripeException {
+        return createRefund(paymentIntentId, amount, null);
     }
 
     /**
@@ -239,6 +279,84 @@ public class StripeService {
         } catch (StripeException e) {
             logger.error("Error canceling PaymentIntent {}: {}", paymentIntentId, e.getMessage());
             throw e;
+        }
+    }
+
+    /**
+     * Get payment details including conversion information
+     */
+    public PaymentDetails getPaymentDetails(PaymentIntent paymentIntent) {
+        PaymentDetails details = new PaymentDetails();
+        details.setPaymentIntentId(paymentIntent.getId());
+        details.setStatus(paymentIntent.getStatus());
+        details.setAmount(paymentIntent.getAmount() / 100.0); // Convert from cents
+        details.setCurrency(paymentIntent.getCurrency().toUpperCase());
+
+        // Extract conversion details from metadata
+        if (paymentIntent.getMetadata() != null) {
+            String originalAmount = paymentIntent.getMetadata().get("original_amount");
+            String originalCurrency = paymentIntent.getMetadata().get("original_currency");
+            String exchangeRate = paymentIntent.getMetadata().get("exchange_rate");
+
+            if (originalAmount != null) {
+                details.setOriginalAmount(Double.parseDouble(originalAmount));
+            }
+            if (originalCurrency != null) {
+                details.setOriginalCurrency(originalCurrency.toUpperCase());
+            }
+            if (exchangeRate != null) {
+                details.setExchangeRate(Double.parseDouble(exchangeRate));
+            }
+        }
+
+        return details;
+    }
+
+    /**
+     * Inner class to hold payment details with conversion information
+     */
+    public static class PaymentDetails {
+        private String paymentIntentId;
+        private String status;
+        private Double amount;
+        private String currency;
+        private Double originalAmount;
+        private String originalCurrency;
+        private Double exchangeRate;
+
+        // Getters and setters
+        public String getPaymentIntentId() { return paymentIntentId; }
+        public void setPaymentIntentId(String paymentIntentId) { this.paymentIntentId = paymentIntentId; }
+
+        public String getStatus() { return status; }
+        public void setStatus(String status) { this.status = status; }
+
+        public Double getAmount() { return amount; }
+        public void setAmount(Double amount) { this.amount = amount; }
+
+        public String getCurrency() { return currency; }
+        public void setCurrency(String currency) { this.currency = currency; }
+
+        public Double getOriginalAmount() { return originalAmount; }
+        public void setOriginalAmount(Double originalAmount) { this.originalAmount = originalAmount; }
+
+        public String getOriginalCurrency() { return originalCurrency; }
+        public void setOriginalCurrency(String originalCurrency) { this.originalCurrency = originalCurrency; }
+
+        public Double getExchangeRate() { return exchangeRate; }
+        public void setExchangeRate(Double exchangeRate) { this.exchangeRate = exchangeRate; }
+
+        @Override
+        public String toString() {
+            return "PaymentDetails{" +
+                    "paymentIntentId='" + paymentIntentId + '\'' +
+                    ", status='" + status + '\'' +
+                    ", amount=" + amount +
+                    ", currency='" + currency + '\'' +
+                    ", originalAmount=" + originalAmount +
+                    ", originalCurrency='" + originalCurrency + '\'' +
+                    ", exchangeRate=" + exchangeRate +
+                    '}';
         }
     }
 }

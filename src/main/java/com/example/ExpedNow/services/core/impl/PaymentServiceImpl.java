@@ -46,11 +46,10 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
     @Override
     public Payment createPayment(Payment payment) {
         try {
-            // 1. Validate input parameters
+            // Validation
             if (payment == null) {
                 throw new IllegalArgumentException("Payment cannot be null");
             }
-            // Fixed: Check for null before comparing value
             if (payment.getAmount() == null || payment.getAmount() <= 0) {
                 throw new IllegalArgumentException("Payment amount must be positive");
             }
@@ -58,64 +57,73 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
                 throw new IllegalArgumentException("Payment method is required");
             }
 
-            // 2. Set default values
+            // Set defaults
             payment.setCreatedAt(LocalDateTime.now());
             payment.setStatus(PaymentStatus.PENDING);
-
-            // Ensure final amount is properly set
             if (payment.getFinalAmountAfterDiscount() == null) {
                 payment.setFinalAmountAfterDiscount(payment.getAmount());
             }
-
-            // Validate final amount
             if (payment.getFinalAmountAfterDiscount() <= 0) {
                 throw new IllegalArgumentException("Final payment amount must be positive");
             }
 
-            // 3. Initial save to generate ID
+            // Initial save
             Payment savedPayment = paymentRepository.save(payment);
 
-            // 4. Handle credit card payments
+            // Handle credit card payments
             if (payment.getPaymentMethod() == PaymentMethod.CREDIT_CARD) {
                 try {
                     logger.info("Creating Stripe payment intent for payment: {}", savedPayment.getId());
 
+                    // Create Stripe payment intent
                     PaymentIntent paymentIntent = stripeService.createPaymentIntent(savedPayment);
+
+                    // Update payment with Stripe details
                     savedPayment.setTransactionId(paymentIntent.getId());
                     savedPayment.setClientSecret(paymentIntent.getClientSecret());
 
-                    logger.info("Stripe PaymentIntent created: {}", paymentIntent.getId());
+                    // Save conversion details
+                    if (paymentIntent.getMetadata() != null) {
+                        String convertedAmount = paymentIntent.getMetadata().get("converted_amount");
+                        String exchangeRate = paymentIntent.getMetadata().get("exchange_rate");
+                        String convertedCurrency = paymentIntent.getMetadata().get("converted_currency");
 
-                    // Update payment with Stripe details
+                        if (convertedAmount != null) {
+                            savedPayment.setConvertedAmount(Double.parseDouble(convertedAmount));
+                        }
+                        if (exchangeRate != null) {
+                            savedPayment.setExchangeRate(Double.parseDouble(exchangeRate));
+                        }
+                        if (convertedCurrency != null) {
+                            savedPayment.setConvertedCurrency(convertedCurrency);
+                        }
+                    }
+
+                    logger.info("Stripe PaymentIntent created: {}", paymentIntent.getId());
                     return paymentRepository.save(savedPayment);
                 } catch (StripeException e) {
-                    logger.error("Stripe error creating PaymentIntent for payment {}: {}",
-                            savedPayment.getId(), e.getMessage(), e);
-
-                    // Critical: Delete payment record if Stripe fails
+                    logger.error("Stripe error creating PaymentIntent: {}", e.getMessage(), e);
                     paymentRepository.deleteById(savedPayment.getId());
-
                     throw new RuntimeException("Payment processing failed: " + e.getMessage(), e);
                 } catch (Exception e) {
-                    logger.error("Unexpected error during Stripe processing for payment {}: {}",
-                            savedPayment.getId(), e.getMessage(), e);
-
+                    logger.error("Unexpected error during Stripe processing: {}", e.getMessage(), e);
                     paymentRepository.deleteById(savedPayment.getId());
                     throw new RuntimeException("Payment processing failed", e);
                 }
             }
 
-            // 5. Return non-card payments directly
+            // Return non-card payments
             logger.info("Created non-card payment: {}", savedPayment.getId());
             return savedPayment;
         } catch (IllegalArgumentException e) {
-            logger.error("Validation error creating payment: {}", e.getMessage());
-            throw e; // Re-throw validation exceptions
+            logger.error("Validation error: {}", e.getMessage());
+            throw e;
         } catch (Exception e) {
-            logger.error("Unexpected error creating payment: {}", e.getMessage(), e);
+            logger.error("Unexpected error: {}", e.getMessage(), e);
             throw new RuntimeException("Payment creation failed: " + e.getMessage(), e);
         }
     }
+
     @Override
     public Payment processPayment(String paymentId, String discountCode) {
         try {
@@ -184,29 +192,43 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
                 throw new IllegalArgumentException("Cannot refund payment that is not completed");
             }
 
-            if (payment.getPaymentMethod() == PaymentMethod.CREDIT_CARD && payment.getTransactionId() != null) {
-                // Process Stripe refund
+            if (payment.getPaymentMethod() == PaymentMethod.CREDIT_CARD &&
+                    payment.getTransactionId() != null) {
+
+                // Process Stripe refund with currency conversion
                 try {
-                    stripeService.createRefund(payment.getTransactionId(), amount);
+                    // Get original currency (default to TND if null)
+                    String originalCurrency = payment.getCurrency() != null ?
+                            payment.getCurrency() : "TND";
+
+                    // Process refund through Stripe
+                    stripeService.createRefund(
+                            payment.getTransactionId(),
+                            amount,
+                            originalCurrency
+                    );
 
                     // Update payment status
-                    payment.setStatus(amount == null || amount >= payment.getFinalAmountAfterDiscount()
-                            ? PaymentStatus.REFUNDED : PaymentStatus.PARTIALLY_REFUNDED);
-                    payment.setUpdatedAt(LocalDateTime.now());
+                    if (amount == null || amount >= payment.getFinalAmountAfterDiscount()) {
+                        payment.setStatus(PaymentStatus.REFUNDED);
+                    } else {
+                        payment.setStatus(PaymentStatus.PARTIALLY_REFUNDED);
+                    }
 
+                    payment.setUpdatedAt(LocalDateTime.now());
                     return paymentRepository.save(payment);
                 } catch (StripeException e) {
-                    logger.error("Error creating refund for payment {}: {}", paymentId, e.getMessage());
+                    logger.error("Stripe refund error: {}", e.getMessage());
                     throw new RuntimeException("Failed to create refund: " + e.getMessage());
                 }
             } else {
-                // Handle refund for non-card payments
+                // Handle non-card payments
                 payment.setStatus(PaymentStatus.REFUNDED);
                 payment.setUpdatedAt(LocalDateTime.now());
                 return paymentRepository.save(payment);
             }
         } catch (Exception e) {
-            logger.error("Error refunding payment {}: {}", paymentId, e.getMessage());
+            logger.error("Refund error: {}", e.getMessage());
             throw new RuntimeException("Failed to refund payment: " + e.getMessage());
         }
     }
@@ -222,25 +244,13 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
         }
 
         try {
-            // Retrieve payment intent from Stripe once
+            // Retrieve payment intent
             PaymentIntent paymentIntent = stripeService.retrievePaymentIntent(transactionId);
             if (paymentIntent == null) {
-                throw new IllegalStateException("PaymentIntent not found for transaction ID: " + transactionId);
+                throw new IllegalStateException("PaymentIntent not found");
             }
 
-            // Convert Stripe amount (cents) to dollars
-            double stripeAmount = paymentIntent.getAmount() / 100.0;
-
-            // Validate amount consistency (optional - depends on your business logic)
-            if (Math.abs(stripeAmount - amount) > 0.01) { // Allow small floating-point differences
-                logger.warn("Amount mismatch for transaction {}: provided={}, stripe={}",
-                        transactionId, amount, stripeAmount);
-            }
-
-            // Use the amount from Stripe as the authoritative source
-            double finalAmount = stripeAmount;
-
-            // Extract metadata once
+            // Extract metadata
             Map<String, String> metadata = paymentIntent.getMetadata();
             String paymentId = metadata != null ? metadata.get("payment_id") : null;
             String deliveryIdFromMetadata = metadata != null ? metadata.get("delivery_id") : null;
@@ -250,64 +260,77 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
             Payment payment = findExistingPayment(transactionId, paymentId);
 
             if (payment == null) {
-                // Create new payment record from Stripe data
-                payment = createPaymentFromStripeData(transactionId, paymentIntent, finalAmount,
+                // Create new payment from Stripe data
+                payment = createPaymentFromStripeData(transactionId, paymentIntent, amount,
                         clientIdFromMetadata, deliveryIdFromMetadata);
-                logger.info("Created new payment record from Stripe data: {}", payment.getId());
+                logger.info("Created new payment from Stripe data: {}", payment.getId());
             } else {
                 // Update existing payment
-                updateExistingPayment(payment, finalAmount);
+                updateExistingPayment(payment, amount);
                 logger.info("Updated existing payment: {}", payment.getId());
             }
 
-            // Save the payment
+            // Save payment
             Payment savedPayment = paymentRepository.save(payment);
 
-            // Update delivery status if needed
+            // Update delivery status
             updateDeliveryStatusIfNeeded(savedPayment, deliveryIdFromMetadata);
 
-            logger.info("Payment confirmation completed successfully for transaction: {}", transactionId);
+            logger.info("Payment confirmed: {}", transactionId);
             return savedPayment;
 
         } catch (StripeException e) {
-            logger.error("Stripe error while confirming payment {}: {}", transactionId, e.getMessage(), e);
-            throw new RuntimeException("Failed to retrieve payment information from Stripe: " + e.getMessage(), e);
-        } catch (IllegalArgumentException | IllegalStateException e) {
-            logger.error("Validation error while confirming payment {}: {}", transactionId, e.getMessage(), e);
-            throw e; // Re-throw validation errors as-is
+            logger.error("Stripe confirmation error: {}", e.getMessage(), e);
+            throw new RuntimeException("Stripe error: " + e.getMessage(), e);
         } catch (Exception e) {
-            logger.error("Unexpected error confirming payment {}: {}", transactionId, e.getMessage(), e);
-            throw new RuntimeException("Failed to confirm payment: " + e.getMessage(), e);
+            logger.error("Confirmation error: {}", e.getMessage(), e);
+            throw new RuntimeException("Confirmation failed: " + e.getMessage(), e);
         }
     }
+
     private Payment createPaymentFromStripeData(String transactionId, PaymentIntent paymentIntent, double amount,
                                                 String clientId, String deliveryId) {
         Payment newPayment = new Payment();
         newPayment.setTransactionId(transactionId);
 
-        // Use original amount from metadata if available
+        // Extract conversion details from metadata
         Map<String, String> metadata = paymentIntent.getMetadata();
-        if (metadata != null && metadata.containsKey("original_amount")) {
-            double originalAmount = Double.parseDouble(metadata.get("original_amount"));
-            String originalCurrency = metadata.get("original_currency");
-
-            newPayment.setAmount(originalAmount);
-            newPayment.setCurrency(originalCurrency);
-            newPayment.setFinalAmountAfterDiscount(originalAmount);
-        } else {
-            // Fallback to Stripe amount (shouldn't happen)
-            newPayment.setAmount(amount);
-            newPayment.setCurrency("usd");
-            newPayment.setFinalAmountAfterDiscount(amount);
+        if (metadata != null) {
+            if (metadata.containsKey("original_amount")) {
+                double originalAmount = Double.parseDouble(metadata.get("original_amount"));
+                newPayment.setAmount(originalAmount);
+                newPayment.setFinalAmountAfterDiscount(originalAmount);
+            }
+            if (metadata.containsKey("original_currency")) {
+                newPayment.setCurrency(metadata.get("original_currency"));
+            }
+            if (metadata.containsKey("converted_amount")) {
+                newPayment.setConvertedAmount(Double.parseDouble(metadata.get("converted_amount")));
+            }
+            if (metadata.containsKey("exchange_rate")) {
+                newPayment.setExchangeRate(Double.parseDouble(metadata.get("exchange_rate")));
+            }
+            if (metadata.containsKey("converted_currency")) {
+                newPayment.setConvertedCurrency(metadata.get("converted_currency"));
+            }
         }
 
+        // Set default values if metadata missing
+        if (newPayment.getAmount() == null) {
+            newPayment.setAmount(amount);
+            newPayment.setFinalAmountAfterDiscount(amount);
+        }
+        if (newPayment.getCurrency() == null) {
+            newPayment.setCurrency("usd");
+        }
+
+        // Set other fields
         newPayment.setStatus(PaymentStatus.COMPLETED);
         newPayment.setPaymentMethod(PaymentMethod.CREDIT_CARD);
         newPayment.setPaymentDate(LocalDateTime.now());
         newPayment.setCreatedAt(LocalDateTime.now());
         newPayment.setUpdatedAt(LocalDateTime.now());
 
-        // Set metadata fields
         if (clientId != null && !clientId.trim().isEmpty()) {
             newPayment.setClientId(clientId);
         }
@@ -317,6 +340,7 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
 
         return newPayment;
     }
+
 
 
     /**

@@ -6,36 +6,45 @@ import org.springframework.messaging.simp.config.MessageBrokerRegistry;
 import org.springframework.web.socket.config.annotation.EnableWebSocketMessageBroker;
 import org.springframework.web.socket.config.annotation.StompEndpointRegistry;
 import org.springframework.web.socket.config.annotation.WebSocketMessageBrokerConfigurer;
-import org.springframework.beans.factory.annotation.Autowired;
-
+import org.springframework.web.socket.server.support.DefaultHandshakeHandler;
 @Configuration
 @EnableWebSocketMessageBroker
 public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
 
-    @Autowired
-    private WebSocketAuthInterceptor webSocketAuthInterceptor;
+    private final WebSocketAuthInterceptor authInterceptor;
+    private final WebSocketHandshakeInterceptor handshakeInterceptor;
 
-    @Autowired
-    private WebSocketHandshakeInterceptor handshakeInterceptor;
-
-    @Override
-    public void configureMessageBroker(MessageBrokerRegistry config) {
-        config.enableSimpleBroker("/queue", "/topic");
-        config.setApplicationDestinationPrefixes("/app");
-        config.setUserDestinationPrefix("/user");
+    public WebSocketConfig(WebSocketAuthInterceptor authInterceptor,
+                           WebSocketHandshakeInterceptor handshakeInterceptor) {
+        this.authInterceptor = authInterceptor;
+        this.handshakeInterceptor = handshakeInterceptor;
     }
 
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
-        registry
-                .addEndpoint("/ws/websocket")
+        registry.addEndpoint("/ws")
                 .setAllowedOriginPatterns("*")
                 .addInterceptors(handshakeInterceptor)
-                .withSockJS();
+                .setHandshakeHandler(new DefaultHandshakeHandler())
+                .withSockJS()
+                .setInterceptors(handshakeInterceptor); // ← AJOUT CRITIQUE
+
     }
 
     @Override
     public void configureClientInboundChannel(ChannelRegistration registration) {
-        registration.interceptors(webSocketAuthInterceptor);
+        registration.interceptors(authInterceptor);
+        registration.taskExecutor()
+                .corePoolSize(4)
+                .maxPoolSize(8)
+                .queueCapacity(100);
+    }
+
+
+    @Override
+    public void configureMessageBroker(MessageBrokerRegistry config) {
+        config.enableSimpleBroker("/topic", "/queue", "/user");
+        config.setApplicationDestinationPrefixes("/app");
+        config.setUserDestinationPrefix("/user");
     }
 }
