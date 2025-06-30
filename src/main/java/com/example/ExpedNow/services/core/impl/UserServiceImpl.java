@@ -384,7 +384,10 @@ public class UserServiceImpl implements UserServiceInterface {
         }
     }
 
-
+    public List<User> searchClients(String query) {
+        String searchPattern = "%" + query + "%";
+        return userRepository.findByClientAttributes(searchPattern);
+    }
     @Override
     public UserDTO getUserByVehicle(String vehicleId) {
         return userRepository.findByAssignedVehicleId(vehicleId)

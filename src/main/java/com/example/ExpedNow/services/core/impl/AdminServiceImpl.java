@@ -16,10 +16,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Service
@@ -28,7 +27,6 @@ public class AdminServiceImpl implements AdminServiceInterface {
 
     private final UserRepository userRepository;
     private final VehicleRepository vehicleRepository;
-
 
     @Autowired
     public AdminServiceImpl(UserRepository userRepository, VehicleRepository vehicleRepository) {
@@ -50,10 +48,38 @@ public class AdminServiceImpl implements AdminServiceInterface {
         Map<String, Long> usersByRole = allUsers.stream()
                 .flatMap(user -> user.getRoles().stream())
                 .collect(Collectors.groupingBy(
-                        Role::name,
+                        role -> role.name().replace("ROLE_", ""), // Remove ROLE_ prefix for cleaner display
                         Collectors.counting()
                 ));
         stats.setUsersByRole(usersByRole);
+
+        // Count delivery persons
+        long deliveryPersonCount = allUsers.stream()
+                .filter(user -> user.getRoles().contains(Role.ROLE_DELIVERY_PERSON))
+                .count();
+        stats.setDeliveryPersons((int) deliveryPersonCount);
+
+        // Count active users today (users who registered today - you can modify this logic)
+        LocalDate today = LocalDate.now();
+        long activeTodayCount = allUsers.stream()
+                .filter(user -> {
+                    if (user.getDateOfRegistration() != null) {
+                        LocalDate regDate = user.getDateOfRegistration().toInstant()
+                                .atZone(ZoneId.systemDefault())
+                                .toLocalDate();
+                        return regDate.equals(today);
+                    }
+                    return false;
+                })
+                .count();
+        stats.setActiveToday((int) activeTodayCount);
+
+        // Set pending approvals (you can implement this based on your business logic)
+        // For now, let's assume users without certain roles are pending
+        long pendingApprovals = allUsers.stream()
+                .filter(user -> user.getRoles().isEmpty())
+                .count();
+        stats.setPendingApprovals((int) pendingApprovals);
 
         // Get recent registrations
         List<UserDTO> recentUsers = userRepository
@@ -63,6 +89,37 @@ public class AdminServiceImpl implements AdminServiceInterface {
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
         stats.setRecentRegistrations(recentUsers);
+
+        // Mock payment data (replace with actual payment repository calls)
+        stats.setTotalPayments(150); // Mock value
+        stats.setTotalRevenue(25000.0); // Mock value
+
+        // Mock payment status breakdown
+        Map<String, Integer> paymentStatusBreakdown = new HashMap<>();
+        paymentStatusBreakdown.put("COMPLETED", 120);
+        paymentStatusBreakdown.put("PENDING", 20);
+        paymentStatusBreakdown.put("FAILED", 10);
+        stats.setPaymentStatusBreakdown(paymentStatusBreakdown);
+
+        // Mock discount data
+        stats.setTotalDiscounts(25);
+        stats.setActiveDiscounts(15);
+
+        Map<String, Integer> discountTypeBreakdown = new HashMap<>();
+        discountTypeBreakdown.put("PERCENTAGE", 15);
+        discountTypeBreakdown.put("FIXED_AMOUNT", 8);
+        discountTypeBreakdown.put("FREE_DELIVERY", 2);
+        stats.setDiscountTypeBreakdown(discountTypeBreakdown);
+
+        // Mock bonus data
+        stats.setTotalBonuses(45);
+        stats.setBonusAmountPaid(3500.0);
+
+        Map<String, Integer> bonusStatusBreakdown = new HashMap<>();
+        bonusStatusBreakdown.put("PAID", 30);
+        bonusStatusBreakdown.put("PENDING", 12);
+        bonusStatusBreakdown.put("CANCELLED", 3);
+        stats.setBonusStatusBreakdown(bonusStatusBreakdown);
 
         return stats;
     }
@@ -111,10 +168,6 @@ public class AdminServiceImpl implements AdminServiceInterface {
         // Date fields - set to current time if unavailable
         dto.setVehicleInsuranceExpiry(new Date());       // Example default
         dto.setVehicleInspectionExpiry(new Date());      // Example default
-
-        // Timestamps - add if available in entity
-        // dto.setCreatedAt(vehicle.getCreatedAt());
-        // dto.setUpdatedAt(vehicle.getUpdatedAt());
 
         return dto;
     }

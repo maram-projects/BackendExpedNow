@@ -23,6 +23,13 @@ public interface UserRepository extends MongoRepository<User, String> {
     @Query("{ 'roles': ?0 }")
     List<User> findByRole(String role);
 
+    @Query("SELECT u FROM User u WHERE " +
+            "(LOWER(u.firstName) LIKE LOWER(:query) OR " +
+            "(LOWER(u.lastName) LIKE LOWER(:query) OR " +
+            "(LOWER(u.email) LIKE LOWER(:query) OR " +
+            "(LOWER(u.companyName) LIKE LOWER(:query)) AND " +
+            "(u.userType = 'individual' OR u.userType = 'enterprise')")
+    List<User> findByClientAttributes(String query);
     // Add this method for the DiscountService
     @Aggregation(pipeline = {
             "{ $match: { 'roles': 'CLIENT', 'enabled': true } }",

@@ -126,6 +126,13 @@ public class UserController {
         return ResponseEntity.ok(user);
     }
 
+    @GetMapping("/search/clients")
+    public ResponseEntity<List<User>> searchClients(@RequestParam String query) {
+        // Search by name, email, or company name
+        List<User> clients = userService.searchClients(query);
+        return ResponseEntity.ok(clients);
+    }
+
     @PutMapping("/profile")
     public ResponseEntity<User> updateProfile(@RequestBody User updatedUser, Principal principal) {
         String email = principal.getName();

@@ -1,6 +1,7 @@
 package com.example.ExpedNow.controllers;
 
 import com.example.ExpedNow.models.Discount;
+import com.example.ExpedNow.models.User;
 import com.example.ExpedNow.services.core.impl.DiscountService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -23,6 +24,8 @@ public class DiscountController {
     public List<Discount> getClientDiscounts(@PathVariable String clientId) {
         return discountService.getActiveDiscountsForClient(clientId);
     }
+
+
 
     @GetMapping
     public List<Discount> getAllDiscounts() {
