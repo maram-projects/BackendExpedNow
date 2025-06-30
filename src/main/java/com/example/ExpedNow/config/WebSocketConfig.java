@@ -23,12 +23,9 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     @Override
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         registry.addEndpoint("/ws")
-                .setAllowedOriginPatterns("*")
+                .setAllowedOriginPatterns("http://localhost:4200")
                 .addInterceptors(handshakeInterceptor)
-                .setHandshakeHandler(new DefaultHandshakeHandler())
-                .withSockJS()
-                .setInterceptors(handshakeInterceptor); // ← AJOUT CRITIQUE
-
+                .withSockJS();
     }
 
     @Override

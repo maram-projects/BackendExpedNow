@@ -81,14 +81,17 @@ public class SecurityConfig {
                                 "/v3/api-docs/**",
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
-                                "/topic/**",      // Add these if you use STOMP topics
-                                "/app/**",        // Add these if you use STOMP message mapping
-                                "/user/**",       // Add these for user-specific queues
+                                "/topic/**",
+                                "/app/**",
+                                "/user/**",
                                 "/queue/**"
                         ).permitAll()
 
                         // Pricing endpoints
                         .requestMatchers("/api/pricing/**").permitAll()
+
+                        // Chat endpoints - FIXED: Only one declaration and specific permissions
+                        .requestMatchers("/api/chat/**").hasAnyAuthority("CLIENT", "INDIVIDUAL", "ENTERPRISE", "DELIVERY_PERSON", "PROFESSIONAL", "TEMPORARY", "ADMIN")
 
                         // Specific authenticated endpoints
                         .requestMatchers("/api/users/by-vehicle/**").authenticated()
@@ -191,15 +194,20 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
+        configuration.setAllowedOriginPatterns(Arrays.asList(
+                "http://localhost:4200",
+                "https://your-production-domain.com"
+        ));
 
-        // Autoriser les origines et méthodes
-        configuration.setAllowedOriginPatterns(List.of("*"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
-
-        // Headers autorisés CRITIQUES pour WebSocket
         configuration.setAllowedHeaders(Arrays.asList(
                 "Authorization",
                 "Content-Type",
+                "X-Requested-With",
+                "Accept",
+                "Origin",
+                "Access-Control-Request-Method",
+                "Access-Control-Request-Headers",
                 "token",
                 "Sec-WebSocket-Protocol",
                 "Sec-WebSocket-Version",
@@ -208,13 +216,19 @@ public class SecurityConfig {
                 "Upgrade"
         ));
 
+        configuration.setExposedHeaders(Arrays.asList(
+                "Access-Control-Allow-Origin",
+                "Access-Control-Allow-Credentials",
+                "Authorization"
+        ));
+
         configuration.setAllowCredentials(true);
+        configuration.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", configuration);
         return source;
     }
-
 
     @Bean
     public MethodSecurityExpressionHandler methodSecurityExpressionHandler() {

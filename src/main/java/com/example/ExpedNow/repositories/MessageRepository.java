@@ -19,11 +19,11 @@ public interface MessageRepository extends MongoRepository<Message, String> {
     Page<Message> findMessagesBetweenUsersForDelivery(
             String userId1, String userId2, String deliveryId, Pageable pageable);
 
-    @Query("{'receiverId': ?0, 'status': {'$ne': 'READ'}}")
+    @Query("{'receiverId': ?0, 'status': {'$ne': 'read'}}")
     List<Message> findUnreadMessagesByReceiver(String receiverId);
 
-    @Query("{'deliveryId': ?0, 'receiverId': ?1, 'status': {'$ne': 'READ'}}")
-    long countUnreadMessagesForDelivery(String deliveryId, String receiverId);
+    // SOLUTION 2: Use Spring Data method naming convention (more reliable)
+    long countByDeliveryIdAndReceiverIdAndStatusNot(String deliveryId, String receiverId, Message.MessageStatus status);
 
     @Query("{'deliveryId': ?0}")
     List<Message> findMessagesByDeliveryId(String deliveryId);

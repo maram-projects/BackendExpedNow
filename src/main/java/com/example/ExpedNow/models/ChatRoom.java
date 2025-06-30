@@ -1,17 +1,18 @@
 package com.example.ExpedNow.models;
 
-import lombok.*;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+import lombok.AllArgsConstructor;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.List;
 
-@Data
-@NoArgsConstructor
-@AllArgsConstructor
-@Builder
 @Document(collection = "chat_rooms")
+@Data
+@Builder
+
 public class ChatRoom {
     @Id
     private String id;
@@ -20,20 +21,37 @@ public class ChatRoom {
     private String clientId;
     private String deliveryPersonId;
 
-    @Builder.Default
-    private LocalDateTime createdAt = LocalDateTime.now();
+    // Use List instead of Set
+    private List<String> participants;
 
+    private boolean isActive;
+    private LocalDateTime createdAt;
+    private LocalDateTime updatedAt;
+
+    // Missing fields that are used in ChatService
     private LocalDateTime lastMessageAt;
     private String lastMessageContent;
 
-    @Builder.Default
-    private Set<String> participants = new HashSet<>();
+    // Custom constructor to set default values
+    public ChatRoom(String id, String deliveryId, String clientId, String deliveryPersonId,
+                    List<String> participants, boolean isActive, LocalDateTime createdAt,
+                    LocalDateTime updatedAt, LocalDateTime lastMessageAt, String lastMessageContent) {
+        this.id = id;
+        this.deliveryId = deliveryId;
+        this.clientId = clientId;
+        this.deliveryPersonId = deliveryPersonId;
+        this.participants = participants;
+        this.isActive = isActive != false ? isActive : true;
+        this.createdAt = createdAt != null ? createdAt : LocalDateTime.now();
+        this.updatedAt = updatedAt != null ? updatedAt : LocalDateTime.now();
+        this.lastMessageAt = lastMessageAt;
+        this.lastMessageContent = lastMessageContent;
+    }
 
-    @Builder.Default
-    private boolean isActive = true;
-
-    // Generate chat room ID based on delivery
-    public static String generateChatRoomId(String deliveryId) {
-        return "chat_" + deliveryId;
+    // Default constructor with default values
+    public ChatRoom() {
+        this.createdAt = LocalDateTime.now();
+        this.updatedAt = LocalDateTime.now();
+        this.isActive = true;
     }
 }

@@ -39,63 +39,36 @@ public class WebSocketHandshakeInterceptor implements HandshakeInterceptor {
     public boolean beforeHandshake(ServerHttpRequest request, ServerHttpResponse response,
                                    WebSocketHandler wsHandler, Map<String, Object> attributes) {
 
-        logger.info("🔗 WebSocket handshake attempt from: {}", request.getRemoteAddress());
-        logger.info("📋 Request URI: {}", request.getURI());
-        logger.info("🔍 Headers: {}", request.getHeaders());
-
+        // Add this to accept token from headers
         if (request instanceof ServletServerHttpRequest) {
             ServletServerHttpRequest servletRequest = (ServletServerHttpRequest) request;
             HttpServletRequest req = servletRequest.getServletRequest();
 
-            // Log all query parameters
-            logger.info("📝 Query parameters: {}", req.getParameterMap());
+            // 1. Check Authorization header first
+            String token = extractTokenFromHeader(req);
 
-            // 1. Try query parameter
-            String token = req.getParameter("token");
-            logger.info("🎫 Token from query param: {}", token != null ? "Found" : "Not found");
-
-            // 2. Try Authorization header
+            // 2. Then check query parameter
             if (token == null) {
-                String authHeader = req.getHeader("Authorization");
-                logger.info("🔐 Authorization header: {}", authHeader != null ? authHeader : "Not found");
-                if (authHeader != null && authHeader.startsWith("Bearer ")) {
-                    token = authHeader.substring(7);
-                    logger.info("🎫 Token extracted from Authorization header");
-                }
+                token = req.getParameter("token");
             }
 
-            // 3. Try custom token header
-            if (token == null) {
-                token = req.getHeader("token");
-                logger.info("🎫 Token from custom header: {}", token != null ? "Found" : "Not found");
-            }
-
-            // 4. Try X-Auth-Token header (common alternative)
-            if (token == null) {
-                token = req.getHeader("X-Auth-Token");
-                logger.info("🎫 Token from X-Auth-Token header: {}", token != null ? "Found" : "Not found");
-            }
-
-            if (token != null) {
+            // Validate and store token
+            if (token != null && jwtUtil.validateToken(token)) {
                 attributes.put("token", token);
-                logger.info("✅ Token found and stored in handshake attributes");
                 return true;
-            } else {
-                logger.warn("❌ No token found in handshake - rejecting connection");
-                logger.warn("💡 Make sure frontend sends token via:");
-                logger.warn("   - Query parameter: ?token=your_jwt_token");
-                logger.warn("   - Authorization header: Bearer your_jwt_token");
-                logger.warn("   - Custom header: token: your_jwt_token");
-
-                response.setStatusCode(HttpStatus.UNAUTHORIZED);
-                return false;
             }
         }
-
-        logger.warn("❌ Request is not ServletServerHttpRequest - rejecting");
+        response.setStatusCode(HttpStatus.UNAUTHORIZED);
         return false;
     }
 
+    private String extractTokenFromHeader(HttpServletRequest request) {
+        String bearerToken = request.getHeader("Authorization");
+        if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {
+            return bearerToken.substring(7);
+        }
+        return null;
+    }
     @Override
     public void afterHandshake(ServerHttpRequest request, ServerHttpResponse response,
                                WebSocketHandler wsHandler, Exception exception) {

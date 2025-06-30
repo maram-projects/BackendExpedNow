@@ -20,6 +20,7 @@ public class WebSocketMessage {
         USER_STOP_TYPING,
         USER_ONLINE,
         USER_OFFLINE,
-        DELIVERY_UPDATE
+        DELIVERY_UPDATE,
+        CHAT_ROOM_CREATED
     }
 }

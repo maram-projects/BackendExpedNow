@@ -2,6 +2,7 @@ package com.example.ExpedNow.services.core.impl;
 
 import com.example.ExpedNow.dto.LocationDTO;
 import com.example.ExpedNow.exception.ResourceNotFoundException;
+import com.example.ExpedNow.models.ChatRoom;
 import com.example.ExpedNow.models.DeliveryRequest;
 import com.example.ExpedNow.models.User;
 import com.example.ExpedNow.models.enums.PackageType;
@@ -36,6 +37,7 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
     private final NotificationServiceInterface notificationService;
     private final LocationServiceInterface locationService;
     private final AvailabilityServiceInterface availabilityService;
+    private final ChatService chatService; // Add this dependency
 
     @Autowired
     public DeliveryAssignmentServiceImpl(
@@ -43,12 +45,13 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
             UserRepository userRepository,
             NotificationServiceInterface notificationService,
             LocationServiceInterface locationService,
-            AvailabilityServiceInterface availabilityService) {
+            AvailabilityServiceInterface availabilityService, ChatService chatService) {
         this.deliveryRepository = deliveryRepository;
         this.userRepository = userRepository;
         this.notificationService = notificationService;
         this.locationService = locationService;
         this.availabilityService = availabilityService;
+        this.chatService = chatService;
     }
 
     @Override
@@ -134,6 +137,24 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
         } catch (Exception e) {
             logger.error("Failed to send notification: {}", e.getMessage(), e);
             // Continue even if notification fails - at least assignment was successful
+        }
+        if (savedDelivery.getDeliveryPersonId() != null && !savedDelivery.getDeliveryPersonId().isEmpty()) {
+            try {
+                // Get or create chat room
+                ChatRoom chatRoom = chatService.getOrCreateChatRoom(
+                        savedDelivery.getId(),
+                        savedDelivery.getClientId(),
+                        savedDelivery.getDeliveryPersonId()
+                );
+
+                logger.info("Chat room created for delivery {} between client {} and delivery person {}",
+                        savedDelivery.getId(),
+                        savedDelivery.getClientId(),
+                        savedDelivery.getDeliveryPersonId());
+            } catch (Exception e) {
+                logger.error("Failed to create chat room for delivery {}: {}", savedDelivery.getId(), e.getMessage());
+                // Continue even if chat room creation fails
+            }
         }
 
         return savedDelivery;

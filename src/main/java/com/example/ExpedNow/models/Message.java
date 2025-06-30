@@ -33,10 +33,27 @@ public class Message {
     private String attachmentType;
 
     public enum MessageType {
-        TEXT, IMAGE, DOCUMENT, LOCATION, SYSTEM_NOTIFICATION
+        TEXT,
+        IMAGE,
+        DOCUMENT,
+        LOCATION,
+        SYSTEM_NOTIFICATION
     }
 
     public enum MessageStatus {
-        SENT, DELIVERED, READ
+        SENT,
+        DELIVERED,
+        READ
+    }
+
+    // Helper method to check if message is read
+    public boolean isRead() {
+        return this.status == MessageStatus.READ;
+    }
+
+    // Helper method to mark as read
+    public void markAsRead() {
+        this.status = MessageStatus.READ;
+        this.readAt = LocalDateTime.now();
     }
 }

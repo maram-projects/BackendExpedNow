@@ -100,4 +100,31 @@ public class WebSocketChatController {
             log.error("Error handling stop typing indicator", e);
         }
     }
+
+
+    @MessageMapping("/chat/room-created")
+    public void notifyChatRoomCreated(@Payload ChatRoomDTO roomDTO) {
+        // Notify both participants
+        messagingTemplate.convertAndSendToUser(
+                roomDTO.getClientId(),
+                "/queue/chat-rooms",
+                new WebSocketMessage(
+                        WebSocketMessage.WebSocketMessageType.CHAT_ROOM_CREATED,
+                        roomDTO,
+                        roomDTO.getClientId(),
+                        roomDTO.getDeliveryId()
+                )
+        );
+
+        messagingTemplate.convertAndSendToUser(
+                roomDTO.getDeliveryPersonId(),
+                "/queue/chat-rooms",
+                new WebSocketMessage(
+                        WebSocketMessage.WebSocketMessageType.CHAT_ROOM_CREATED,
+                        roomDTO,
+                        roomDTO.getDeliveryPersonId(),
+                        roomDTO.getDeliveryId()
+                )
+        );
+    }
 }

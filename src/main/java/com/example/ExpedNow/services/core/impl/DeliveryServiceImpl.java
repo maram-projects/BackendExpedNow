@@ -3,6 +3,7 @@
     import com.example.ExpedNow.dto.DeliveryResponseDTO;
     import com.example.ExpedNow.dto.UserDTO;
     import com.example.ExpedNow.dto.VehicleDTO;
+    import com.example.ExpedNow.models.ChatRoom;
     import com.example.ExpedNow.models.DeliveryRequest;
     import com.example.ExpedNow.models.User;
     import com.example.ExpedNow.models.Vehicle;
@@ -33,6 +34,7 @@
     public class DeliveryServiceImpl implements DeliveryServiceInterface {
         private static final Logger logger = LoggerFactory.getLogger(DeliveryServiceImpl.class);
         private final UserServiceInterface userService; // أضف هذا
+        private final ChatService chatService; // Add this dependency
 
         private final DeliveryReqRepository deliveryRepository;
         private final VehicleServiceInterface vehicleService;
@@ -41,8 +43,9 @@
         @Autowired
         private DeliveryAssignmentServiceImpl deliveryAssignmentService;
 
-        public DeliveryServiceImpl(UserServiceInterface userService, DeliveryReqRepository deliveryRepository, VehicleServiceInterface vehicleService) {
+        public DeliveryServiceImpl(UserServiceInterface userService, ChatService chatService, DeliveryReqRepository deliveryRepository, VehicleServiceInterface vehicleService) {
             this.userService = userService;
+            this.chatService = chatService;
             this.deliveryRepository = deliveryRepository;
             this.vehicleService = vehicleService;
         }
@@ -100,6 +103,24 @@
                         savedDelivery.getId(), savedDelivery.getDeliveryPersonId());
             }
 
+            if (savedDelivery.getDeliveryPersonId() != null && !savedDelivery.getDeliveryPersonId().isEmpty()) {
+                try {
+                    // Get or create chat room
+                    ChatRoom chatRoom = chatService.getOrCreateChatRoom(
+                            savedDelivery.getId(),
+                            savedDelivery.getClientId(),
+                            savedDelivery.getDeliveryPersonId()
+                    );
+
+                    logger.info("Chat room created for delivery {} between client {} and delivery person {}",
+                            savedDelivery.getId(),
+                            savedDelivery.getClientId(),
+                            savedDelivery.getDeliveryPersonId());
+                } catch (Exception e) {
+                    logger.error("Failed to create chat room for delivery {}: {}", savedDelivery.getId(), e.getMessage());
+                    // Continue even if chat room creation fails
+                }
+            }
             // Return the saved delivery (whether assignment worked or not)
             return savedDelivery;
         }
