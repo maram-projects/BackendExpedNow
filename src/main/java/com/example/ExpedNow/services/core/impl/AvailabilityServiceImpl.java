@@ -544,30 +544,32 @@ public class AvailabilityServiceImpl implements AvailabilityServiceInterface {
     /**
      * Check if a delivery person already has a meaningful schedule
      */
+// Add this method to AvailabilityServiceImpl
+    @Override
     public boolean hasExistingSchedule(String userId) {
         try {
-            AvailabilitySchedule schedule = availabilityRepository.findByUserId(userId)
-                    .orElse(null);
-
+            AvailabilitySchedule schedule = availabilityRepository.findByUserId(userId).orElse(null);
             if (schedule == null) {
                 return false;
             }
 
-            // Check if any weekly schedule days are set to working
+            // Check weekly schedule
             boolean hasWeeklySchedule = schedule.getWeeklySchedule().values().stream()
                     .anyMatch(day -> day.isWorking());
 
-            // Check if any monthly schedule dates are set
+            // Check monthly schedule
             boolean hasMonthlySchedule = schedule.getMonthlySchedule() != null &&
                     !schedule.getMonthlySchedule().isEmpty();
 
             return hasWeeklySchedule || hasMonthlySchedule;
         } catch (Exception e) {
-            logger.error("Error checking existing schedule for user {}: {}", userId, e.getMessage());
+            logger.error("Error checking existing schedule: {}", e.getMessage());
             return false;
         }
     }
 
+// Keep your existing isUserAvailableAt implementations
+// They're already correctly implemented in your service
     /**
      * Get delivery persons without schedules
      */
