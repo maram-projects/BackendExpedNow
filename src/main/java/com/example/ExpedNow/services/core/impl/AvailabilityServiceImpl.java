@@ -617,7 +617,13 @@ public class AvailabilityServiceImpl implements AvailabilityServiceInterface {
                         new AvailabilitySchedule.DaySchedule(false, null, null));
             }
         }
-
+        for (DayOfWeek day : DayOfWeek.values()) {
+            boolean isWeekend = day == DayOfWeek.SATURDAY || day == DayOfWeek.SUNDAY;
+            if (!isWeekend) {
+                schedule.getWeeklySchedule().put(day,
+                        new AvailabilitySchedule.DaySchedule(true, LocalTime.of(8,0), LocalTime.of(18,0)));
+            }
+        }
         return availabilityRepository.save(schedule);
     }
 

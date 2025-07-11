@@ -95,4 +95,5 @@ public interface MissionRepository extends MongoRepository<Mission, String> {
      */
     @Query("{ 'deliveryPerson.$id': ObjectId(?0), 'status': 'COMPLETED' }")
     List<Mission> findCompletedMissionsByDeliveryPersonId(String deliveryPersonId);
+
 }

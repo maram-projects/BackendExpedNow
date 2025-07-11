@@ -101,4 +101,5 @@ public interface PaymentRepository extends MongoRepository<Payment, String> {
 
     @Query("{ 'deliveryPersonPaid': false, 'status': 'COMPLETED' }")
     List<Payment> findUnpaidDeliveryPayments();
+    List<Payment> findByDeliveryPersonIdAndDeliveryPersonPaidTrue(String deliveryPersonId);
 }

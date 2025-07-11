@@ -6,6 +6,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import lombok.Data;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.annotation.Transient;
 import org.springframework.data.mongodb.core.mapping.Document;
 import org.springframework.data.mongodb.core.mapping.Field;
 import org.springframework.data.mongodb.core.mapping.FieldType;
@@ -47,7 +48,8 @@ public class Payment {
     // معلومات خاصة بالتحويل البنكي
     private String bankName;      // اسم البنك
     private String bankReference; // رقم المرجع البنكي
-
+    @Transient // Not stored in DB but populated when needed
+    private User deliveryPerson;
     // خصومات إذا وجدت
     private String discountId;   // رابط مع نموذج الخصم إذا استخدم العميل خصم
     private Double discountAmount; // قيمة الخصم (changed to Double)
@@ -55,10 +57,13 @@ public class Payment {
     // Additional fields needed by the service
     private String clientSecret; // For Stripe payments
     private String discountCode; // Discount code used
-    private String deliveryPersonId; // رقم الموصل المسؤول عن التوصيل
-    private Double deliveryPersonShare; // حصة الموصل من المبلغ (مثلا 70%)
-    private Boolean deliveryPersonPaid = false; // هل تم دفع حصة الموصل
 
+
+    // In your Payment model class
+    private String deliveryPersonId; // ID of the delivery person
+    private Double deliveryPersonShare; // 80% of the payment amount
+    private Boolean deliveryPersonPaid = false; // Whether payment was released to delivery person
+    private LocalDateTime deliveryPersonPaidAt; // When payment was released
     @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSS'Z'")
     private LocalDateTime paymentDate;
 
@@ -84,4 +89,6 @@ public class Payment {
     public void setPaymentMethod(PaymentMethod paymentMethod) {
         this.method = paymentMethod;
     }
+
+
 }

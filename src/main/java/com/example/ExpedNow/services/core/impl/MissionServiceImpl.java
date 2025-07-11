@@ -1,28 +1,36 @@
 package com.example.ExpedNow.services.core.impl;
 
 import com.example.ExpedNow.models.*;
+import com.example.ExpedNow.models.enums.PackageType;
 import com.example.ExpedNow.repositories.*;
+import com.example.ExpedNow.services.core.DeliveryAssignmentServiceInterface;
 import com.example.ExpedNow.services.core.MissionServiceInterface;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
 import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
-import org.springframework.transaction.annotation.Transactional; // أضف هذا السطر
+import org.springframework.transaction.annotation.Transactional;
+
 @Service
 @Primary
 @Transactional
 public class MissionServiceImpl implements MissionServiceInterface {
-
+    private static final org.slf4j.Logger logger = LoggerFactory.getLogger(MissionServiceImpl.class);
     private final MissionRepository missionRepository;
     private final DeliveryReqRepository deliveryReqRepository;
     private final UserRepository userRepository;
+    private final DeliveryAssignmentServiceInterface deliveryAssignmentService;
 
     public MissionServiceImpl(MissionRepository missionRepository,
                               DeliveryReqRepository deliveryReqRepository,
-                              UserRepository userRepository) {
+                              UserRepository userRepository,
+                              DeliveryAssignmentServiceInterface deliveryAssignmentService) {
         this.missionRepository = missionRepository;
         this.deliveryReqRepository = deliveryReqRepository;
         this.userRepository = userRepository;
+        this.deliveryAssignmentService = deliveryAssignmentService;
     }
 
     @Override
@@ -39,8 +47,6 @@ public class MissionServiceImpl implements MissionServiceInterface {
         if (delivery.getStatus() != DeliveryRequest.DeliveryReqStatus.ASSIGNED) {
             throw new RuntimeException("Cannot create mission for delivery with status: " + delivery.getStatus());
         }
-
-
 
         User deliveryPerson = userRepository.findById(deliveryPersonId)
                 .orElseThrow(() -> new RuntimeException("Delivery person not found"));
@@ -64,6 +70,7 @@ public class MissionServiceImpl implements MissionServiceInterface {
 
         return missionRepository.save(mission);
     }
+
     @Override
     public Mission startMission(String missionId) {
         Mission mission = getMissionById(missionId);
@@ -85,17 +92,36 @@ public class MissionServiceImpl implements MissionServiceInterface {
     @Override
     public Mission completeMission(String missionId) {
         Mission mission = getMissionById(missionId);
-
         validateMissionStatus(mission, "IN_PROGRESS", "complete");
 
         mission.setStatus("COMPLETED");
         mission.setEndTime(LocalDateTime.now());
 
-        // تحديث حالة الطلب المرتبط
+        // Update linked delivery request status
         updateDeliveryStatus(mission.getDeliveryRequest(), DeliveryRequest.DeliveryReqStatus.DELIVERED);
         mission.getDeliveryRequest().setCompletedAt(LocalDateTime.now());
 
-        return missionRepository.save(mission);
+        Mission savedMission = missionRepository.save(mission);
+
+        // Automatically assign a NEW pending delivery to the same delivery person
+        try {
+            String deliveryPersonId = mission.getDeliveryPerson().getId();
+            logger.info("Mission completed. Attempting to assign new pending delivery to delivery person: {}", deliveryPersonId);
+
+            // Use the assignPendingDeliveriesToUser method to assign new deliveries
+            List<DeliveryRequest> assignedDeliveries = deliveryAssignmentService.assignPendingDeliveriesToUser(deliveryPersonId);
+
+            if (!assignedDeliveries.isEmpty()) {
+                logger.info("Successfully assigned {} new delivery(ies) to delivery person: {}",
+                        assignedDeliveries.size(), deliveryPersonId);
+            } else {
+                logger.info("No pending deliveries available for assignment to delivery person: {}", deliveryPersonId);
+            }
+        } catch (Exception e) {
+            logger.error("Failed to assign new delivery after mission completion: {}", e.getMessage(), e);
+        }
+
+        return savedMission;
     }
 
     @Override
@@ -146,6 +172,20 @@ public class MissionServiceImpl implements MissionServiceInterface {
             // تحديث حالة الطلب المرتبط إذا لزم الأمر
             if ("COMPLETED".equals(status)) {
                 updateDeliveryStatus(mission.getDeliveryRequest(), DeliveryRequest.DeliveryReqStatus.DELIVERED);
+
+                // Auto-assign new deliveries when mission is completed via status update
+                try {
+                    String deliveryPersonId = mission.getDeliveryPerson().getId();
+                    logger.info("Mission status updated to COMPLETED. Attempting to assign new delivery to person: {}", deliveryPersonId);
+
+                    List<DeliveryRequest> assignedDeliveries = deliveryAssignmentService.assignPendingDeliveriesToUser(deliveryPersonId);
+
+                    if (!assignedDeliveries.isEmpty()) {
+                        logger.info("Successfully assigned {} new delivery(ies) after status update", assignedDeliveries.size());
+                    }
+                } catch (Exception e) {
+                    logger.error("Failed to assign new delivery after status update: {}", e.getMessage(), e);
+                }
             } else if ("CANCELLED".equals(status)) {
                 updateDeliveryStatus(mission.getDeliveryRequest(), DeliveryRequest.DeliveryReqStatus.CANCELLED);
             }
@@ -161,11 +201,11 @@ public class MissionServiceImpl implements MissionServiceInterface {
         return missionRepository.save(mission);
     }
 
-    // ====== Methods privées ======
+    // ====== Private Methods ======
 
     private void updateDeliveryStatus(DeliveryRequest delivery, DeliveryRequest.DeliveryReqStatus newStatus) {
         delivery.setStatus(newStatus);
-        deliveryReqRepository.save(delivery); // تأكيد الحفظ
+        deliveryReqRepository.save(delivery);
     }
 
     private void validateMissionStatus(Mission mission, String expectedStatus, String action) {
@@ -195,6 +235,4 @@ public class MissionServiceImpl implements MissionServiceInterface {
                 throw new RuntimeException("Unknown current status: " + currentStatus);
         }
     }
-
-
 }

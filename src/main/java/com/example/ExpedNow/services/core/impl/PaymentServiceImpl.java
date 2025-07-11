@@ -1,12 +1,13 @@
 package com.example.ExpedNow.services.core.impl;
 
-import com.example.ExpedNow.models.Discount;
-import com.example.ExpedNow.models.Payment;
+import com.example.ExpedNow.models.*;
 import com.example.ExpedNow.models.enums.PaymentMethod;
 import com.example.ExpedNow.models.enums.PaymentStatus;
 import com.example.ExpedNow.repositories.PaymentRepository;
+import com.example.ExpedNow.repositories.VehicleRepository;
 import com.example.ExpedNow.services.core.PaymentServiceInterface;
 import com.example.ExpedNow.services.core.DeliveryServiceInterface;
+import com.example.ExpedNow.services.core.UserServiceInterface;
 import com.stripe.exception.StripeException;
 import com.stripe.model.PaymentIntent;
 import org.slf4j.Logger;
@@ -15,22 +16,29 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @Service
 public class PaymentServiceImpl implements PaymentServiceInterface {
+    public static final double DELIVERY_PERSON_SHARE_PERCENTAGE = 0.8;
 
     private static final Logger logger = LoggerFactory.getLogger(PaymentServiceImpl.class);
-
+    @Autowired
+    private UserServiceInterface userService; // Add this line
     @Autowired
     private PaymentRepository paymentRepository;
-
+    @Autowired
+    private VehicleRepository vehicleRepository; // Add this if not already present
     @Autowired
     private MongoTemplate mongoTemplate;
 
@@ -55,6 +63,10 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
             }
             if (payment.getPaymentMethod() == null) {
                 throw new IllegalArgumentException("Payment method is required");
+            }
+            if (payment.getDeliveryId() != null) {
+                DeliveryRequest delivery = deliveryService.getDeliveryById(payment.getDeliveryId());
+                payment.setDeliveryPersonId(delivery.getDeliveryPersonId());
             }
 
             // Set defaults
@@ -152,14 +164,12 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
         }
     }
 
+    // Update methods to use the enricher
     @Override
     public Payment getPaymentById(String paymentId) {
-        Optional<Payment> payment = paymentRepository.findById(paymentId);
-        if (payment.isPresent()) {
-            return payment.get();
-        } else {
-            throw new IllegalArgumentException("Payment not found with ID: " + paymentId);
-        }
+        Payment payment = paymentRepository.findById(paymentId)
+                .orElseThrow(() -> new IllegalArgumentException("Payment not found"));
+        return enrichPayment(payment);
     }
 
     @Override
@@ -183,6 +193,88 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
         throw new IllegalArgumentException("Client secret not available for this payment method");
     }
 
+    // Add these methods to PaymentServiceImpl
+
+    @Override
+    public List<Payment> getPaymentsByDeliveryPerson(String deliveryPersonId) {
+        try {
+            if (deliveryPersonId == null || deliveryPersonId.trim().isEmpty()) {
+                throw new IllegalArgumentException("Delivery person ID cannot be null or empty");
+            }
+
+            Query query = new Query();
+            query.addCriteria(Criteria.where("deliveryPersonId").is(deliveryPersonId)
+                    .and("deliveryPersonPaid").is(true));
+
+            // Sort by payment date descending
+            query.with(Sort.by(Sort.Direction.DESC, "deliveryPersonPaidAt"));
+
+            return mongoTemplate.find(query, Payment.class);
+        } catch (Exception e) {
+            logger.error("Error getting payments for delivery person {}: {}", deliveryPersonId, e.getMessage());
+            throw new RuntimeException("Failed to retrieve payments for delivery person", e);
+        }
+    }
+
+
+
+    @Override
+    public ResponseEntity<?> releaseToDeliveryPerson(String paymentId) {
+        try {
+            Payment payment = paymentRepository.findById(paymentId)
+                    .orElseThrow(() -> new IllegalArgumentException("Payment not found with ID: " + paymentId));
+
+            if (payment.getStatus() != PaymentStatus.COMPLETED) {
+                throw new IllegalArgumentException(
+                        "Payment status must be COMPLETED to release. Current status: " + payment.getStatus()
+                );
+            }
+
+            if (payment.getDeliveryPersonId() == null) {
+                throw new IllegalArgumentException(
+                        "Cannot release payment - no delivery person assigned. Payment ID: " + paymentId
+                );
+            }
+
+            if (payment.getDeliveryPersonPaid() != null && payment.getDeliveryPersonPaid()) {
+                throw new IllegalArgumentException(
+                        "Payment already released to delivery person at: " + payment.getDeliveryPersonPaidAt()
+                );
+            }
+
+            // Calculate 80% share
+            double shareAmount = payment.getFinalAmountAfterDiscount() * DELIVERY_PERSON_SHARE_PERCENTAGE;
+            payment.setDeliveryPersonShare(shareAmount);
+            payment.setDeliveryPersonPaid(true);
+            payment.setDeliveryPersonPaidAt(LocalDateTime.now());
+
+            paymentRepository.save(payment);
+
+            // Return response with payment details
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Payment released to delivery person successfully");
+            response.put("paymentId", payment.getId());
+            response.put("deliveryPersonId", payment.getDeliveryPersonId());
+            response.put("amountReleased", shareAmount);
+            response.put("releaseDate", payment.getDeliveryPersonPaidAt());
+
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            logger.error("Validation error: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "message", e.getMessage()
+            ));
+        } catch (Exception e) {
+            logger.error("Error releasing payment: {}", e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "success", false,
+                    "message", "Failed to release payment: " + e.getMessage()
+            ));
+        }
+    }
     @Override
     public Payment refundPayment(String paymentId, Double amount) {
         try {
@@ -364,6 +456,18 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
                         PaymentStatus.COMPLETED
                 );
                 logger.info("Updated delivery status for delivery: {}", deliveryId);
+            }
+
+            if (deliveryId != null) {
+                DeliveryRequest delivery = deliveryService.getDeliveryById(deliveryId);
+                if (delivery != null) {
+                    payment.setDeliveryPersonId(delivery.getDeliveryPersonId()); // Add this
+                    deliveryService.updateDeliveryPaymentStatus(
+                            deliveryId,
+                            payment.getId(),
+                            PaymentStatus.COMPLETED
+                    );
+                }
             }
         } catch (Exception e) {
             // Log error but don't fail the payment confirmation
@@ -578,15 +682,36 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
             throw new RuntimeException("Failed to retrieve payments: " + e.getMessage());
         }
     }
+    private void populateDeliveryPerson(Payment payment) {
+        if (payment.getDeliveryPersonId() != null && payment.getDeliveryPerson() == null) {
+            try {
+                User deliveryPerson = userService.findById(payment.getDeliveryPersonId());
+                payment.setDeliveryPerson(deliveryPerson);
+
+                // Populate vehicle if available
+                if (deliveryPerson.getAssignedVehicleId() != null) {
+                    Vehicle vehicle = vehicleRepository.findById(deliveryPerson.getAssignedVehicleId())
+                            .orElse(null);
+                    deliveryPerson.setAssignedVehicle(vehicle);
+                }
+            } catch (Exception e) {
+                logger.error("Error populating delivery person: {}", e.getMessage());
+            }
+        }
+    }
+
+    private Payment enrichPayment(Payment payment) {
+        populateDeliveryPerson(payment);
+        // Add other population logic if needed
+        return payment;
+    }
 
     @Override
     public List<Payment> getAllPaymentsSimple() {
-        try {
-            return paymentRepository.findAll();
-        } catch (Exception e) {
-            logger.error("Error getting all payments: {}", e.getMessage());
-            throw new RuntimeException("Failed to retrieve all payments: " + e.getMessage());
-        }
+        List<Payment> payments = paymentRepository.findAll();
+        return payments.stream()
+                .map(this::enrichPayment)
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -707,4 +832,8 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
             payment.setFinalAmountAfterDiscount(payment.getAmount());
             return payment;
         }
-    }}
+    }
+
+
+
+}

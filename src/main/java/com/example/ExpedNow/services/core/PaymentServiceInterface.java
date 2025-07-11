@@ -5,6 +5,8 @@ import com.example.ExpedNow.models.enums.PaymentMethod;
 import com.example.ExpedNow.models.enums.PaymentStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.http.ResponseEntity;
+
 import java.util.List;
 import java.util.Map;
 
@@ -17,7 +19,9 @@ public interface PaymentServiceInterface {
     String getPaymentClientSecret(String paymentId);
     Payment refundPayment(String paymentId, Double amount);
     Payment confirmPayment(String transactionId, double amount);
+    ResponseEntity<?> releaseToDeliveryPerson(String paymentId);
 
+    List<Payment> getPaymentsByDeliveryPerson(String deliveryPersonId);
 
     Payment failPayment(String transactionId);
     Payment updatePaymentStatus(String paymentId, String status);

@@ -60,6 +60,71 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
         this.chatService = chatService;
     }
 
+    /**
+     * @param userId
+     * @return
+     */
+    @Override
+    public List<DeliveryRequest> assignPendingDeliveriesToUser(String userId) {
+        // Fetch all pending deliveries
+        List<DeliveryRequest> pendingDeliveries = deliveryRepository.findByStatus(DeliveryRequest.DeliveryReqStatus.PENDING);
+
+        if (pendingDeliveries.isEmpty()) {
+            logger.info("No pending deliveries available for assignment");
+            return Collections.emptyList();
+        }
+
+        // Get delivery person details
+        User deliveryPerson = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Delivery person not found"));
+
+        List<DeliveryRequest> assignedDeliveries = new ArrayList<>();
+
+        for (DeliveryRequest delivery : pendingDeliveries) {
+            LocalDateTime deliveryTime = delivery.getScheduledDate() != null ?
+                    delivery.getScheduledDate() : LocalDateTime.now();
+
+            // Check if delivery person is suitable
+            if (isSuitableForDelivery(deliveryPerson, delivery, deliveryTime)) {
+                // Assign delivery
+                delivery.setStatus(DeliveryRequest.DeliveryReqStatus.ASSIGNED);
+                delivery.setDeliveryPersonId(userId);
+                delivery.setAssignedAt(LocalDateTime.now());
+                DeliveryRequest savedDelivery = deliveryRepository.save(delivery);
+                assignedDeliveries.add(savedDelivery);
+
+                // Notify delivery person
+                try {
+                    notificationService.sendAssignmentRequestNotification(userId, savedDelivery);
+                } catch (Exception e) {
+                    logger.error("Failed to send notification for delivery {}: {}", savedDelivery.getId(), e.getMessage());
+                }
+
+                // Create chat room
+                try {
+                    ChatRoom chatRoom = chatService.getOrCreateChatRoom(
+                            savedDelivery.getId(),
+                            savedDelivery.getClientId(),
+                            userId
+                    );
+                    logger.info("Chat room created for delivery {}", savedDelivery.getId());
+                } catch (Exception e) {
+                    logger.error("Failed to create chat room for delivery {}: {}", savedDelivery.getId(), e.getMessage());
+                }
+            }
+        }
+
+        return assignedDeliveries;
+    }
+
+    private boolean isSuitableForDelivery(User user, DeliveryRequest delivery, LocalDateTime time) {
+        // Use existing logic from findSuitableDeliveryPersons()
+        return availabilityService.isUserAvailableAt(user.getId(), time.toLocalDate(), time.toLocalTime())
+                && canHandlePackageType(user, delivery.getPackageType())
+                && !hasExcessiveWorkload(user.getId())
+                && !hasActiveMissionInProgress(user.getId());
+    }
+
     @Override
     public DeliveryRequest assignDelivery(String deliveryId) {
         logger.info("Starting assignment process for delivery ID: {}", deliveryId);
@@ -257,37 +322,9 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
      * Completed missions should not block new assignments
      */
     private boolean hasActiveMissionInProgress(String userId) {
-        try {
-            // Only check for truly active statuses - exclude COMPLETED missions
-            List<Mission> activeMissions = missionRepository.findByDeliveryPersonIdAndStatusIn(
-                    userId,
-                    Arrays.asList("IN_PROGRESS", "PENDING") // Removed "COMPLETED" from here
-            );
-
-            boolean hasActiveMission = !activeMissions.isEmpty();
-
-            if (hasActiveMission) {
-                logger.debug("User {} has {} active mission(s) in progress/pending",
-                        userId, activeMissions.size());
-
-                // Log mission details for debugging
-                for (Mission mission : activeMissions) {
-                    logger.debug("Active mission for user {}: ID={}, Status={}, DeliveryId={}",
-                            userId, mission.getId(), mission.getStatus(),
-                            mission.getDeliveryRequest().getId());
-                }
-            } else {
-                logger.debug("User {} has no active missions - available for new assignments", userId);
-            }
-
-            return hasActiveMission;
-        } catch (Exception e) {
-            logger.error("Error checking active missions for user {}: {}", userId, e.getMessage());
-            // In case of error, assume no active missions to avoid blocking assignments
-            return false;
-        }
+        long activeCount = missionRepository.countActiveMissionsByDeliveryPersonId(userId);
+        return activeCount > 0;
     }
-
     private boolean hasExcessiveWorkload(String userId) {
         final int MAX_ACTIVE_DELIVERIES = 5;
         List<DeliveryRequest> activeDeliveries = deliveryRepository.findActiveDeliveriesByDeliveryPerson(userId);
@@ -466,6 +503,10 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
                     mission.setEndTime(LocalDateTime.now());
                     missionRepository.save(mission);
 
+                    // **إضافة هذا الجزء الجديد**
+                    // Set delivery person as available again
+                    setDeliveryPersonAvailableAfterMissionCompletion(deliveryPersonId);
+
                     logger.info("Mission {} successfully completed automatically", mission.getId());
                 } else {
                     logger.debug("Mission {} for delivery {} is not in IN_PROGRESS status (current: {}), skipping auto-completion",
@@ -480,6 +521,22 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
         }
     }
 
+    /**
+     * **دالة جديدة لتعيين المستخدم كـ Available بعد إكمال المهمة**
+     */
+    private void setDeliveryPersonAvailableAfterMissionCompletion(String deliveryPersonId) {
+        try {
+            Optional<User> userOpt = userRepository.findById(deliveryPersonId);
+            if (userOpt.isPresent()) {
+                User deliveryPerson = userOpt.get();
+                deliveryPerson.setAvailable(true); // Always set to available
+                userRepository.save(deliveryPerson);
+                logger.info("Delivery person {} set as available after mission", deliveryPersonId);
+            }
+        } catch (Exception e) {
+            logger.error("Error setting delivery person {} as available: {}", deliveryPersonId, e.getMessage(), e);
+        }
+    }
     /**
      * Complete mission when delivery is fully delivered (backup method)
      */
@@ -498,6 +555,10 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
                     mission.setStatus("COMPLETED");
                     mission.setEndTime(LocalDateTime.now());
                     missionRepository.save(mission);
+
+                    // **إضافة هذا الجزء الجديد**
+                    // Set delivery person as available again
+                    setDeliveryPersonAvailableAfterMissionCompletion(deliveryPersonId);
 
                     logger.info("Mission {} completed on delivery completion", mission.getId());
                 }
@@ -549,5 +610,31 @@ public class DeliveryAssignmentServiceImpl implements DeliveryAssignmentServiceI
     @Override
     public List<DeliveryRequest> getPendingDeliveries() {
         return deliveryRepository.findByStatus(DeliveryRequest.DeliveryReqStatus.PENDING);
+    }
+
+    /**
+     * @return
+     */
+    @Override
+    public List<DeliveryRequest> getAssignedDeliveries() {
+        return List.of();
+    }
+
+    /**
+     * @param clientId
+     * @return
+     */
+    @Override
+    public List<DeliveryRequest> getDeliveriesByClientId(String clientId) {
+        return List.of();
+    }
+
+    /**
+     * @param deliveryPersonId
+     * @return
+     */
+    @Override
+    public List<DeliveryRequest> getDeliveriesByDeliveryPersonId(String deliveryPersonId) {
+        return List.of();
     }
 }

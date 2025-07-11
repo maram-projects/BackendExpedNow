@@ -15,11 +15,8 @@ import java.util.Optional;
 public interface DeliveryReqRepository extends MongoRepository<DeliveryRequest, String> {
 
     List<DeliveryRequest> findByClientId(String clientId);
-
     List<DeliveryRequest> findByStatus(DeliveryRequest.DeliveryReqStatus status);
-
     List<DeliveryRequest> findByDeliveryPersonId(String deliveryPersonId);
-
     List<DeliveryRequest> findByStatusAndDeliveryPersonId(
             DeliveryRequest.DeliveryReqStatus status,
             String deliveryPersonId
@@ -65,6 +62,12 @@ public interface DeliveryReqRepository extends MongoRepository<DeliveryRequest, 
 
     Optional<DeliveryRequest> findById(String id);
 
+    // *** الطريقة الجديدة اللي نحتاجوها للـ Recent Activity ***
+    @Query("{ 'deliveryPersonId': ?0, 'status': 'COMPLETED' }")
+    List<DeliveryRequest> findByDeliveryPersonIdAndStatusOrderByCompletedAtDesc(String deliveryPersonId);
 
-
+    // أو يمكن نستعمل هادي اللي أوضح:
+    @Query(value = "{ 'deliveryPersonId': ?0, 'status': 'COMPLETED' }",
+            sort = "{ 'completedAt': -1 }")
+    List<DeliveryRequest> findLastCompletedDeliveryByUser(String userId);
 }

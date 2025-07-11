@@ -1,11 +1,13 @@
 package com.example.ExpedNow.controllers;
 
 import com.example.ExpedNow.models.Payment;
+import com.example.ExpedNow.models.User;
 import com.example.ExpedNow.models.enums.PaymentMethod;
 import com.example.ExpedNow.models.enums.PaymentStatus;
+import com.example.ExpedNow.repositories.PaymentRepository;
 import com.example.ExpedNow.services.core.DeliveryPaymentServiceInterface;
 import com.example.ExpedNow.services.core.PaymentServiceInterface;
-import com.example.ExpedNow.services.core.DeliveryServiceInterface; // Add this import
+import com.example.ExpedNow.services.core.DeliveryServiceInterface;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -14,6 +16,9 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -21,27 +26,32 @@ import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/payments")
 public class PaymentController {
-
+    @Autowired
+    private MongoTemplate mongoTemplate;
     private static final Logger logger = LoggerFactory.getLogger(PaymentController.class);
-    private final DeliveryPaymentServiceInterface deliveryPaymentService; // أضف هذا السطر
+    private final DeliveryPaymentServiceInterface deliveryPaymentService;
 
     @Autowired
     private PaymentServiceInterface paymentService;
     @Autowired
-    private DeliveryServiceInterface deliveryService; // Fix the type here
+    private DeliveryServiceInterface deliveryService;
 
     public PaymentController(DeliveryPaymentServiceInterface deliveryPaymentService) {
         this.deliveryPaymentService = deliveryPaymentService;
     }
-
+    @Autowired
+    private PaymentRepository paymentRepository;
     // CREATE PAYMENT
     @PostMapping
     public ResponseEntity<Map<String, Object>> createPayment(@Valid @RequestBody Payment payment) {
         try {
+            // Add this logic to link delivery person
+
             Payment createdPayment = paymentService.createPayment(payment);
 
             Map<String, Object> response = new HashMap<>();
@@ -437,8 +447,14 @@ public class PaymentController {
     @PutMapping("/{paymentId}/status")
     public ResponseEntity<Map<String, Object>> updatePaymentStatus(
             @PathVariable String paymentId,
-            @RequestParam String status) {
+            @RequestBody Map<String, String> request) {  // Change to @RequestBody
+
         try {
+            String status = request.get("status");  // Extract status from request body
+            if (status == null || status.isEmpty()) {
+                throw new IllegalArgumentException("Status parameter is required");
+            }
+
             Payment updatedPayment = paymentService.updatePaymentStatus(paymentId, status);
 
             Map<String, Object> response = new HashMap<>();
@@ -448,7 +464,7 @@ public class PaymentController {
 
             logger.info("Payment status updated: {} to {}", paymentId, status);
             return ResponseEntity.ok(response);
-        } catch (IllegalArgumentException e) {
+        }  catch (IllegalArgumentException e) {
             logger.error("Invalid status update request: {}", e.getMessage());
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);
@@ -652,19 +668,106 @@ public class PaymentController {
     }
 
 
-    @PostMapping("/{paymentId}/release-to-delivery")
-    public ResponseEntity<?> releaseToDelivery(@PathVariable String paymentId) {
+    @GetMapping("/delivery-person/{deliveryPersonId}")
+    public ResponseEntity<Map<String, Object>> getPaymentsForDeliveryPerson(
+            @PathVariable String deliveryPersonId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+
         try {
-            deliveryPaymentService.processDeliveryPayment(paymentId);
-            return ResponseEntity.ok(Map.of(
-                    "success", true,
-                    "message", "تم تحويل الحصة للموصل بنجاح"
+            // Create pageable
+            Pageable pageable = PageRequest.of(page, size);
+
+            // Create query
+            Query query = new Query();
+            query.addCriteria(Criteria.where("deliveryPersonId").is(deliveryPersonId)
+                    .and("deliveryPersonPaid").is(true));
+
+            // Get total count
+            long total = mongoTemplate.count(query, Payment.class);
+
+            // Apply pagination
+            query.with(pageable);
+
+            // Execute query
+            List<Payment> payments = mongoTemplate.find(query, Payment.class);
+
+            // Build response
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("data", payments);
+            response.put("pagination", Map.of(
+                    "currentPage", page,
+                    "totalPages", (int) Math.ceil((double) total / size),
+                    "totalElements", total
             ));
+
+            return ResponseEntity.ok(response);
+
         } catch (Exception e) {
-            return ResponseEntity.status(500).body(Map.of(
+            logger.error("Error getting payments for delivery person: {}", e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of(
                     "success", false,
-                    "message", e.getMessage()
+                    "message", "Failed to get payments: " + e.getMessage()
             ));
         }
     }
+    @PreAuthorize("hasAuthority('ADMIN')")
+    @PostMapping("/{paymentId}/release-to-delivery")
+    public ResponseEntity<Map<String, Object>> releaseToDeliveryPerson(@PathVariable String paymentId) {
+        try {
+            Payment payment = paymentRepository.findById(paymentId)
+                    .orElseThrow(() -> new IllegalArgumentException("Payment not found"));
+
+            // Validate payment can be released
+            if (payment.getStatus() != PaymentStatus.COMPLETED) {
+                throw new IllegalArgumentException("Only completed payments can be released");
+            }
+
+            if (payment.getDeliveryPersonId() == null) {
+                throw new IllegalArgumentException("No delivery person assigned to this payment");
+            }
+
+            if (payment.getDeliveryPersonPaid() != null && payment.getDeliveryPersonPaid()) {
+                throw new IllegalArgumentException("Payment already released to delivery person");
+            }
+
+            // Calculate 80% share (or your business logic)
+            double shareAmount = payment.getFinalAmountAfterDiscount() * 0.8;
+
+            // Update payment
+            payment.setDeliveryPersonShare(shareAmount);
+            payment.setDeliveryPersonPaid(true);
+            payment.setDeliveryPersonPaidAt(LocalDateTime.now());
+            payment.setUpdatedAt(LocalDateTime.now());
+
+            Payment updatedPayment = paymentRepository.save(payment);
+
+            // Build response
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Payment released to delivery person successfully");
+            response.put("paymentId", updatedPayment.getId());
+            response.put("deliveryPersonId", updatedPayment.getDeliveryPersonId());
+            response.put("amountReleased", shareAmount);
+            response.put("releaseDate", updatedPayment.getDeliveryPersonPaidAt());
+
+            return ResponseEntity.ok(response);
+
+        } catch (IllegalArgumentException e) {
+            logger.error("Validation error: {}", e.getMessage());
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(errorResponse);
+        } catch (Exception e) {
+            logger.error("Error releasing payment: {}", e.getMessage());
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", "Failed to release payment");
+            return ResponseEntity.internalServerError().body(errorResponse);
+        }
+    }
+
+
 }
