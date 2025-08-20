@@ -760,6 +760,31 @@ public class UserServiceImpl implements UserServiceInterface {
         mailSender.send(mailMessage);
     }
 
+    // Dans UserServiceImpl.java
+    @Override
+    public long countActiveUsers() {
+        return userRepository.countByEnabledTrueAndApprovedTrue();
+    }
+
+    @Override
+    public long countTotalUsers() {
+        return userRepository.count();
+    }
+
+    @Override
+    public long countInactiveUsers() {
+        return userRepository.countByEnabledFalseOrApprovedFalse();
+    }
+
+    @Override
+    public Map<String, Long> countUsersByRole() {
+        Map<String, Long> counts = new HashMap<>();
+        for (Role role : Role.values()) {
+            counts.put(role.name(), userRepository.countByRolesContains(role));
+        }
+        return counts;
+    }
+
     // Update the loadUserByUsername method in CustomUserDetailsService to check for approval
     @Override
     public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {

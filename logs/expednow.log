@@ -1,0 +1,226 @@
+2025-07-30 17:27:02.365 [restartedMain] INFO  [m.p.s.DotenvPropertySource] - Initializing Dotenv with DotenvConfig{directory=null, filename=null, ignoreIfMalformed=false, ignoreIfMissing=true, systemProperties=false, prefix=null}
+2025-07-30 17:27:02.391 [restartedMain] INFO  [c.e.ExpedNow.ExpedNowApplication] - Starting ExpedNowApplication using Java 17.0.14 with PID 10768 (C:\pfe16\BackendExpedNow\target\classes started by Maram in C:\pfe16\BackendExpedNow)
+2025-07-30 17:27:02.391 [restartedMain] DEBUG [c.e.ExpedNow.ExpedNowApplication] - Running with Spring Boot v3.4.2, Spring v6.2.2
+2025-07-30 17:27:02.392 [restartedMain] INFO  [c.e.ExpedNow.ExpedNowApplication] - The following 1 profile is active: "dev"
+2025-07-30 17:27:02.451 [restartedMain] INFO  [o.s.b.d.e.DevToolsPropertyDefaultsPostProcessor] - Devtools property defaults active! Set 'spring.devtools.add-properties' to 'false' to disable
+2025-07-30 17:27:02.451 [restartedMain] INFO  [o.s.b.d.e.DevToolsPropertyDefaultsPostProcessor] - For additional web related logging consider setting the 'logging.level.web' property to 'DEBUG'
+2025-07-30 17:27:04.011 [restartedMain] INFO  [o.s.d.r.c.RepositoryConfigurationDelegate] - Bootstrapping Spring Data MongoDB repositories in DEFAULT mode.
+2025-07-30 17:27:04.219 [restartedMain] INFO  [o.s.d.r.c.RepositoryConfigurationDelegate] - Finished Spring Data repository scanning in 198 ms. Found 14 MongoDB repository interfaces.
+2025-07-30 17:27:05.564 [restartedMain] INFO  [o.s.b.w.e.tomcat.TomcatWebServer] - Tomcat initialized with port 8080 (http)
+2025-07-30 17:27:05.580 [restartedMain] INFO  [o.a.catalina.core.StandardService] - Starting service [Tomcat]
+2025-07-30 17:27:05.581 [restartedMain] INFO  [o.a.catalina.core.StandardEngine] - Starting Servlet engine: [Apache Tomcat/10.1.34]
+2025-07-30 17:27:05.642 [restartedMain] INFO  [o.a.c.c.C.[Tomcat].[localhost].[/]] - Initializing Spring embedded WebApplicationContext
+2025-07-30 17:27:05.642 [restartedMain] INFO  [o.s.b.w.s.c.ServletWebServerApplicationContext] - Root WebApplicationContext: initialization completed in 3190 ms
+2025-07-30 17:27:05.892 [restartedMain] INFO  [org.mongodb.driver.client] - MongoClient with metadata {"driver": {"name": "mongo-java-driver|sync|spring-boot", "version": "5.2.1"}, "os": {"type": "Windows", "name": "Windows 11", "architecture": "amd64", "version": "10.0"}, "platform": "Java/Oracle Corporation/17.0.14+8-LTS-191"} created with settings MongoClientSettings{readPreference=primary, writeConcern=WriteConcern{w=null, wTimeout=null ms, journal=null}, retryWrites=true, retryReads=true, readConcern=ReadConcern{level=null}, credential=null, transportSettings=null, commandListeners=[], codecRegistry=ProvidersCodecRegistry{codecProviders=[ValueCodecProvider{}, BsonValueCodecProvider{}, DBRefCodecProvider{}, DBObjectCodecProvider{}, DocumentCodecProvider{}, CollectionCodecProvider{}, IterableCodecProvider{}, MapCodecProvider{}, GeoJsonCodecProvider{}, GridFSFileCodecProvider{}, Jsr310CodecProvider{}, JsonObjectCodecProvider{}, BsonCodecProvider{}, EnumCodecProvider{}, com.mongodb.client.model.mql.ExpressionCodecProvider@14eb7709, com.mongodb.Jep395RecordCodecProvider@771c4417, com.mongodb.KotlinCodecProvider@6ee25420]}, loggerSettings=LoggerSettings{maxDocumentLength=1000}, clusterSettings={hosts=[localhost:27017], srvServiceName=mongodb, mode=SINGLE, requiredClusterType=UNKNOWN, requiredReplicaSetName='null', serverSelector='null', clusterListeners='[]', serverSelectionTimeout='30000 ms', localThreshold='15 ms'}, socketSettings=SocketSettings{connectTimeoutMS=10000, readTimeoutMS=0, receiveBufferSize=0, proxySettings=ProxySettings{host=null, port=null, username=null, password=null}}, heartbeatSocketSettings=SocketSettings{connectTimeoutMS=10000, readTimeoutMS=10000, receiveBufferSize=0, proxySettings=ProxySettings{host=null, port=null, username=null, password=null}}, connectionPoolSettings=ConnectionPoolSettings{maxSize=100, minSize=0, maxWaitTimeMS=120000, maxConnectionLifeTimeMS=0, maxConnectionIdleTimeMS=0, maintenanceInitialDelayMS=0, maintenanceFrequencyMS=60000, connectionPoolListeners=[], maxConnecting=2}, serverSettings=ServerSettings{heartbeatFrequencyMS=10000, minHeartbeatFrequencyMS=500, serverMonitoringMode=AUTO, serverListeners='[]', serverMonitorListeners='[]'}, sslSettings=SslSettings{enabled=false, invalidHostNameAllowed=false, context=null}, applicationName='null', compressorList=[], uuidRepresentation=JAVA_LEGACY, serverApi=null, autoEncryptionSettings=null, dnsClient=null, inetAddressResolver=null, contextProvider=null, timeoutMS=null}
+2025-07-30 17:27:05.927 [cluster-ClusterId{value='688a47d9e134244d459dc57c', description='null'}-localhost:27017] INFO  [org.mongodb.driver.cluster] - Monitor thread successfully connected to server with description ServerDescription{address=localhost:27017, type=STANDALONE, cryptd=false, state=CONNECTED, ok=true, minWireVersion=0, maxWireVersion=25, maxDocumentSize=16777216, logicalSessionTimeoutMinutes=30, roundTripTimeNanos=38609900, minRoundTripTimeNanos=0}
+2025-07-30 17:27:06.970 [restartedMain] INFO  [o.s.b.d.a.OptionalLiveReloadServer] - LiveReload server is running on port 35729
+2025-07-30 17:27:07.409 [restartedMain] DEBUG [c.e.E.s.core.impl.UserServiceImpl] - JWT Secret: G7ZPaRwhmVa8yQ+NjJv5rjMczdbNLCCHsVt0k36bH+4=
+2025-07-30 17:27:08.572 [restartedMain] INFO  [c.e.E.s.core.impl.FileStorageService] - File storage directory created at: C:\pfe4\uploads
+2025-07-30 17:27:08.581 [restartedMain] WARN  [c.e.E.s.c.i.DeliveryPricingServiceImpl] - Failed to parse pricing rule, using default value 0.0
+2025-07-30 17:27:08.708 [restartedMain] INFO  [c.e.E.c.StripeWebhookController] - Stripe webhook configuration validated successfully
+2025-07-30 17:27:08.871 [restartedMain] DEBUG [o.s.w.s.s.s.WebSocketHandlerMapping] - Patterns [/ws/**] in 'stompWebSocketHandlerMapping'
+2025-07-30 17:27:09.183 [restartedMain] DEBUG [o.s.w.s.m.WebSocketAnnotationMethodMessageHandler] - 
+	c.e.E.c.AdminController:
+	
+2025-07-30 17:27:09.184 [restartedMain] DEBUG [o.s.w.s.m.WebSocketAnnotationMethodMessageHandler] - 
+	c.e.E.c.AuthController:
+	
+2025-07-30 17:27:09.184 [restartedMain] DEBUG [o.s.w.s.m.WebSocketAnnotationMethodMessageHandler] - 
+	c.e.E.c.AvailabilityController:
+	
+2025-07-30 17:27:09.186 [restartedMain] DEBUG [o.s.w.s.m.WebSocketAnnotationMethodMessageHandler] - 
+	c.e.E.c.BonusController:
+	
+2025-07-30 17:27:09.187 [restartedMain] DEBUG [o.s.w.s.m.WebSocketAnnotationMethodMessageHandler] - 
+	c.e.E.c.ChatController:
+	
+2025-07-30 17:27:09.187 [restartedMain] DEBUG [o.s.w.s.m.WebSocketAnnotationMethodMessageHandler] - 
+	c.e.E.c.DeliveryAssignmentController:
+	
+2025-07-30 17:27:09.187 [restartedMain] DEBUG [o.s.w.s.m.WebSocketAnnotationMethodMessageHandler] - 
+	c.e.E.c.DeliveryController:
+	
+2025-07-30 17:27:09.188 [restartedMain] DEBUG [o.s.w.s.m.WebSocketAnnotationMethodMessageHandler] - 
+	c.e.E.c.DiscountController:
+	
+2025-07-30 17:27:09.188 [restartedMain] DEBUG [o.s.w.s.m.WebSocketAnnotationMethodMessageHandler] - 
+	c.e.E.c.GoogleMapsController:
+	
+2025-07-30 17:27:09.188 [restartedMain] DEBUG [o.s.w.s.m.WebSocketAnnotationMethodMessageHandler] - 
+	c.e.E.c.MissionController:
+	
+2025-07-30 17:27:09.189 [restartedMain] DEBUG [o.s.w.s.m.WebSocketAnnotationMethodMessageHandler] - 
+	c.e.E.c.NotificationController:
+	
+2025-07-30 17:27:09.189 [restartedMain] DEBUG [o.s.w.s.m.WebSocketAnnotationMethodMessageHandler] - 
+	c.e.E.c.OAuth2Controller:
+	
+2025-07-30 17:27:09.189 [restartedMain] DEBUG [o.s.w.s.m.WebSocketAnnotationMethodMessageHandler] - 
+	c.e.E.c.PaymentController:
+	
+2025-07-30 17:27:09.189 [restartedMain] DEBUG [o.s.w.s.m.WebSocketAnnotationMethodMessageHandler] - 
+	c.e.E.c.PricingController:
+	
+2025-07-30 17:27:09.190 [restartedMain] DEBUG [o.s.w.s.m.WebSocketAnnotationMethodMessageHandler] - 
+	c.e.E.c.StripeWebhookController:
+	
+2025-07-30 17:27:09.190 [restartedMain] DEBUG [o.s.w.s.m.WebSocketAnnotationMethodMessageHandler] - 
+	c.e.E.c.UserController:
+	
+2025-07-30 17:27:09.190 [restartedMain] DEBUG [o.s.w.s.m.WebSocketAnnotationMethodMessageHandler] - 
+	c.e.E.c.VehicleController:
+	
+2025-07-30 17:27:09.196 [restartedMain] DEBUG [o.s.w.s.m.WebSocketAnnotationMethodMessageHandler] - 
+	c.e.E.c.WebSocketChatController:
+	{[MESSAGE],[/chat/send]}: sendMessage(ChatMessageRequest,Authentication)
+	{[MESSAGE],[/chat/stop-typing]}: handleStopTyping(TypingIndicator,Principal)
+	{[MESSAGE],[/chat/typing]}: handleTyping(TypingIndicator,Principal)
+	{[MESSAGE],[/chat/room-created]}: notifyChatRoomCreated(ChatRoomDTO)
+2025-07-30 17:27:09.203 [restartedMain] DEBUG [o.s.w.s.m.WebSocketAnnotationMethodMessageHandler] - 
+	o.s.b.a.w.s.e.BasicErrorController:
+	
+2025-07-30 17:27:09.303 [restartedMain] INFO  [o.s.s.c.a.a.c.InitializeAuthenticationProviderBeanManagerConfigurer$InitializeAuthenticationProviderManagerConfigurer] - Global AuthenticationManager configured with AuthenticationProvider bean with name authenticationProvider
+2025-07-30 17:27:09.703 [restartedMain] DEBUG [o.s.w.s.m.m.a.RequestMappingHandlerMapping] - 167 mappings in 'requestMappingHandlerMapping'
+2025-07-30 17:27:09.737 [restartedMain] DEBUG [o.s.w.s.h.SimpleUrlHandlerMapping] - Patterns [/webjars/**, /**, /uploads/vehicle-photos/**] in 'resourceHandlerMapping'
+2025-07-30 17:27:10.069 [restartedMain] DEBUG [o.s.w.s.m.m.a.RequestMappingHandlerAdapter] - ControllerAdvice beans: 0 @ModelAttribute, 0 @InitBinder, 1 RequestBodyAdvice, 1 ResponseBodyAdvice
+2025-07-30 17:27:10.147 [restartedMain] DEBUG [o.s.w.s.m.m.a.ExceptionHandlerExceptionResolver] - ControllerAdvice beans: 2 @ExceptionHandler, 1 ResponseBodyAdvice
+2025-07-30 17:27:10.595 [restartedMain] DEBUG [org.springframework.web.SimpLogging] - clientOutboundChannel added SubProtocolWebSocketHandler[StompSubProtocolHandler[v10.stomp, v11.stomp, v12.stomp]]
+2025-07-30 17:27:10.596 [restartedMain] DEBUG [org.springframework.web.SimpLogging] - clientInboundChannel added WebSocketAnnotationMethodMessageHandler[prefixes=[/app/]]
+2025-07-30 17:27:10.596 [restartedMain] INFO  [o.s.m.s.b.SimpleBrokerMessageHandler] - Starting...
+2025-07-30 17:27:10.597 [restartedMain] DEBUG [org.springframework.web.SimpLogging] - clientInboundChannel added SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@4c95fa57]
+2025-07-30 17:27:10.597 [restartedMain] DEBUG [org.springframework.web.SimpLogging] - brokerChannel added SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@4c95fa57]
+2025-07-30 17:27:10.598 [restartedMain] INFO  [o.s.m.s.b.SimpleBrokerMessageHandler] - BrokerAvailabilityEvent[available=true, SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@4c95fa57]]
+2025-07-30 17:27:10.599 [restartedMain] INFO  [o.s.m.s.b.SimpleBrokerMessageHandler] - Started.
+2025-07-30 17:27:10.599 [restartedMain] DEBUG [org.springframework.web.SimpLogging] - clientInboundChannel added UserDestinationMessageHandler[DefaultUserDestinationResolver[prefix=/user/]]
+2025-07-30 17:27:10.599 [restartedMain] DEBUG [org.springframework.web.SimpLogging] - brokerChannel added UserDestinationMessageHandler[DefaultUserDestinationResolver[prefix=/user/]]
+2025-07-30 17:27:10.652 [restartedMain] INFO  [o.s.b.w.e.tomcat.TomcatWebServer] - Tomcat started on port 8080 (http) with context path '/'
+2025-07-30 17:27:10.682 [restartedMain] INFO  [c.e.ExpedNow.ExpedNowApplication] - Started ExpedNowApplication in 9.295 seconds (process running for 10.886)
+2025-07-30 17:27:10.692 [MessageBroker-1] INFO  [c.e.E.s.c.i.AutomatedDeliveryAssignmentServiceImpl] - 🔄 Starting automated delivery assignment process...
+2025-07-30 17:27:10.837 [MessageBroker-1] INFO  [c.e.E.s.c.i.AutomatedDeliveryAssignmentServiceImpl] - ✅ No pending requests found. Nothing to assign.
+2025-07-30 17:28:10.602 [MessageBroker-2] INFO  [o.s.w.s.c.WebSocketMessageBrokerStats] - WebSocketSession[0 current WS(0)-HttpStream(0)-HttpPoll(0), 0 total, 0 closed abnormally (0 connect failure, 0 send limit, 0 transport error)], stompSubProtocol[processed CONNECT(0)-CONNECTED(0)-DISCONNECT(0)], stompBrokerRelay[null], inboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 0], outboundChannel[pool size = 0, active threads = 0, queued tasks = 0, completed tasks = 0], sockJsScheduler[pool size = 6, active threads = 1, queued tasks = 4, completed tasks = 1]
+2025-07-30 17:28:32.839 [http-nio-8080-exec-2] INFO  [o.a.c.c.C.[Tomcat].[localhost].[/]] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2025-07-30 17:28:32.840 [http-nio-8080-exec-2] INFO  [o.s.web.servlet.DispatcherServlet] - Initializing Servlet 'dispatcherServlet'
+2025-07-30 17:28:32.842 [http-nio-8080-exec-2] DEBUG [o.s.web.servlet.DispatcherServlet] - Detected StandardServletMultipartResolver
+2025-07-30 17:28:32.842 [http-nio-8080-exec-2] DEBUG [o.s.web.servlet.DispatcherServlet] - Detected AcceptHeaderLocaleResolver
+2025-07-30 17:28:32.843 [http-nio-8080-exec-2] DEBUG [o.s.web.servlet.DispatcherServlet] - Detected FixedThemeResolver
+2025-07-30 17:28:32.849 [http-nio-8080-exec-2] DEBUG [o.s.web.servlet.DispatcherServlet] - Detected org.springframework.web.servlet.view.DefaultRequestToViewNameTranslator@10e3e519
+2025-07-30 17:28:32.851 [http-nio-8080-exec-2] DEBUG [o.s.web.servlet.DispatcherServlet] - Detected org.springframework.web.servlet.support.SessionFlashMapManager@7a0ae018
+2025-07-30 17:28:32.851 [http-nio-8080-exec-2] DEBUG [o.s.web.servlet.DispatcherServlet] - enableLoggingRequestDetails='false': request parameters and headers will be masked to prevent unsafe logging of potentially sensitive data
+2025-07-30 17:28:32.852 [http-nio-8080-exec-2] INFO  [o.s.web.servlet.DispatcherServlet] - Completed initialization in 11 ms
+2025-07-30 17:28:32.983 [http-nio-8080-exec-3] DEBUG [o.s.web.servlet.DispatcherServlet] - GET "/ws/info?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc&t=1753892912623", parameters={masked}
+2025-07-30 17:28:32.983 [http-nio-8080-exec-2] DEBUG [o.s.web.servlet.DispatcherServlet] - GET "/ws/info?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc&t=1753892912614", parameters={masked}
+2025-07-30 17:28:32.985 [http-nio-8080-exec-2] DEBUG [o.s.w.s.s.s.WebSocketHandlerMapping] - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@6ac5fe86
+2025-07-30 17:28:32.986 [http-nio-8080-exec-3] DEBUG [o.s.w.s.s.s.WebSocketHandlerMapping] - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@6ac5fe86
+2025-07-30 17:28:32.990 [http-nio-8080-exec-3] DEBUG [o.s.w.s.s.t.h.DefaultSockJsService] - Processing transport request: GET http://localhost:8080/ws/info?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc&t=1753892912623
+2025-07-30 17:28:32.990 [http-nio-8080-exec-2] DEBUG [o.s.w.s.s.t.h.DefaultSockJsService] - Processing transport request: GET http://localhost:8080/ws/info?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc&t=1753892912614
+2025-07-30 17:28:32.995 [http-nio-8080-exec-2] DEBUG [o.s.web.servlet.DispatcherServlet] - Completed 200 OK
+2025-07-30 17:28:33.013 [http-nio-8080-exec-3] DEBUG [o.s.web.servlet.DispatcherServlet] - Completed 200 OK
+2025-07-30 17:28:33.071 [http-nio-8080-exec-1] DEBUG [o.s.web.servlet.DispatcherServlet] - GET "/ws/079/1vzy0pcs/websocket?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc", parameters={masked}
+2025-07-30 17:28:33.072 [http-nio-8080-exec-1] DEBUG [o.s.w.s.s.s.WebSocketHandlerMapping] - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@6ac5fe86
+2025-07-30 17:28:33.073 [http-nio-8080-exec-1] DEBUG [o.s.w.s.s.t.h.DefaultSockJsService] - Processing transport request: GET http://localhost:8080/ws/079/1vzy0pcs/websocket?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc
+2025-07-30 17:28:33.127 [http-nio-8080-exec-8] ERROR [c.e.ExpedNow.security.JwtFilter] - Cannot set user authentication: JWT expired at 2025-07-26T11:48:13Z. Current time: 2025-07-30T16:28:33Z, a difference of 362420125 milliseconds.  Allowed clock skew: 0 milliseconds.
+2025-07-30 17:28:33.127 [http-nio-8080-exec-7] ERROR [c.e.ExpedNow.security.JwtFilter] - Cannot set user authentication: JWT expired at 2025-07-26T11:48:13Z. Current time: 2025-07-30T16:28:33Z, a difference of 362420125 milliseconds.  Allowed clock skew: 0 milliseconds.
+2025-07-30 17:28:33.127 [http-nio-8080-exec-5] ERROR [c.e.ExpedNow.security.JwtFilter] - Cannot set user authentication: JWT expired at 2025-07-26T11:48:13Z. Current time: 2025-07-30T16:28:33Z, a difference of 362420125 milliseconds.  Allowed clock skew: 0 milliseconds.
+2025-07-30 17:28:33.128 [http-nio-8080-exec-1] DEBUG [o.s.w.s.s.s.HandshakeInterceptorChain] - com.example.ExpedNow.config.WebSocketHandshakeInterceptor@7dac51ea returns false from beforeHandshake - precluding handshake
+2025-07-30 17:28:33.129 [http-nio-8080-exec-1] DEBUG [o.s.web.servlet.DispatcherServlet] - Completed 401 UNAUTHORIZED
+2025-07-30 17:28:33.162 [http-nio-8080-exec-10] DEBUG [o.s.web.servlet.DispatcherServlet] - POST "/ws/079/rs0a1wf4/xhr_streaming?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc&t=1753892913137", parameters={masked}
+2025-07-30 17:28:33.167 [http-nio-8080-exec-6] DEBUG [o.s.web.servlet.DispatcherServlet] - GET "/ws/136/ph2s2bfx/websocket?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc", parameters={masked}
+2025-07-30 17:28:33.169 [http-nio-8080-exec-10] DEBUG [o.s.w.s.s.s.WebSocketHandlerMapping] - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@6ac5fe86
+2025-07-30 17:28:33.169 [http-nio-8080-exec-6] DEBUG [o.s.w.s.s.s.WebSocketHandlerMapping] - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@6ac5fe86
+2025-07-30 17:28:33.171 [http-nio-8080-exec-6] DEBUG [o.s.w.s.s.t.h.DefaultSockJsService] - Processing transport request: GET http://localhost:8080/ws/136/ph2s2bfx/websocket?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc
+2025-07-30 17:28:33.171 [http-nio-8080-exec-10] DEBUG [o.s.w.s.s.t.h.DefaultSockJsService] - Processing transport request: POST http://localhost:8080/ws/079/rs0a1wf4/xhr_streaming?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc&t=1753892913137
+2025-07-30 17:28:33.174 [http-nio-8080-exec-6] DEBUG [o.s.w.s.s.s.HandshakeInterceptorChain] - com.example.ExpedNow.config.WebSocketHandshakeInterceptor@7dac51ea returns false from beforeHandshake - precluding handshake
+2025-07-30 17:28:33.174 [http-nio-8080-exec-10] DEBUG [o.s.w.s.s.s.HandshakeInterceptorChain] - com.example.ExpedNow.config.WebSocketHandshakeInterceptor@7dac51ea returns false from beforeHandshake - precluding handshake
+2025-07-30 17:28:33.175 [http-nio-8080-exec-6] DEBUG [o.s.web.servlet.DispatcherServlet] - Completed 401 UNAUTHORIZED
+2025-07-30 17:28:33.175 [http-nio-8080-exec-10] DEBUG [o.s.web.servlet.DispatcherServlet] - Completed 401 UNAUTHORIZED
+2025-07-30 17:28:33.218 [http-nio-8080-exec-4] DEBUG [o.s.web.servlet.DispatcherServlet] - GET "/ws/079/wyvrzapz/eventsource?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc", parameters={masked}
+2025-07-30 17:28:33.219 [http-nio-8080-exec-4] DEBUG [o.s.w.s.s.s.WebSocketHandlerMapping] - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@6ac5fe86
+2025-07-30 17:28:33.221 [http-nio-8080-exec-4] DEBUG [o.s.w.s.s.t.h.DefaultSockJsService] - Processing transport request: GET http://localhost:8080/ws/079/wyvrzapz/eventsource?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc
+2025-07-30 17:28:33.223 [http-nio-8080-exec-4] DEBUG [o.s.w.s.s.s.HandshakeInterceptorChain] - com.example.ExpedNow.config.WebSocketHandshakeInterceptor@7dac51ea returns false from beforeHandshake - precluding handshake
+2025-07-30 17:28:33.223 [http-nio-8080-exec-4] DEBUG [o.s.web.servlet.DispatcherServlet] - Completed 401 UNAUTHORIZED
+2025-07-30 17:28:33.273 [http-nio-8080-exec-9] DEBUG [o.s.web.servlet.DispatcherServlet] - POST "/ws/136/tjnel3sm/xhr_streaming?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc&t=1753892913261", parameters={masked}
+2025-07-30 17:28:33.275 [http-nio-8080-exec-9] DEBUG [o.s.w.s.s.s.WebSocketHandlerMapping] - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@6ac5fe86
+2025-07-30 17:28:33.276 [http-nio-8080-exec-9] DEBUG [o.s.w.s.s.t.h.DefaultSockJsService] - Processing transport request: POST http://localhost:8080/ws/136/tjnel3sm/xhr_streaming?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc&t=1753892913261
+2025-07-30 17:28:33.292 [http-nio-8080-exec-9] DEBUG [o.s.w.s.s.s.HandshakeInterceptorChain] - com.example.ExpedNow.config.WebSocketHandshakeInterceptor@7dac51ea returns false from beforeHandshake - precluding handshake
+2025-07-30 17:28:33.292 [http-nio-8080-exec-9] DEBUG [o.s.web.servlet.DispatcherServlet] - Completed 401 UNAUTHORIZED
+2025-07-30 17:28:33.405 [http-nio-8080-exec-2] DEBUG [o.s.web.servlet.DispatcherServlet] - GET "/ws/136/4hl2usrf/eventsource?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc", parameters={masked}
+2025-07-30 17:28:33.407 [http-nio-8080-exec-2] DEBUG [o.s.w.s.s.s.WebSocketHandlerMapping] - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@6ac5fe86
+2025-07-30 17:28:33.408 [http-nio-8080-exec-2] DEBUG [o.s.w.s.s.t.h.DefaultSockJsService] - Processing transport request: GET http://localhost:8080/ws/136/4hl2usrf/eventsource?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc
+2025-07-30 17:28:33.423 [http-nio-8080-exec-2] DEBUG [o.s.w.s.s.s.HandshakeInterceptorChain] - com.example.ExpedNow.config.WebSocketHandshakeInterceptor@7dac51ea returns false from beforeHandshake - precluding handshake
+2025-07-30 17:28:33.423 [http-nio-8080-exec-2] DEBUG [o.s.web.servlet.DispatcherServlet] - Completed 401 UNAUTHORIZED
+2025-07-30 17:28:33.486 [http-nio-8080-exec-3] DEBUG [o.s.web.servlet.DispatcherServlet] - GET "/ws/iframe.html?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc", parameters={masked}
+2025-07-30 17:28:33.488 [http-nio-8080-exec-3] DEBUG [o.s.w.s.s.s.WebSocketHandlerMapping] - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@6ac5fe86
+2025-07-30 17:28:33.488 [http-nio-8080-exec-3] DEBUG [o.s.w.s.s.t.h.DefaultSockJsService] - Iframe support is disabled when an origin check is required. Ignoring transport request: GET http://localhost:8080/ws/iframe.html?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc
+2025-07-30 17:28:33.489 [http-nio-8080-exec-3] DEBUG [o.s.web.servlet.DispatcherServlet] - Completed 404 NOT_FOUND
+2025-07-30 17:28:33.673 [http-nio-8080-exec-1] DEBUG [o.s.web.servlet.DispatcherServlet] - GET "/ws/iframe.html?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc", parameters={masked}
+2025-07-30 17:28:33.675 [http-nio-8080-exec-1] DEBUG [o.s.w.s.s.s.WebSocketHandlerMapping] - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@6ac5fe86
+2025-07-30 17:28:33.676 [http-nio-8080-exec-1] DEBUG [o.s.w.s.s.t.h.DefaultSockJsService] - Iframe support is disabled when an origin check is required. Ignoring transport request: GET http://localhost:8080/ws/iframe.html?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc
+2025-07-30 17:28:33.676 [http-nio-8080-exec-1] DEBUG [o.s.web.servlet.DispatcherServlet] - Completed 404 NOT_FOUND
+2025-07-30 17:28:35.622 [http-nio-8080-exec-9] DEBUG [o.s.web.servlet.DispatcherServlet] - GET "/ws/iframe.html?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc", parameters={masked}
+2025-07-30 17:28:35.623 [http-nio-8080-exec-9] DEBUG [o.s.w.s.s.s.WebSocketHandlerMapping] - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@6ac5fe86
+2025-07-30 17:28:35.624 [http-nio-8080-exec-9] DEBUG [o.s.w.s.s.t.h.DefaultSockJsService] - Iframe support is disabled when an origin check is required. Ignoring transport request: GET http://localhost:8080/ws/iframe.html?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc
+2025-07-30 17:28:35.625 [http-nio-8080-exec-9] DEBUG [o.s.web.servlet.DispatcherServlet] - Completed 404 NOT_FOUND
+2025-07-30 17:28:35.751 [http-nio-8080-exec-2] DEBUG [o.s.web.servlet.DispatcherServlet] - GET "/ws/iframe.html?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc", parameters={masked}
+2025-07-30 17:28:35.756 [http-nio-8080-exec-2] DEBUG [o.s.w.s.s.s.WebSocketHandlerMapping] - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@6ac5fe86
+2025-07-30 17:28:35.757 [http-nio-8080-exec-2] DEBUG [o.s.w.s.s.t.h.DefaultSockJsService] - Iframe support is disabled when an origin check is required. Ignoring transport request: GET http://localhost:8080/ws/iframe.html?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc
+2025-07-30 17:28:35.758 [http-nio-8080-exec-2] DEBUG [o.s.web.servlet.DispatcherServlet] - Completed 404 NOT_FOUND
+2025-07-30 17:28:37.037 [http-nio-8080-exec-3] DEBUG [o.s.web.servlet.DispatcherServlet] - POST "/ws/079/eerugwtj/xhr?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc&t=1753892917024", parameters={masked}
+2025-07-30 17:28:37.039 [http-nio-8080-exec-3] DEBUG [o.s.w.s.s.s.WebSocketHandlerMapping] - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@6ac5fe86
+2025-07-30 17:28:37.041 [http-nio-8080-exec-3] DEBUG [o.s.w.s.s.t.h.DefaultSockJsService] - Processing transport request: POST http://localhost:8080/ws/079/eerugwtj/xhr?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc&t=1753892917024
+2025-07-30 17:28:37.047 [http-nio-8080-exec-3] DEBUG [o.s.w.s.s.s.HandshakeInterceptorChain] - com.example.ExpedNow.config.WebSocketHandshakeInterceptor@7dac51ea returns false from beforeHandshake - precluding handshake
+2025-07-30 17:28:37.053 [http-nio-8080-exec-3] DEBUG [o.s.web.servlet.DispatcherServlet] - Completed 401 UNAUTHORIZED
+2025-07-30 17:28:37.089 [http-nio-8080-exec-1] DEBUG [o.s.web.servlet.DispatcherServlet] - POST "/ws/136/soiuphek/xhr?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc&t=1753892917066", parameters={masked}
+2025-07-30 17:28:37.089 [http-nio-8080-exec-1] DEBUG [o.s.w.s.s.s.WebSocketHandlerMapping] - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@6ac5fe86
+2025-07-30 17:28:37.091 [http-nio-8080-exec-1] DEBUG [o.s.w.s.s.t.h.DefaultSockJsService] - Processing transport request: POST http://localhost:8080/ws/136/soiuphek/xhr?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc&t=1753892917066
+2025-07-30 17:28:37.093 [http-nio-8080-exec-1] DEBUG [o.s.w.s.s.s.HandshakeInterceptorChain] - com.example.ExpedNow.config.WebSocketHandshakeInterceptor@7dac51ea returns false from beforeHandshake - precluding handshake
+2025-07-30 17:28:37.093 [http-nio-8080-exec-1] DEBUG [o.s.web.servlet.DispatcherServlet] - Completed 401 UNAUTHORIZED
+2025-07-30 17:28:37.108 [http-nio-8080-exec-8] DEBUG [o.s.web.servlet.DispatcherServlet] - GET "/ws/iframe.html?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc", parameters={masked}
+2025-07-30 17:28:37.110 [http-nio-8080-exec-8] DEBUG [o.s.w.s.s.s.WebSocketHandlerMapping] - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@6ac5fe86
+2025-07-30 17:28:37.111 [http-nio-8080-exec-8] DEBUG [o.s.w.s.s.t.h.DefaultSockJsService] - Iframe support is disabled when an origin check is required. Ignoring transport request: GET http://localhost:8080/ws/iframe.html?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc
+2025-07-30 17:28:37.111 [http-nio-8080-exec-8] DEBUG [o.s.web.servlet.DispatcherServlet] - Completed 404 NOT_FOUND
+2025-07-30 17:28:37.137 [http-nio-8080-exec-7] DEBUG [o.s.web.servlet.DispatcherServlet] - GET "/ws/079/4c23pie5/jsonp?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc&c=_jp.adi2y1r", parameters={masked}
+2025-07-30 17:28:37.139 [http-nio-8080-exec-7] DEBUG [o.s.w.s.s.s.WebSocketHandlerMapping] - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@6ac5fe86
+2025-07-30 17:28:37.139 [http-nio-8080-exec-5] DEBUG [o.s.web.servlet.DispatcherServlet] - GET "/ws/iframe.html?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc", parameters={masked}
+2025-07-30 17:28:37.141 [http-nio-8080-exec-7] WARN  [o.s.w.s.s.t.h.DefaultSockJsService] - Origin check enabled but transport 'jsonp' does not support it.
+2025-07-30 17:28:37.141 [http-nio-8080-exec-7] DEBUG [o.s.w.s.s.t.h.DefaultSockJsService] - Ignoring transport request: GET http://localhost:8080/ws/079/4c23pie5/jsonp?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc&c=_jp.adi2y1r
+2025-07-30 17:28:37.141 [http-nio-8080-exec-7] DEBUG [o.s.web.servlet.DispatcherServlet] - Completed 404 NOT_FOUND
+2025-07-30 17:28:37.142 [http-nio-8080-exec-5] DEBUG [o.s.w.s.s.s.WebSocketHandlerMapping] - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@6ac5fe86
+2025-07-30 17:28:37.152 [http-nio-8080-exec-5] DEBUG [o.s.w.s.s.t.h.DefaultSockJsService] - Iframe support is disabled when an origin check is required. Ignoring transport request: GET http://localhost:8080/ws/iframe.html?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc
+2025-07-30 17:28:37.153 [http-nio-8080-exec-5] DEBUG [o.s.web.servlet.DispatcherServlet] - Completed 404 NOT_FOUND
+2025-07-30 17:28:37.222 [http-nio-8080-exec-6] DEBUG [o.s.web.servlet.DispatcherServlet] - GET "/ws/136/ziwwjy0j/jsonp?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc&c=_jp.avn24q1", parameters={masked}
+2025-07-30 17:28:37.223 [http-nio-8080-exec-6] DEBUG [o.s.w.s.s.s.WebSocketHandlerMapping] - Mapped to org.springframework.web.socket.sockjs.support.SockJsHttpRequestHandler@6ac5fe86
+2025-07-30 17:28:37.223 [http-nio-8080-exec-6] WARN  [o.s.w.s.s.t.h.DefaultSockJsService] - Origin check enabled but transport 'jsonp' does not support it.
+2025-07-30 17:28:37.223 [http-nio-8080-exec-6] DEBUG [o.s.w.s.s.t.h.DefaultSockJsService] - Ignoring transport request: GET http://localhost:8080/ws/136/ziwwjy0j/jsonp?token=eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiI2ODcwNWZjNWJiYWNiMjQ2NGRlMGUwZmQiLCJlbWFpbCI6InRvZmFzYWQ4NjhAYXhjcmFkaW8uY29tIiwicm9sZXMiOlsiQ0xJRU5UIiwiUk9MRV9DTElFTlQiXSwiaWF0IjoxNzUzNDQ0MDkzLCJleHAiOjE3NTM1MzA0OTN9.7mfOW7fFFTfUI3c-LCwOrWYv9byNlUoY-wJgDTkjNLc&c=_jp.avn24q1
+2025-07-30 17:28:37.224 [http-nio-8080-exec-6] DEBUG [o.s.web.servlet.DispatcherServlet] - Completed 404 NOT_FOUND
+2025-07-30 17:28:42.951 [http-nio-8080-exec-9] ERROR [c.e.ExpedNow.security.JwtFilter] - Cannot set user authentication: JWT expired at 2025-07-26T11:48:13Z. Current time: 2025-07-30T16:28:42Z, a difference of 362429951 milliseconds.  Allowed clock skew: 0 milliseconds.
+2025-07-30 17:29:02.935 [http-nio-8080-exec-3] ERROR [c.e.ExpedNow.security.JwtFilter] - Cannot set user authentication: JWT expired at 2025-07-26T11:48:13Z. Current time: 2025-07-30T16:29:02Z, a difference of 362449935 milliseconds.  Allowed clock skew: 0 milliseconds.
+2025-07-30 17:29:02.936 [http-nio-8080-exec-1] ERROR [c.e.ExpedNow.security.JwtFilter] - Cannot set user authentication: JWT expired at 2025-07-26T11:48:13Z. Current time: 2025-07-30T16:29:02Z, a difference of 362449936 milliseconds.  Allowed clock skew: 0 milliseconds.
+2025-07-30 17:29:36.630 [http-nio-8080-exec-6] DEBUG [o.s.web.servlet.DispatcherServlet] - POST "/api/auth/login", parameters={}
+2025-07-30 17:29:36.631 [http-nio-8080-exec-6] DEBUG [o.s.w.s.m.m.a.RequestMappingHandlerMapping] - Mapped to com.example.ExpedNow.controllers.AuthController#login(LoginRequest)
+2025-07-30 17:29:36.850 [http-nio-8080-exec-6] DEBUG [o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor] - Read "application/json;charset=UTF-8" to [LoginRequest(email=tofasad868@axcradio.com, password=111111)]
+2025-07-30 17:29:37.600 [http-nio-8080-exec-6] DEBUG [o.s.w.s.m.m.a.HttpEntityMethodProcessor] - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json]
+2025-07-30 17:29:37.604 [http-nio-8080-exec-6] DEBUG [o.s.w.s.m.m.a.HttpEntityMethodProcessor] - Writing [{error=Invalid email or password}]
+2025-07-30 17:29:37.645 [http-nio-8080-exec-6] DEBUG [o.s.web.servlet.DispatcherServlet] - Completed 401 UNAUTHORIZED
+2025-07-30 17:29:42.914 [http-nio-8080-exec-4] DEBUG [o.s.web.servlet.DispatcherServlet] - POST "/api/auth/login", parameters={}
+2025-07-30 17:29:42.914 [http-nio-8080-exec-4] DEBUG [o.s.w.s.m.m.a.RequestMappingHandlerMapping] - Mapped to com.example.ExpedNow.controllers.AuthController#login(LoginRequest)
+2025-07-30 17:29:42.916 [http-nio-8080-exec-4] DEBUG [o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor] - Read "application/json;charset=UTF-8" to [LoginRequest(email=tofasad868@axcradio.com, password=000000)]
+2025-07-30 17:29:43.241 [http-nio-8080-exec-4] DEBUG [o.s.w.s.m.m.a.HttpEntityMethodProcessor] - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json]
+2025-07-30 17:29:43.241 [http-nio-8080-exec-4] DEBUG [o.s.w.s.m.m.a.HttpEntityMethodProcessor] - Writing [{error=Invalid email or password}]
+2025-07-30 17:29:43.243 [http-nio-8080-exec-4] DEBUG [o.s.web.servlet.DispatcherServlet] - Completed 401 UNAUTHORIZED
+2025-07-30 17:29:47.755 [http-nio-8080-exec-2] DEBUG [o.s.web.servlet.DispatcherServlet] - POST "/api/auth/login", parameters={}
+2025-07-30 17:29:47.756 [http-nio-8080-exec-2] DEBUG [o.s.w.s.m.m.a.RequestMappingHandlerMapping] - Mapped to com.example.ExpedNow.controllers.AuthController#login(LoginRequest)
+2025-07-30 17:29:47.758 [http-nio-8080-exec-2] DEBUG [o.s.w.s.m.m.a.RequestResponseBodyMethodProcessor] - Read "application/json;charset=UTF-8" to [LoginRequest(email=tofasad868@axcradio.com, password=111111)]
+2025-07-30 17:29:47.995 [http-nio-8080-exec-2] DEBUG [o.s.w.s.m.m.a.HttpEntityMethodProcessor] - Using 'application/json', given [application/json, text/plain, */*] and supported [application/json, application/*+json]
+2025-07-30 17:29:47.996 [http-nio-8080-exec-2] DEBUG [o.s.w.s.m.m.a.HttpEntityMethodProcessor] - Writing [{error=Invalid email or password}]
+2025-07-30 17:29:47.998 [http-nio-8080-exec-2] DEBUG [o.s.web.servlet.DispatcherServlet] - Completed 401 UNAUTHORIZED
+2025-07-30 17:30:04.898 [SpringApplicationShutdownHook] INFO  [o.s.b.w.e.tomcat.GracefulShutdown] - Commencing graceful shutdown. Waiting for active requests to complete
+2025-07-30 17:30:05.116 [tomcat-shutdown] INFO  [o.s.b.w.e.tomcat.GracefulShutdown] - Graceful shutdown complete
+2025-07-30 17:30:05.120 [SpringApplicationShutdownHook] DEBUG [org.springframework.web.SimpLogging] - clientOutboundChannel removed SubProtocolWebSocketHandler[StompSubProtocolHandler[v10.stomp, v11.stomp, v12.stomp]]
+2025-07-30 17:30:05.120 [SpringApplicationShutdownHook] DEBUG [org.springframework.web.SimpLogging] - clientInboundChannel removed WebSocketAnnotationMethodMessageHandler[prefixes=[/app/]]
+2025-07-30 17:30:05.120 [SpringApplicationShutdownHook] INFO  [o.s.m.s.b.SimpleBrokerMessageHandler] - Stopping...
+2025-07-30 17:30:05.120 [SpringApplicationShutdownHook] INFO  [o.s.m.s.b.SimpleBrokerMessageHandler] - BrokerAvailabilityEvent[available=false, SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@4c95fa57]]
+2025-07-30 17:30:05.120 [SpringApplicationShutdownHook] DEBUG [org.springframework.web.SimpLogging] - clientInboundChannel removed SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@4c95fa57]
+2025-07-30 17:30:05.120 [SpringApplicationShutdownHook] DEBUG [org.springframework.web.SimpLogging] - brokerChannel removed SimpleBrokerMessageHandler [org.springframework.messaging.simp.broker.DefaultSubscriptionRegistry@4c95fa57]
+2025-07-30 17:30:05.121 [SpringApplicationShutdownHook] INFO  [o.s.m.s.b.SimpleBrokerMessageHandler] - Stopped.
+2025-07-30 17:30:05.121 [SpringApplicationShutdownHook] DEBUG [org.springframework.web.SimpLogging] - clientInboundChannel removed UserDestinationMessageHandler[DefaultUserDestinationResolver[prefix=/user/]]
+2025-07-30 17:30:05.121 [SpringApplicationShutdownHook] DEBUG [org.springframework.web.SimpLogging] - brokerChannel removed UserDestinationMessageHandler[DefaultUserDestinationResolver[prefix=/user/]]

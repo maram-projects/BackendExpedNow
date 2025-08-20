@@ -20,7 +20,6 @@ spring:
           connectiontimeout: 5000
           timeout: 5000
           writetimeout: 5000
-  # Rest of your configuration...
   security:
     oauth2:
       client:
@@ -52,8 +51,29 @@ spring:
   profiles:
     active: dev
 
+# Enhanced OpenAI Configuration with fallback settings
+openai:
+  api:
+    key: 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
+    url: https://api.openai.com/v1/chat/completions
+    timeout: 30000
+    max-tokens: 300
+    temperature: 0.7
+    model: gpt-3.5-turbo
+
+# Chatbot Configuration
+chatbot:
+  fallback:
+    enabled: true
+    priority: high # high = prefer fallback, low = prefer OpenAI
+  rate-limiting:
+    enabled: true
+    max-requests-per-hour: 50
+    max-requests-per-day: 200
+    reset-hour: 0 # Hour to reset daily count (0-23)
+
 stripe:
-  api-key: ${STRIPE_SECRET_KEY:}  # Fallback to .env if not set here
+  api-key: ${STRIPE_SECRET_KEY:}
   publishable-key: ${STRIPE_PUBLISHABLE_KEY:}
   webhook:
     secret: ${STRIPE_WEBHOOK_SECRET:}
@@ -70,6 +90,26 @@ jwt:
 
 file:
   upload-dir: C:\\pfe4\\uploads
+
+# Image Analysis Service Configuration
+image:
+  analysis:
+    api:
+      url: http://localhost:5001
+      timeout: 30000
+      connection-timeout: 10000
+    enabled: true
+    fallback-on-error: true
+    max-retries: 3
+    retry-delay: 1000
+    supported-formats:
+      - jpg
+      - jpeg
+      - png
+      - gif
+      - bmp
+      - webp
+    max-file-size: 10485760
 
 pricing:
   base: 5.0
@@ -111,8 +151,23 @@ logging:
       eclipse:
         angus:
           mail: DEBUG
+    com:
+      example:
+        ExpedNow:
+          controllers:
+            AIChatController: INFO # Reduced from DEBUG to INFO to avoid spam
+          services:
+            core:
+              ImageAnalysisService: DEBUG
+              FileStorageService: DEBUG
+    root: INFO
 
-mvn:
-  spring-boot:
-    run:
-      profiles: debug
+# Management endpoints for monitoring
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+  endpoint:
+    health:
+      show-details: when-authorized

@@ -28,6 +28,7 @@ public class User {
     private String password;
     private String resetToken;
     private LocalDateTime resetTokenExpiry;
+    private int ratingCount; // Ajout du champ manquant
 
     @Transient
     private String confirmPassword;
@@ -149,7 +150,6 @@ public class User {
 
     // Performance metrics
     private double rating;
-    private int ratingCount; // الحقل الجديد
     private int completedDeliveries;
     private Date lastActive;
     private double successScore;

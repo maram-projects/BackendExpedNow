@@ -9,6 +9,7 @@ import jakarta.validation.constraints.Positive;
 import java.util.Date;
 
 // DeliveryRequestDTO.java
+@JsonIgnoreProperties(ignoreUnknown = true)
 public record DeliveryRequestDTO(
         @NotBlank String pickupAddress,
         @NotBlank String deliveryAddress,
@@ -24,9 +25,7 @@ public record DeliveryRequestDTO(
         Double pickupLongitude, // Optional
         Double deliveryLatitude, // Optional
         Double deliveryLongitude, // Optional
-        String clientId
+        String clientId,
+        String recipientName // Add the missing field
 ) {
-        // إضافة هذا لتجاهل الحقول غير المعرفة
-        @JsonIgnoreProperties(ignoreUnknown = true)
-        public DeliveryRequestDTO {}
 }

@@ -11,14 +11,17 @@ import com.example.ExpedNow.repositories.VehicleRepository;
 import com.example.ExpedNow.services.core.AdminServiceInterface;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
-import org.springframework.data.domain.PageRequest;
-import org.springframework.data.domain.Sort;
+import org.springframework.data.domain.*;
+import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.query.Criteria;
+import org.springframework.data.mongodb.core.query.Query; // Correct import
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.*;
+import java.util.regex.Pattern;
 import java.util.stream.Collectors;
 
 @Service
@@ -27,11 +30,13 @@ public class AdminServiceImpl implements AdminServiceInterface {
 
     private final UserRepository userRepository;
     private final VehicleRepository vehicleRepository;
+    private final MongoTemplate mongoTemplate; // Add MongoTemplate
 
     @Autowired
-    public AdminServiceImpl(UserRepository userRepository, VehicleRepository vehicleRepository) {
+    public AdminServiceImpl(UserRepository userRepository, VehicleRepository vehicleRepository, MongoTemplate mongoTemplate) {
         this.userRepository = userRepository;
         this.vehicleRepository = vehicleRepository;
+        this.mongoTemplate = mongoTemplate; // Inject MongoTemplate
     }
 
     @Override
@@ -200,6 +205,66 @@ public class AdminServiceImpl implements AdminServiceInterface {
         userRepository.save(user);
     }
 
+    @Override
+    public Page<UserDTO> getUsersWithFilters(String search, String role, Boolean active, Pageable pageable) {
+        Query query = new Query(); // Now using the correct Query class
+        List<Criteria> criteriaList = new ArrayList<>();
+
+        // Critère de recherche
+        if (search != null && !search.isBlank()) {
+            Pattern pattern = Pattern.compile(".*" + search + ".*", Pattern.CASE_INSENSITIVE);
+            Criteria searchCriteria = new Criteria().orOperator(
+                    Criteria.where("firstName").regex(pattern),
+                    Criteria.where("lastName").regex(pattern),
+                    Criteria.where("email").regex(pattern),
+                    Criteria.where("companyName").regex(pattern)
+            );
+            criteriaList.add(searchCriteria);
+        }
+
+        // Critère de rôle
+        if (role != null && !role.isBlank()) {
+            try {
+                Role roleEnum = Role.valueOf(role);
+                criteriaList.add(Criteria.where("roles").is(roleEnum));
+            } catch (IllegalArgumentException e) {
+                // Rôle invalide, ignorer ce filtre
+            }
+        }
+
+        // Critère de statut actif
+        if (active != null) {
+            if (active) {
+                criteriaList.add(Criteria.where("enabled").is(true));
+                criteriaList.add(Criteria.where("approved").is(true));
+            } else {
+                criteriaList.add(new Criteria().orOperator(
+                        Criteria.where("enabled").is(false),
+                        Criteria.where("approved").is(false)
+                ));
+            }
+        }
+
+        // Combiner tous les critères
+        if (!criteriaList.isEmpty()) {
+            query.addCriteria(new Criteria().andOperator(criteriaList.toArray(new Criteria[0])));
+        }
+
+        // Compter le total
+        long total = mongoTemplate.count(query, User.class);
+
+        // Appliquer la pagination et le tri
+        query.with(pageable);
+
+        // Exécuter la requête
+        List<User> users = mongoTemplate.find(query, User.class);
+        List<UserDTO> dtos = users.stream()
+                .map(this::convertToDTOWithVehicle)
+                .collect(Collectors.toList());
+
+        return new PageImpl<>(dtos, pageable, total);
+    }
+
     private UserDTO convertToDTO(User user) {
         UserDTO dto = new UserDTO();
         dto.setId(user.getId());
@@ -210,6 +275,10 @@ public class AdminServiceImpl implements AdminServiceInterface {
         dto.setAddress(user.getAddress());
         dto.setDateOfRegistration(user.getDateOfRegistration());
         dto.setRoles(user.getRoles().stream().map(Role::name).collect(Collectors.toSet()));
+        dto.setEnabled(user.isEnabled());
+        dto.setApproved(user.isApproved());
+        dto.setVerified(user.isVerified());
+        dto.setAvailable(user.isAvailable());
         return dto;
     }
 }

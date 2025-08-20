@@ -13,6 +13,9 @@ import java.util.Optional;
 
 public interface UserRepository extends MongoRepository<User, String> {
 
+    long countByEnabledTrueAndApprovedTrue();
+    long countByEnabledFalseOrApprovedFalse();
+    long countByRolesContains(Role role);
     Optional<User> findByEmail(String email);
     Optional<User> findById(String id);
     boolean existsByEmail(String email);

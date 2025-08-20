@@ -25,11 +25,17 @@ public class DeliveryRequest {
     private String deliveryAddress;
 
     private String packageDescription;
-
+    private String recipientName;
     private double packageWeight;
 
     private String vehicleId;
 
+    private String packageImageUrl;           // رابط صورة الطرد
+    private String packageImageAnalysis;      // نتيجة تحليل الصورة
+    private String extractedText;             // النص المستخرج من الصورة
+    private boolean imageAnalyzed = false;    // هل تم تحليل الصورة
+    private String imageQuality;              // جودة الصورة
+    private LocalDateTime imageAnalyzedAt;    // وقت تحليل الصورة
 
     // حقول جديدة للدفع
     private String paymentId;          // رابط مع عملية الدفع
@@ -79,6 +85,7 @@ public class DeliveryRequest {
     @LastModifiedDate
     private LocalDateTime updatedAt;
     private double deliveryLongitude;
+
 
     public enum DeliveryReqStatus {
         PENDING,

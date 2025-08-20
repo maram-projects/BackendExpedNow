@@ -11,6 +11,7 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 
 import java.util.Collection;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 public interface UserServiceInterface {
@@ -78,6 +79,16 @@ public interface UserServiceInterface {
         void rejectUser(String userId);
 
         UserDTO convertToDTO(User user);
+
+    // Dans UserServiceImpl.java
+    long countActiveUsers();
+
+        long countTotalUsers();
+
+        long countInactiveUsers();
+
+        Map<String, Long> countUsersByRole();
+
         // Update the loadUserByUsername method in CustomUserDetailsService to check for approval
         UserDetails loadUserByUsername(String email) throws UsernameNotFoundException;
 }

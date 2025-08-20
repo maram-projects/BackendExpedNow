@@ -40,18 +40,23 @@ public class JwtFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
 
-        // Skip filter for public endpoints
         final String requestPath = request.getRequestURI();
-        if (requestPath.startsWith("/api/auth/register") ||
-                requestPath.startsWith("/api/auth/login") ||
-                requestPath.startsWith("/api/auth/confirm-account") ||
-                requestPath.startsWith("/oauth2/")) {
+
+        // Skip filter for public endpoints - including health check
+        if (isPublicEndpoint(requestPath)) {
             filterChain.doFilter(request, response);
             return;
         }
 
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+            // For protected endpoints, return 401 if no token is provided
+            if (!isPublicEndpoint(requestPath)) {
+                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                response.setContentType("application/json");
+                response.getWriter().write("{\"error\":\"Unauthorized\",\"message\":\"Missing or invalid token\"}");
+                return;
+            }
             filterChain.doFilter(request, response);
             return;
         }
@@ -67,16 +72,32 @@ public class JwtFilter extends OncePerRequestFilter {
                             new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
+                } else {
+                    logger.warn("Invalid JWT token for email: {}", email);
                 }
             }
         } catch (Exception e) {
             logger.error("Cannot set user authentication: {}", e.getMessage());
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"error\":\"Unauthorized\",\"message\":\"Invalid token\"}");
+            return;
         }
 
         filterChain.doFilter(request, response);
     }
 
-    // In your JwtFilter or wherever you're extracting authorities:
+    private boolean isPublicEndpoint(String requestPath) {
+        return requestPath.startsWith("/api/auth/register") ||
+                requestPath.startsWith("/api/auth/login") ||
+                requestPath.startsWith("/api/auth/confirm-account") ||
+                requestPath.startsWith("/oauth2/") ||
+                requestPath.startsWith("/api/ai/health") || // Health endpoint
+                requestPath.startsWith("/v3/api-docs") || // Swagger
+                requestPath.startsWith("/swagger-ui") || // Swagger UI
+                requestPath.startsWith("/ws/"); // WebSocket
+    }
+
     private Collection<GrantedAuthority> getAuthoritiesFromJwt(Claims claims) {
         List<String> roles = claims.get("roles", List.class);
         if (roles == null || roles.isEmpty()) {
@@ -84,7 +105,7 @@ public class JwtFilter extends OncePerRequestFilter {
         }
 
         return roles.stream()
-                .map(SimpleGrantedAuthority::new)
+                .map(role -> new SimpleGrantedAuthority(role))
                 .collect(Collectors.toList());
     }
 }

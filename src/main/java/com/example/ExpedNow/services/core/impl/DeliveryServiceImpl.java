@@ -1,6 +1,7 @@
 package com.example.ExpedNow.services.core.impl;
 
 import com.example.ExpedNow.dto.DeliveryResponseDTO;
+import com.example.ExpedNow.dto.ImageAnalysisResponse;
 import com.example.ExpedNow.dto.UserDTO;
 import com.example.ExpedNow.dto.VehicleDTO;
 import com.example.ExpedNow.models.ChatRoom;
@@ -11,11 +12,9 @@ import com.example.ExpedNow.models.Vehicle;
 import com.example.ExpedNow.models.enums.PaymentStatus;
 import com.example.ExpedNow.repositories.DeliveryReqRepository;
 import com.example.ExpedNow.repositories.MissionRepository;
-import com.example.ExpedNow.services.core.DeliveryPricingService;
-import com.example.ExpedNow.services.core.DeliveryServiceInterface;
-import com.example.ExpedNow.services.core.UserServiceInterface;
-import com.example.ExpedNow.services.core.VehicleServiceInterface;
+import com.example.ExpedNow.services.core.*;
 import com.example.ExpedNow.exception.ResourceNotFoundException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +22,8 @@ import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.Sort;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
@@ -31,6 +32,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Optional;
 import java.util.stream.Collectors;
+
 
 @Service
 @Primary
@@ -41,24 +43,240 @@ public class DeliveryServiceImpl implements DeliveryServiceInterface {
     private final ChatService chatService;
     private final DeliveryReqRepository deliveryRepository;
     private final VehicleServiceInterface vehicleService;
-    private final MissionRepository missionRepository; // Added for mission auto-completion
+    private final MissionRepository missionRepository;
+
+    @Autowired
+    private ImageAnalysisService imageAnalysisService;
+
+    @Autowired
+    private FileStorageService fileStorageService;
 
     @Autowired
     private DeliveryPricingService pricingService;
+
     @Autowired
     private DeliveryAssignmentServiceImpl deliveryAssignmentService;
+
+    @Autowired
+    private ObjectMapper objectMapper;
 
     public DeliveryServiceImpl(UserServiceInterface userService,
                                ChatService chatService,
                                DeliveryReqRepository deliveryRepository,
                                VehicleServiceInterface vehicleService,
-                               MissionRepository missionRepository) { // Added mission repository
+                               MissionRepository missionRepository) {
         this.userService = userService;
         this.chatService = chatService;
         this.deliveryRepository = deliveryRepository;
         this.vehicleService = vehicleService;
         this.missionRepository = missionRepository;
     }
+
+    // ... (all your existing methods remain the same) ...
+
+    /**
+     * Create delivery request with image analysis
+     */
+    public DeliveryRequest createDeliveryWithImage(DeliveryRequest delivery, MultipartFile imageFile) {
+        try {
+            String imagePath = fileStorageService.storeFile(imageFile);
+            delivery.setPackageImageUrl(imagePath);
+
+            ImageAnalysisResponse analysis = imageAnalysisService.analyzeImage(imageFile);
+
+            if (analysis.isSuccess()) {
+                // Store analysis as JSON
+                delivery.setPackageImageAnalysis(objectMapper.writeValueAsString(analysis));
+
+                String extractedText = analysis.getAnalysis().getTextExtraction().getFullText();
+                delivery.setExtractedText(extractedText);
+                delivery.setImageQuality(analysis.getDeliveryRelevantInfo().getImageQuality());
+                delivery.setImageAnalyzed(true);
+                delivery.setImageAnalyzedAt(LocalDateTime.now());
+
+                // Append to description only if text exists
+                if (StringUtils.hasText(extractedText)) {
+                    delivery.setPackageDescription(
+                            delivery.getPackageDescription() +
+                                    "\n\nExtracted text from image: " + extractedText
+                    );
+                }
+                logger.info("Image analysis successful for delivery: {}", delivery.getId());
+            } else {
+                logger.warn("Image analysis failed: {}", analysis.getError());
+            }
+        } catch (Exception e) {
+            logger.error("Error in image analysis: {}", e.getMessage());
+        }
+        return createDelivery(delivery);
+    }
+
+
+    /**
+     * Re-analyze image for existing delivery request
+     */
+    public DeliveryRequest reanalyzeImage(String deliveryId, MultipartFile newImageFile) {
+        DeliveryRequest delivery = getDeliveryById(deliveryId);
+
+        try {
+            // Store the new image
+            String imagePath = fileStorageService.storeFile(newImageFile);
+            delivery.setPackageImageUrl(imagePath);
+
+            // Analyze the new image
+            ImageAnalysisResponse analysis = imageAnalysisService.analyzeImage(newImageFile);
+
+            if (analysis.isSuccess()) {
+                delivery.setPackageImageAnalysis(objectMapper.writeValueAsString(analysis));
+                delivery.setExtractedText(analysis.getAnalysis().getTextExtraction().getFullText());
+                delivery.setImageQuality(analysis.getDeliveryRelevantInfo().getImageQuality());
+                delivery.setImageAnalyzed(true);
+                delivery.setImageAnalyzedAt(LocalDateTime.now());
+
+                logger.info("Image reanalysis successful for delivery: {}", deliveryId);
+            }
+
+        } catch (Exception e) {
+            logger.error("Error in image reanalysis: {}", e.getMessage());
+            throw new RuntimeException("Failed to reanalyze image", e);
+        }
+
+        return deliveryRepository.save(delivery);
+    }
+
+    /**
+     * Get image analysis for specific delivery
+     * Fixed to properly handle JSON deserialization and consistent response structure
+     */
+    public ImageAnalysisResponse getImageAnalysis(String deliveryId) {
+        DeliveryRequest delivery = getDeliveryById(deliveryId);
+
+        if (!delivery.isImageAnalyzed()) {
+            throw new IllegalStateException("Image has not been analyzed for this delivery");
+        }
+
+        try {
+            // If we have stored JSON analysis, deserialize it
+            if (delivery.getPackageImageAnalysis() != null && !delivery.getPackageImageAnalysis().trim().isEmpty()) {
+                try {
+                    ImageAnalysisResponse storedAnalysis = objectMapper.readValue(
+                            delivery.getPackageImageAnalysis(),
+                            ImageAnalysisResponse.class
+                    );
+
+                    // Ensure the stored analysis has all required fields
+                    if (storedAnalysis.getAnalysis() != null &&
+                            storedAnalysis.getDeliveryRelevantInfo() != null) {
+                        logger.info("Returning stored analysis for delivery: {}", deliveryId);
+                        return storedAnalysis;
+                    }
+                } catch (Exception e) {
+                    logger.warn("Failed to deserialize stored analysis for delivery {}: {}",
+                            deliveryId, e.getMessage());
+                    // Fall through to manual construction
+                }
+            }
+
+            // Fallback: manually construct response from individual fields
+            logger.info("Manually constructing analysis response for delivery: {}", deliveryId);
+
+            ImageAnalysisResponse response = new ImageAnalysisResponse();
+            response.setSuccess(true);
+            response.setError(null);
+
+            // Create analysis object with text extraction
+            ImageAnalysisResponse.Analysis analysis = new ImageAnalysisResponse.Analysis();
+            ImageAnalysisResponse.Analysis.TextExtraction textExtraction =
+                    new ImageAnalysisResponse.Analysis.TextExtraction();
+
+            // Use camelCase for consistency with Angular expectations
+            String extractedText = delivery.getExtractedText();
+            textExtraction.setFullText(extractedText != null ? extractedText : "");
+
+            analysis.setTextExtraction(textExtraction);
+
+            // Create delivery relevant info
+            ImageAnalysisResponse.DeliveryRelevantInfo deliveryInfo =
+                    new ImageAnalysisResponse.DeliveryRelevantInfo();
+
+            deliveryInfo.setImageQuality(delivery.getImageQuality() != null ?
+                    delivery.getImageQuality() : "UNKNOWN");
+            deliveryInfo.setHasText(extractedText != null && !extractedText.trim().isEmpty());
+            deliveryInfo.setAnalyzedAt(delivery.getImageAnalyzedAt() != null ?
+                    delivery.getImageAnalyzedAt().toString() : null);
+
+            // Set the constructed objects
+            response.setAnalysis(analysis);
+            response.setDeliveryRelevantInfo(deliveryInfo);
+
+            return response;
+
+        } catch (Exception e) {
+            logger.error("Error retrieving image analysis for delivery {}: {}", deliveryId, e.getMessage());
+
+            // Return error response
+            ImageAnalysisResponse errorResponse = new ImageAnalysisResponse();
+            errorResponse.setSuccess(false);
+            errorResponse.setError("Failed to retrieve image analysis: " + e.getMessage());
+
+            return errorResponse;
+        }
+    }
+
+    /**
+     * Helper method to validate and potentially re-save analysis data
+     * Call this if you want to ensure all existing deliveries have properly formatted analysis
+     */
+    public void validateAndFixAnalysisData(String deliveryId) {
+        DeliveryRequest delivery = getDeliveryById(deliveryId);
+
+        if (!delivery.isImageAnalyzed()) {
+            return;
+        }
+
+        // Check if the stored JSON is valid
+        if (delivery.getPackageImageAnalysis() == null ||
+                delivery.getPackageImageAnalysis().trim().isEmpty()) {
+
+            // Reconstruct from individual fields
+            try {
+                ImageAnalysisResponse reconstructed = new ImageAnalysisResponse();
+                reconstructed.setSuccess(true);
+
+                ImageAnalysisResponse.Analysis analysis = new ImageAnalysisResponse.Analysis();
+                ImageAnalysisResponse.Analysis.TextExtraction textExtraction =
+                        new ImageAnalysisResponse.Analysis.TextExtraction();
+
+                textExtraction.setFullText(delivery.getExtractedText());
+
+
+                analysis.setTextExtraction(textExtraction);
+
+                ImageAnalysisResponse.DeliveryRelevantInfo deliveryInfo =
+                        new ImageAnalysisResponse.DeliveryRelevantInfo();
+                deliveryInfo.setImageQuality(delivery.getImageQuality());
+                boolean hasText = delivery.getExtractedText() != null &&
+                        !delivery.getExtractedText().trim().isEmpty();
+                deliveryInfo.setHasText(hasText);
+                deliveryInfo.setHasText(delivery.getExtractedText() != null &&
+                        !delivery.getExtractedText().trim().isEmpty());
+
+                reconstructed.setAnalysis(analysis);
+                reconstructed.setDeliveryRelevantInfo(deliveryInfo);
+
+                // Save the reconstructed analysis
+                delivery.setPackageImageAnalysis(objectMapper.writeValueAsString(reconstructed));
+                deliveryRepository.save(delivery);
+
+                logger.info("Reconstructed and saved analysis data for delivery: {}", deliveryId);
+
+            } catch (Exception e) {
+                logger.error("Failed to reconstruct analysis data for delivery {}: {}",
+                        deliveryId, e.getMessage());
+            }
+        }
+    }
+
 
     @Override
     public DeliveryRequest createDelivery(DeliveryRequest delivery) {

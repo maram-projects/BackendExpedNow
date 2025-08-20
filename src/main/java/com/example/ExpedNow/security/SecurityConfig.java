@@ -42,6 +42,9 @@ public class SecurityConfig {
     private final PasswordEncoder passwordEncoder;
     private final OAuth2UserService oAuth2UserService;
 
+    @Value("${jwt.secret}")
+    private String jwtSecret;
+
     public SecurityConfig(JwtFilter jwtFilter,
                           UserDetailsService customUserDetailsService,
                           PasswordEncoder passwordEncoder,
@@ -71,7 +74,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
-                        // Public endpoints - must come first
+                        // Public endpoints
                         .requestMatchers(
                                 "/uploads/**",
                                 "/uploads/vehicle-photos/**",
@@ -90,8 +93,19 @@ public class SecurityConfig {
                         // Pricing endpoints
                         .requestMatchers("/api/pricing/**").permitAll()
 
-                        // Chat endpoints - FIXED: Only one declaration and specific permissions
-                        .requestMatchers("/api/chat/**").hasAnyAuthority("CLIENT", "INDIVIDUAL", "ENTERPRISE", "DELIVERY_PERSON", "PROFESSIONAL", "TEMPORARY", "ADMIN")
+                        // AI Chatbot endpoints
+                        .requestMatchers(HttpMethod.GET, "/api/ai/health").permitAll()  // Health check public
+                        .requestMatchers(HttpMethod.POST, "/api/ai/chat/public").permitAll()
+                        .requestMatchers("/api/ai/**").hasAnyAuthority(  // All other AI endpoints require auth
+                                "CLIENT", "INDIVIDUAL", "ENTERPRISE",
+                                "DELIVERY_PERSON", "PROFESSIONAL", "TEMPORARY", "ADMIN"
+                        )
+
+                        // Chat endpoints
+                        .requestMatchers("/api/chat/**").hasAnyAuthority(
+                                "CLIENT", "INDIVIDUAL", "ENTERPRISE",
+                                "DELIVERY_PERSON", "PROFESSIONAL", "TEMPORARY", "ADMIN"
+                        )
 
                         // Specific authenticated endpoints
                         .requestMatchers("/api/users/by-vehicle/**").authenticated()
@@ -100,54 +114,87 @@ public class SecurityConfig {
                         // Discounts endpoints
                         .requestMatchers("/api/discounts/**").hasAnyAuthority("CLIENT", "ENTERPRISE", "ADMIN")
 
-                        // Payment endpoints - specific routes first (order matters!)
-                        .requestMatchers(HttpMethod.GET, "/api/payments/client/**").hasAnyAuthority("CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/payments/delivery/**").hasAnyAuthority("CLIENT", "INDIVIDUAL", "ENTERPRISE", "DELIVERY_PERSON", "PROFESSIONAL", "TEMPORARY", "ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/payments/methods/*/supported").hasAnyAuthority("CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/payments/*/client-secret").hasAnyAuthority("CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/payments/*/status").hasAnyAuthority("CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/payments/*").hasAnyAuthority("CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/payments").hasAnyAuthority("CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/payments/confirm").hasAnyAuthority("CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/payments/fail").hasAnyAuthority("CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/payments/*/process").hasAnyAuthority("CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/payments/*/process/**").hasAnyAuthority("CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN")
-                        .requestMatchers(HttpMethod.POST, "/api/payments/*/cancel").hasAnyAuthority("CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN")
-
-                        // Admin-only payment endpoints
+                        // Payment endpoints
                         .requestMatchers(HttpMethod.GET, "/api/payments/all").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.GET, "/api/payments/stats").hasAuthority("ADMIN")
-                        .requestMatchers(HttpMethod.GET, "/api/payments").hasAuthority("ADMIN") // This is the paginated endpoint
                         .requestMatchers(HttpMethod.PUT, "/api/payments/*/status").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/payments/*/refund").hasAuthority("ADMIN")
                         .requestMatchers(HttpMethod.POST, "/api/payments/*/release-to-delivery").hasAuthority("ADMIN")
 
-                        // Catch-all for any remaining payment endpoints - keep as admin only
-                        .requestMatchers("/api/payments/**").hasAuthority("ADMIN")
+                        // Client payment endpoints
+                        .requestMatchers(HttpMethod.GET, "/api/payments/client/**").hasAnyAuthority(
+                                "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
+                        )
+                        .requestMatchers(HttpMethod.GET, "/api/payments/delivery/**").hasAnyAuthority(
+                                "CLIENT", "INDIVIDUAL", "ENTERPRISE",
+                                "DELIVERY_PERSON", "PROFESSIONAL", "TEMPORARY", "ADMIN"
+                        )
+                        .requestMatchers(HttpMethod.GET, "/api/payments/methods/*/supported").hasAnyAuthority(
+                                "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
+                        )
+                        .requestMatchers(HttpMethod.GET, "/api/payments/*/client-secret").hasAnyAuthority(
+                                "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
+                        )
+                        .requestMatchers(HttpMethod.GET, "/api/payments/*/status").hasAnyAuthority(
+                                "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
+                        )
+                        .requestMatchers(HttpMethod.GET, "/api/payments/*").hasAnyAuthority(
+                                "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
+                        )
+                        .requestMatchers(HttpMethod.GET, "/api/payments").hasAuthority("ADMIN")
 
-                        // BONUS ENDPOINTS - FIXED ORDER
-                        // Delivery person specific bonus endpoints - MUST come before catch-all
-                        .requestMatchers(HttpMethod.GET, "/api/bonuses/delivery-person/**").hasAnyAuthority("ADMIN", "DELIVERY_PERSON", "PROFESSIONAL", "TEMPORARY")
+                        // Payment POST endpoints
+                        .requestMatchers(HttpMethod.POST, "/api/payments").hasAnyAuthority(
+                                "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
+                        )
+                        .requestMatchers(HttpMethod.POST, "/api/payments/confirm").hasAnyAuthority(
+                                "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
+                        )
+                        .requestMatchers(HttpMethod.POST, "/api/payments/fail").hasAnyAuthority(
+                                "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
+                        )
+                        .requestMatchers(HttpMethod.POST, "/api/payments/*/process").hasAnyAuthority(
+                                "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
+                        )
+                        .requestMatchers(HttpMethod.POST, "/api/payments/*/process/**").hasAnyAuthority(
+                                "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
+                        )
+                        .requestMatchers(HttpMethod.POST, "/api/payments/*/cancel").hasAnyAuthority(
+                                "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
+                        )
+                        .requestMatchers("/api/payments/**").hasAuthority("ADMIN")  // Catch-all
 
-                        // Admin-only bonus endpoints - catch-all MUST come last
+                        // Bonus endpoints
+                        .requestMatchers(HttpMethod.GET, "/api/bonuses/delivery-person/**").hasAnyAuthority(
+                                "ADMIN", "DELIVERY_PERSON", "PROFESSIONAL", "TEMPORARY"
+                        )
                         .requestMatchers("/api/bonuses/**").hasAuthority("ADMIN")
 
                         // Availability endpoints
-                        .requestMatchers("/api/availability/**").hasAnyAuthority("ADMIN", "DELIVERY_PERSON", "PROFESSIONAL", "TEMPORARY")
+                        .requestMatchers("/api/availability/**").hasAnyAuthority(
+                                "ADMIN", "DELIVERY_PERSON", "PROFESSIONAL", "TEMPORARY"
+                        )
 
                         // Delivery endpoints
-                        .requestMatchers("/api/deliveries/**").hasAnyAuthority("CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN", "DELIVERY_PERSON", "PROFESSIONAL", "TEMPORARY")
+                        .requestMatchers("/api/deliveries/**").hasAnyAuthority(
+                                "CLIENT", "INDIVIDUAL", "ENTERPRISE",
+                                "ADMIN", "DELIVERY_PERSON", "PROFESSIONAL", "TEMPORARY"
+                        )
 
                         // Delivery person endpoints
-                        .requestMatchers("/api/deliveriesperson/**").hasAnyAuthority("PROFESSIONAL", "TEMPORARY", "ADMIN", "DELIVERY_PERSON")
+                        .requestMatchers("/api/deliveriesperson/**").hasAnyAuthority(
+                                "PROFESSIONAL", "TEMPORARY", "ADMIN", "DELIVERY_PERSON"
+                        )
 
                         // Rating endpoints
-                        .requestMatchers(HttpMethod.POST, "/api/deliveries/*/rate").hasAnyAuthority("CLIENT", "INDIVIDUAL", "ENTERPRISE")
+                        .requestMatchers(HttpMethod.POST, "/api/deliveries/*/rate").hasAnyAuthority(
+                                "CLIENT", "INDIVIDUAL", "ENTERPRISE"
+                        )
 
                         // Admin endpoints
                         .requestMatchers("/api/admin/**").hasAuthority("ADMIN")
 
-                        // Default to authenticated for any other requests
+                        // Default to authenticated
                         .anyRequest().authenticated()
                 )
                 .exceptionHandling(ex -> ex
@@ -174,6 +221,11 @@ public class SecurityConfig {
     }
 
     @Bean
+    public SecretKey secretKey() {
+        return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
+    }
+
+    @Bean
     public JwtDecoder jwtDecoder() {
         return NimbusJwtDecoder.withSecretKey(secretKey()).build();
     }
@@ -183,23 +235,20 @@ public class SecurityConfig {
         return new NimbusJwtEncoder(new ImmutableSecret<>(secretKey()));
     }
 
-    @Value("${jwt.secret}")
-    private String jwtSecret;
-
-    @Bean
-    public SecretKey secretKey() {
-        return Keys.hmacShaKeyFor(jwtSecret.getBytes(StandardCharsets.UTF_8));
-    }
-
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
+
+        // Use allowedOriginPatterns for wildcard support
         configuration.setAllowedOriginPatterns(Arrays.asList(
                 "http://localhost:4200",
                 "https://your-production-domain.com"
         ));
 
-        configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"));
+        configuration.setAllowedMethods(Arrays.asList(
+                "GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH", "HEAD"
+        ));
+
         configuration.setAllowedHeaders(Arrays.asList(
                 "Authorization",
                 "Content-Type",
@@ -217,9 +266,10 @@ public class SecurityConfig {
         ));
 
         configuration.setExposedHeaders(Arrays.asList(
+                "Authorization",
+                "Content-Type",
                 "Access-Control-Allow-Origin",
-                "Access-Control-Allow-Credentials",
-                "Authorization"
+                "Access-Control-Allow-Credentials"
         ));
 
         configuration.setAllowCredentials(true);
