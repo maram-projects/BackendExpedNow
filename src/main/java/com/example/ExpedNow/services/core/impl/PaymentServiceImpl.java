@@ -64,9 +64,18 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
             if (payment.getPaymentMethod() == null) {
                 throw new IllegalArgumentException("Payment method is required");
             }
-            if (payment.getDeliveryId() != null) {
-                DeliveryRequest delivery = deliveryService.getDeliveryById(payment.getDeliveryId());
-                payment.setDeliveryPersonId(delivery.getDeliveryPersonId());
+
+            // IMPORTANT: Link delivery person when creating payment
+            if (payment.getDeliveryId() != null && payment.getDeliveryPersonId() == null) {
+                try {
+                    DeliveryRequest delivery = deliveryService.getDeliveryById(payment.getDeliveryId());
+                    if (delivery != null && delivery.getDeliveryPersonId() != null) {
+                        payment.setDeliveryPersonId(delivery.getDeliveryPersonId());
+                        logger.info("Linked new payment to delivery person {}", delivery.getDeliveryPersonId());
+                    }
+                } catch (Exception e) {
+                    logger.warn("Could not link delivery person during payment creation: {}", e.getMessage());
+                }
             }
 
             // Set defaults
@@ -74,9 +83,6 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
             payment.setStatus(PaymentStatus.PENDING);
             if (payment.getFinalAmountAfterDiscount() == null) {
                 payment.setFinalAmountAfterDiscount(payment.getAmount());
-            }
-            if (payment.getFinalAmountAfterDiscount() <= 0) {
-                throw new IllegalArgumentException("Final payment amount must be positive");
             }
 
             // Initial save
@@ -94,7 +100,7 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
                     savedPayment.setTransactionId(paymentIntent.getId());
                     savedPayment.setClientSecret(paymentIntent.getClientSecret());
 
-                    // Save conversion details
+                    // Save conversion details from metadata
                     if (paymentIntent.getMetadata() != null) {
                         String convertedAmount = paymentIntent.getMetadata().get("converted_amount");
                         String exchangeRate = paymentIntent.getMetadata().get("exchange_rate");
@@ -112,21 +118,21 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
                     }
 
                     logger.info("Stripe PaymentIntent created: {}", paymentIntent.getId());
-                    return paymentRepository.save(savedPayment);
+                    Payment finalPayment = paymentRepository.save(savedPayment);
+
+                    // Enrich with delivery person data before returning
+                    return enrichPayment(finalPayment);
+
                 } catch (StripeException e) {
                     logger.error("Stripe error creating PaymentIntent: {}", e.getMessage(), e);
                     paymentRepository.deleteById(savedPayment.getId());
                     throw new RuntimeException("Payment processing failed: " + e.getMessage(), e);
-                } catch (Exception e) {
-                    logger.error("Unexpected error during Stripe processing: {}", e.getMessage(), e);
-                    paymentRepository.deleteById(savedPayment.getId());
-                    throw new RuntimeException("Payment processing failed", e);
                 }
             }
 
-            // Return non-card payments
-            logger.info("Created non-card payment: {}", savedPayment.getId());
-            return savedPayment;
+            // Return enriched payment
+            return enrichPayment(savedPayment);
+
         } catch (IllegalArgumentException e) {
             logger.error("Validation error: {}", e.getMessage());
             throw e;
@@ -135,7 +141,6 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
             throw new RuntimeException("Payment creation failed: " + e.getMessage(), e);
         }
     }
-
     @Override
     public Payment processPayment(String paymentId, String discountCode) {
         try {
@@ -202,21 +207,25 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
                 throw new IllegalArgumentException("Delivery person ID cannot be null or empty");
             }
 
+            // Query for payments assigned to delivery person (both released and not released)
             Query query = new Query();
-            query.addCriteria(Criteria.where("deliveryPersonId").is(deliveryPersonId)
-                    .and("deliveryPersonPaid").is(true));
+            query.addCriteria(Criteria.where("deliveryPersonId").is(deliveryPersonId));
 
             // Sort by payment date descending
-            query.with(Sort.by(Sort.Direction.DESC, "deliveryPersonPaidAt"));
+            query.with(Sort.by(Sort.Direction.DESC, "createdAt"));
 
-            return mongoTemplate.find(query, Payment.class);
+            List<Payment> payments = mongoTemplate.find(query, Payment.class);
+
+            // Enrich each payment with delivery person data
+            return payments.stream()
+                    .map(this::enrichPayment)
+                    .collect(Collectors.toList());
+
         } catch (Exception e) {
             logger.error("Error getting payments for delivery person {}: {}", deliveryPersonId, e.getMessage());
             throw new RuntimeException("Failed to retrieve payments for delivery person", e);
         }
     }
-
-
 
     @Override
     public ResponseEntity<?> releaseToDeliveryPerson(String paymentId) {
@@ -224,40 +233,32 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
             Payment payment = paymentRepository.findById(paymentId)
                     .orElseThrow(() -> new IllegalArgumentException("Payment not found with ID: " + paymentId));
 
-            if (payment.getStatus() != PaymentStatus.COMPLETED) {
-                throw new IllegalArgumentException(
-                        "Payment status must be COMPLETED to release. Current status: " + payment.getStatus()
-                );
+            // Calculate 80% share using the correct amount
+            double finalAmount = payment.getFinalAmountAfterDiscount() != null ?
+                    payment.getFinalAmountAfterDiscount() : payment.getAmount();
+
+            if (finalAmount <= 0) {
+                throw new IllegalArgumentException("Invalid payment amount for release");
             }
 
-            if (payment.getDeliveryPersonId() == null) {
-                throw new IllegalArgumentException(
-                        "Cannot release payment - no delivery person assigned. Payment ID: " + paymentId
-                );
-            }
+            double shareAmount = finalAmount * DELIVERY_PERSON_SHARE_PERCENTAGE;
 
-            if (payment.getDeliveryPersonPaid() != null && payment.getDeliveryPersonPaid()) {
-                throw new IllegalArgumentException(
-                        "Payment already released to delivery person at: " + payment.getDeliveryPersonPaidAt()
-                );
-            }
-
-            // Calculate 80% share
-            double shareAmount = payment.getFinalAmountAfterDiscount() * DELIVERY_PERSON_SHARE_PERCENTAGE;
+            // Update payment
             payment.setDeliveryPersonShare(shareAmount);
             payment.setDeliveryPersonPaid(true);
             payment.setDeliveryPersonPaidAt(LocalDateTime.now());
+            payment.setUpdatedAt(LocalDateTime.now());
 
-            paymentRepository.save(payment);
+            Payment updatedPayment = paymentRepository.save(payment);
 
-            // Return response with payment details
+            // Build response
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("message", "Payment released to delivery person successfully");
-            response.put("paymentId", payment.getId());
-            response.put("deliveryPersonId", payment.getDeliveryPersonId());
+            response.put("paymentId", updatedPayment.getId());
+            response.put("deliveryPersonId", updatedPayment.getDeliveryPersonId());
             response.put("amountReleased", shareAmount);
-            response.put("releaseDate", payment.getDeliveryPersonPaidAt());
+            response.put("releaseDate", updatedPayment.getDeliveryPersonPaidAt());
 
             return ResponseEntity.ok(response);
 
@@ -325,6 +326,30 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
         }
     }
 
+    private Payment enrichPaymentWithDeliveryPerson(Payment payment) {
+        if (payment.getDeliveryPersonId() != null && payment.getDeliveryPerson() == null) {
+            try {
+                User deliveryPerson = userService.findById(payment.getDeliveryPersonId());
+                if (deliveryPerson != null) {
+                    payment.setDeliveryPerson(deliveryPerson);
+
+                    // Also populate vehicle if available
+                    if (deliveryPerson.getAssignedVehicleId() != null) {
+                        Vehicle vehicle = vehicleRepository.findById(deliveryPerson.getAssignedVehicleId())
+                                .orElse(null);
+                        if (vehicle != null) {
+                            deliveryPerson.setAssignedVehicle(vehicle);
+                        }
+                    }
+                }
+            } catch (Exception e) {
+                logger.error("Error populating delivery person for payment {}: {}",
+                        payment.getId(), e.getMessage());
+            }
+        }
+        return payment;
+    }
+
     @Override
     public Payment confirmPayment(String transactionId, double amount) {
         // Input validation
@@ -362,8 +387,25 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
                 logger.info("Updated existing payment: {}", payment.getId());
             }
 
+            // CRITICAL FIX: Link delivery person BEFORE saving
+            if (payment.getDeliveryId() != null) {
+                try {
+                    DeliveryRequest delivery = deliveryService.getDeliveryById(payment.getDeliveryId());
+                    if (delivery != null && delivery.getDeliveryPersonId() != null) {
+                        payment.setDeliveryPersonId(delivery.getDeliveryPersonId());
+                        logger.info("Linked payment {} to delivery person {}",
+                                payment.getId(), delivery.getDeliveryPersonId());
+                    }
+                } catch (Exception e) {
+                    logger.warn("Could not link delivery person to payment: {}", e.getMessage());
+                }
+            }
+
             // Save payment
             Payment savedPayment = paymentRepository.save(payment);
+
+            // Enrich with delivery person data
+            savedPayment = enrichPayment(savedPayment);
 
             // Update delivery status
             updateDeliveryStatusIfNeeded(savedPayment, deliveryIdFromMetadata);
@@ -379,6 +421,7 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
             throw new RuntimeException("Confirmation failed: " + e.getMessage(), e);
         }
     }
+
 
     private Payment createPaymentFromStripeData(String transactionId, PaymentIntent paymentIntent, double amount,
                                                 String clientId, String deliveryId) {
@@ -686,25 +729,31 @@ public class PaymentServiceImpl implements PaymentServiceInterface {
         if (payment.getDeliveryPersonId() != null && payment.getDeliveryPerson() == null) {
             try {
                 User deliveryPerson = userService.findById(payment.getDeliveryPersonId());
-                payment.setDeliveryPerson(deliveryPerson);
+                if (deliveryPerson != null) {
+                    payment.setDeliveryPerson(deliveryPerson);
 
-                // Populate vehicle if available
-                if (deliveryPerson.getAssignedVehicleId() != null) {
-                    Vehicle vehicle = vehicleRepository.findById(deliveryPerson.getAssignedVehicleId())
-                            .orElse(null);
-                    deliveryPerson.setAssignedVehicle(vehicle);
+                    // Populate vehicle if available
+                    if (deliveryPerson.getAssignedVehicleId() != null) {
+                        Vehicle vehicle = vehicleRepository.findById(deliveryPerson.getAssignedVehicleId())
+                                .orElse(null);
+                        if (vehicle != null) {
+                            deliveryPerson.setAssignedVehicle(vehicle);
+                        }
+                    }
                 }
             } catch (Exception e) {
-                logger.error("Error populating delivery person: {}", e.getMessage());
+                logger.error("Error populating delivery person for payment {}: {}",
+                        payment.getId(), e.getMessage());
             }
         }
     }
 
     private Payment enrichPayment(Payment payment) {
+        // Populate delivery person data
         populateDeliveryPerson(payment);
-        // Add other population logic if needed
         return payment;
     }
+
 
     @Override
     public List<Payment> getAllPaymentsSimple() {

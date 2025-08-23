@@ -815,6 +815,16 @@ public class UserServiceImpl implements UserServiceInterface {
                 user.getLockTime()
         );
     }
+
+    /**
+     * @param username
+     * @return
+     */
+    @Override
+    public User findByUsername(String username) {
+        return null;
+    }
+
     private Collection<? extends GrantedAuthority> getAuthorities(User user) {
         Collection<GrantedAuthority> authorities = new ArrayList<>();
 

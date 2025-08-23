@@ -91,4 +91,6 @@ public interface UserServiceInterface {
 
         // Update the loadUserByUsername method in CustomUserDetailsService to check for approval
         UserDetails loadUserByUsername(String email) throws UsernameNotFoundException;
+
+    User findByUsername(String username);
 }

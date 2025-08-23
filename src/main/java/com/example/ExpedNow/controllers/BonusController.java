@@ -1,8 +1,12 @@
 package com.example.ExpedNow.controllers;
 
 import com.example.ExpedNow.models.Bonus;
+import com.example.ExpedNow.models.User;
 import com.example.ExpedNow.models.enums.BonusStatus;
+import com.example.ExpedNow.models.enums.Role;
+import com.example.ExpedNow.repositories.UserRepository;
 import com.example.ExpedNow.services.core.impl.BonusService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
@@ -14,16 +18,19 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/bonuses")
 public class BonusController {
 
     private final BonusService bonusService;
-
+    @Autowired
+    private UserRepository userRepository; // This should already exist
     public BonusController(BonusService bonusService) {
         this.bonusService = bonusService;
     }
@@ -618,6 +625,53 @@ public class BonusController {
             response.put("success", false);
             response.put("message", e.getMessage());
             response.put("data", null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    // Add this method to your BonusController.java
+    @GetMapping("/delivery-persons")
+    public ResponseEntity<Map<String, Object>> getDeliveryPersons() {
+        try {
+            System.out.println("Controller: Fetching delivery persons...");
+
+            // Use the Role enum instead of string
+            List<User> deliveryPersons = userRepository.findAllByRolesContaining(Role.ROLE_DELIVERY_PERSON);
+
+            System.out.println("Controller: Found " + deliveryPersons.size() + " delivery persons");
+
+            // Create simplified user objects
+            List<Map<String, Object>> simplifiedUsers = deliveryPersons.stream()
+                    .map(user -> {
+                        Map<String, Object> userMap = new HashMap<>();
+                        userMap.put("id", user.getId());
+                        userMap.put("fullName", user.getFullName() != null ? user.getFullName() :
+                                (user.getFirstName() + " " + user.getLastName()));
+                        userMap.put("email", user.getEmail());
+                        userMap.put("phone", user.getPhone());
+                        System.out.println("Controller: Processing user - ID: " + user.getId() + ", Name: " + user.getFullName());
+                        return userMap;
+                    })
+                    .collect(Collectors.toList());
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "تم جلب الموصلين بنجاح");
+            response.put("data", simplifiedUsers);
+            response.put("count", simplifiedUsers.size());
+
+            System.out.println("Controller: Returning " + simplifiedUsers.size() + " delivery persons");
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            System.err.println("Controller: Error fetching delivery persons: " + e.getMessage());
+            e.printStackTrace();
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", "Error fetching delivery persons: " + e.getMessage());
+            response.put("data", new ArrayList<>());
+
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }

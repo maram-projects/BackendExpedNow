@@ -1,6 +1,8 @@
 package com.example.ExpedNow.controllers;
 
 import com.example.ExpedNow.models.Payment;
+import com.example.ExpedNow.services.core.UserServiceInterface;
+
 import com.example.ExpedNow.models.User;
 import com.example.ExpedNow.models.enums.PaymentMethod;
 import com.example.ExpedNow.models.enums.PaymentStatus;
@@ -9,6 +11,8 @@ import com.example.ExpedNow.services.core.DeliveryPaymentServiceInterface;
 import com.example.ExpedNow.services.core.PaymentServiceInterface;
 import com.example.ExpedNow.services.core.DeliveryServiceInterface;
 import jakarta.validation.Valid;
+import com.example.ExpedNow.repositories.UserRepository;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -22,6 +26,7 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
@@ -35,11 +40,15 @@ public class PaymentController {
     private MongoTemplate mongoTemplate;
     private static final Logger logger = LoggerFactory.getLogger(PaymentController.class);
     private final DeliveryPaymentServiceInterface deliveryPaymentService;
-
+    @Autowired
+    private UserServiceInterface userService;
     @Autowired
     private PaymentServiceInterface paymentService;
     @Autowired
     private DeliveryServiceInterface deliveryService;
+    @Autowired
+    private UserRepository userRepository;
+
 
     public PaymentController(DeliveryPaymentServiceInterface deliveryPaymentService) {
         this.deliveryPaymentService = deliveryPaymentService;
@@ -672,43 +681,203 @@ public class PaymentController {
     public ResponseEntity<Map<String, Object>> getPaymentsForDeliveryPerson(
             @PathVariable String deliveryPersonId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "10") int size,
+            @RequestParam(defaultValue = "false") boolean includeAll,
+            @RequestParam(defaultValue = "false") boolean includeDeliveryPerson,
+            Authentication authentication) {
 
         try {
-            // Create pageable
-            Pageable pageable = PageRequest.of(page, size);
+            if (deliveryPersonId == null || deliveryPersonId.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of(
+                        "success", false,
+                        "message", "Delivery person ID is required"
+                ));
+            }
 
-            // Create query
-            Query query = new Query();
-            query.addCriteria(Criteria.where("deliveryPersonId").is(deliveryPersonId)
-                    .and("deliveryPersonPaid").is(true));
+            // Get the authenticated user's email/username from JWT
+            String authenticatedUserEmail = authentication.getName();
+            logger.info("Authenticated user email: {}, Requested delivery person ID: {}",
+                    authenticatedUserEmail, deliveryPersonId);
 
-            // Get total count
-            long total = mongoTemplate.count(query, Payment.class);
+            // Resolve the authenticated user's actual database ID
+            User authenticatedUser = null;
+            try {
+                authenticatedUser = userService.findByEmail(authenticatedUserEmail);
+                if (authenticatedUser == null) {
+                    // Try finding by username if email lookup fails
+                    authenticatedUser = userService.findByUsername(authenticatedUserEmail);
+                }
+            } catch (Exception e) {
+                logger.error("Failed to resolve authenticated user: {}", e.getMessage());
+            }
 
-            // Apply pagination
-            query.with(pageable);
+            if (authenticatedUser == null) {
+                logger.error("Could not resolve authenticated user: {}", authenticatedUserEmail);
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                        "success", false,
+                        "message", "Could not validate user identity"
+                ));
+            }
 
-            // Execute query
-            List<Payment> payments = mongoTemplate.find(query, Payment.class);
+            String authenticatedUserId = authenticatedUser.getId();
+            logger.info("Resolved authenticated user ID: {} for email: {}",
+                    authenticatedUserId, authenticatedUserEmail);
+
+            // Check authorization
+            boolean hasDeliveryPersonRole = authentication.getAuthorities().stream()
+                    .anyMatch(auth -> auth.getAuthority().equals("DELIVERY_PERSON") ||
+                            auth.getAuthority().equals("PROFESSIONAL") ||
+                            auth.getAuthority().equals("TEMPORARY"));
+
+            boolean isAdmin = authentication.getAuthorities().stream()
+                    .anyMatch(auth -> auth.getAuthority().equals("ADMIN"));
+
+            boolean isOwner = authenticatedUserId.equals(deliveryPersonId);
+
+            logger.info("Authorization check - hasDeliveryPersonRole: {}, isAdmin: {}, isOwner: {}",
+                    hasDeliveryPersonRole, isAdmin, isOwner);
+
+            if (!isAdmin && !isOwner) {
+                logger.warn("Access denied: User {} (ID: {}) tried to access payments for delivery person {}",
+                        authenticatedUserEmail, authenticatedUserId, deliveryPersonId);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                        "success", false,
+                        "message", "Access denied. You can only view your own payments."
+                ));
+            }
+
+            // Get payments using the service method
+            List<Payment> allPayments = paymentService.getPaymentsByDeliveryPerson(deliveryPersonId);
+
+            // Calculate pagination
+            int totalElements = allPayments.size();
+            int totalPages = (int) Math.ceil((double) totalElements / size);
+            int startIndex = page * size;
+            int endIndex = Math.min(startIndex + size, totalElements);
+
+            List<Payment> pagedPayments = totalElements > 0 ?
+                    allPayments.subList(startIndex, endIndex) : new ArrayList<>();
+
+            // Enrich payments with delivery person data if requested
+            // Payments are already enriched by the service method
+// No additional enrichment needed since getPaymentsByDeliveryPerson already calls enrichPayment
+            // Calculate summary data
+            double totalAmount = allPayments.stream()
+                    .mapToDouble(p -> p.getDeliveryPersonShare() != null ? p.getDeliveryPersonShare() : 0.0)
+                    .sum();
 
             // Build response
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
-            response.put("data", payments);
+            response.put("data", pagedPayments);
             response.put("pagination", Map.of(
                     "currentPage", page,
-                    "totalPages", (int) Math.ceil((double) total / size),
-                    "totalElements", total
+                    "totalPages", totalPages,
+                    "totalElements", totalElements,
+                    "hasNext", page < totalPages - 1,
+                    "hasPrevious", page > 0,
+                    "pageSize", size
             ));
+            response.put("summary", Map.of(
+                    "totalEarnings", totalAmount,
+                    "totalPayments", totalElements,
+                    "averagePayment", totalElements > 0 ? totalAmount / totalElements : 0.0
+            ));
+
+            logger.info("Successfully retrieved {} payments for delivery person {}",
+                    totalElements, deliveryPersonId);
 
             return ResponseEntity.ok(response);
 
         } catch (Exception e) {
-            logger.error("Error getting payments for delivery person: {}", e.getMessage());
+            logger.error("Error getting payments for delivery person {}: {}", deliveryPersonId, e.getMessage(), e);
             return ResponseEntity.internalServerError().body(Map.of(
                     "success", false,
                     "message", "Failed to get payments: " + e.getMessage()
+            ));
+        }
+    }
+    @GetMapping("/delivery-person/{deliveryPersonId}/summary")
+    public ResponseEntity<Map<String, Object>> getDeliveryPersonPaymentSummary(
+            @PathVariable String deliveryPersonId,
+            Authentication authentication) {
+
+        try {
+            // Get the authenticated user's email/username from JWT
+            String authenticatedUserEmail = authentication.getName();
+
+            // Resolve the authenticated user's actual database ID
+            User authenticatedUser = userService.findByEmail(authenticatedUserEmail);
+            if (authenticatedUser == null) {
+                authenticatedUser = userService.findByUsername(authenticatedUserEmail);
+            }
+
+            if (authenticatedUser == null) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of(
+                        "success", false,
+                        "message", "Could not validate user identity"
+                ));
+            }
+
+            String authenticatedUserId = authenticatedUser.getId();
+
+            // Check authorization
+            boolean isAdmin = authentication.getAuthorities().stream()
+                    .anyMatch(auth -> auth.getAuthority().equals("ADMIN"));
+            boolean isOwner = authenticatedUserId.equals(deliveryPersonId);
+
+            if (!isAdmin && !isOwner) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).body(Map.of(
+                        "success", false,
+                        "message", "Access denied. You can only view your own payment summary."
+                ));
+            }
+
+            List<Payment> payments = paymentService.getPaymentsByDeliveryPerson(deliveryPersonId);
+
+            double totalEarnings = payments.stream()
+                    .mapToDouble(p -> p.getDeliveryPersonShare() != null ? p.getDeliveryPersonShare() : 0.0)
+                    .sum();
+
+            // Calculate monthly earnings
+            LocalDateTime now = LocalDateTime.now();
+            double monthlyEarnings = payments.stream()
+                    .filter(p -> p.getDeliveryPersonPaidAt() != null &&
+                            p.getDeliveryPersonPaidAt().getMonth() == now.getMonth() &&
+                            p.getDeliveryPersonPaidAt().getYear() == now.getYear())
+                    .mapToDouble(p -> p.getDeliveryPersonShare() != null ? p.getDeliveryPersonShare() : 0.0)
+                    .sum();
+
+            // Get latest payment
+            Payment latestPayment = payments.stream()
+                    .max((p1, p2) -> {
+                        LocalDateTime date1 = p1.getDeliveryPersonPaidAt();
+                        LocalDateTime date2 = p2.getDeliveryPersonPaidAt();
+                        if (date1 == null && date2 == null) return 0;
+                        if (date1 == null) return -1;
+                        if (date2 == null) return 1;
+                        return date1.compareTo(date2);
+                    })
+                    .orElse(null);
+
+            Map<String, Object> summary = new HashMap<>();
+            summary.put("totalEarnings", totalEarnings);
+            summary.put("monthlyEarnings", monthlyEarnings);
+            summary.put("totalPayments", payments.size());
+            summary.put("averagePayment", payments.size() > 0 ? totalEarnings / payments.size() : 0.0);
+            summary.put("lastPaymentAmount", latestPayment != null ? latestPayment.getDeliveryPersonShare() : 0.0);
+            summary.put("lastPaymentDate", latestPayment != null ? latestPayment.getDeliveryPersonPaidAt() : null);
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "data", summary
+            ));
+
+        } catch (Exception e) {
+            logger.error("Error getting payment summary for delivery person: {}", e.getMessage());
+            return ResponseEntity.internalServerError().body(Map.of(
+                    "success", false,
+                    "message", "Failed to get payment summary"
             ));
         }
     }
@@ -732,8 +901,15 @@ public class PaymentController {
                 throw new IllegalArgumentException("Payment already released to delivery person");
             }
 
-            // Calculate 80% share (or your business logic)
-            double shareAmount = payment.getFinalAmountAfterDiscount() * 0.8;
+            // Calculate 80% share using the correct amount
+            double finalAmount = payment.getFinalAmountAfterDiscount() != null ?
+                    payment.getFinalAmountAfterDiscount() : payment.getAmount();
+
+            if (finalAmount <= 0) {
+                throw new IllegalArgumentException("Invalid payment amount for release");
+            }
+
+            double shareAmount = finalAmount * 0.8;
 
             // Update payment
             payment.setDeliveryPersonShare(shareAmount);
@@ -769,5 +945,24 @@ public class PaymentController {
         }
     }
 
+    // In BonusController.java
+    @GetMapping("/delivery-persons")
+    public ResponseEntity<List<Map<String, String>>> getDeliveryPersons() {
+        try {
+            List<User> deliveryPersons = userRepository.findByRole("DELIVERY_PERSON");
+            List<Map<String, String>> result = deliveryPersons.stream()
+                    .map(dp -> {
+                        Map<String, String> person = new HashMap<>();
+                        person.put("id", dp.getId());
+                        person.put("fullName", dp.getFullName()); // Assuming you have a fullName field
+                        return person;
+                    })
+                    .collect(Collectors.toList());
 
+            return ResponseEntity.ok(result);
+        } catch (Exception e) {
+            logger.error("Error retrieving delivery persons: {}", e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
 }
