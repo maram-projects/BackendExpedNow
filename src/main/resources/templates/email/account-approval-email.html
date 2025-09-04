@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Account Approved - ExpedeNow</title>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background-color: #f8f9fa;
+            line-height: 1.6;
+        }
+        .email-container {
+            max-width: 600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 12px;
+            overflow: hidden;
+            box-shadow: 0 4px 24px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: white;
+            text-align: center;
+            padding: 40px 20px;
+        }
+        .header h1 {
+            margin: 0;
+            font-size: 24px;
+            font-weight: 700;
+        }
+        .content {
+            padding: 40px;
+            text-align: center;
+        }
+        .content h2 {
+            color: #1a1a1a;
+            font-size: 24px;
+            margin: 0 0 16px 0;
+        }
+        .content p {
+            color: #666;
+            font-size: 16px;
+            margin: 0 0 24px 0;
+        }
+        .dashboard-button {
+            display: inline-block;
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            text-decoration: none;
+            padding: 16px 32px;
+            border-radius: 8px;
+            font-weight: 600;
+            font-size: 16px;
+            margin: 16px 0 24px 0;
+        }
+        .footer {
+            background: #f8f9fa;
+            text-align: center;
+            padding: 24px;
+            color: #666;
+            font-size: 14px;
+        }
+        .footer a {
+            color: #667eea;
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+<div class="email-container">
+    <div class="header">
+        <h1>🎉 Account Approved!</h1>
+    </div>
+
+    <div class="content">
+        <h2>Hello <span th:text="${firstName}">User</span>!</h2>
+        <p><strong>Congratulations!</strong> Your ExpedeNow account has been approved by our admin team.</p>
+        <p>You can now access all features of our platform and start using ExpedeNow services.</p>
+
+        <a th:href="${dashboardUrl}" class="dashboard-button">Go to Dashboard</a>
+
+        <p>Welcome to the ExpedeNow community!</p>
+        <p>Best regards,<br><strong>The ExpedeNow Admin Team</strong></p>
+    </div>
+
+    <div class="footer">
+        <p>© 2025 ExpedeNow. All rights reserved.</p>
+    </div>
+</div>
+</body>
+</html>

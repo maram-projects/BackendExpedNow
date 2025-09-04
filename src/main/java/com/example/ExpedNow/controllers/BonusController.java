@@ -147,7 +147,6 @@ public class BonusController {
     }
 
     // Create a new bonus
-    // In your Spring controller
     @PostMapping
     public ResponseEntity<ApiResponse<Bonus>> createBonus(@RequestBody Bonus bonusData) {
         try {
@@ -160,10 +159,10 @@ public class BonusController {
             }
 
             bonusData.setCreatedAt(LocalDateTime.now());
-            bonusData.setStatus(BonusStatus.PENDING);
+            bonusData.setStatus(BonusStatus.CREATED); // <<<--- Change here
 
             Bonus bonus = bonusService.createBonus(bonusData);
-            ApiResponse<Bonus> response = new ApiResponse<>(true, "تم إنشاء المكافأة بنجاح", bonus);
+            ApiResponse<Bonus> response = new ApiResponse<>(true, "Bonus created successfully and ready for payment", bonus);
             return ResponseEntity.status(HttpStatus.CREATED).body(response);
         } catch (Exception e) {
             ApiResponse<Bonus> response = new ApiResponse<>(false, e.getMessage(), null);
@@ -190,18 +189,18 @@ public class BonusController {
     // BONUS STATUS OPERATIONS
     // =============================================================================
 
-    // Approve bonus (for admin)
-    @PatchMapping("/{bonusId}/approve")
-    public ResponseEntity<ApiResponse<Bonus>> approveBonus(@PathVariable String bonusId) {
-        try {
-            Bonus approvedBonus = bonusService.approveBonus(bonusId);
-            ApiResponse<Bonus> response = new ApiResponse<>(true, "تم الموافقة على المكافأة بنجاح", approvedBonus);
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            ApiResponse<Bonus> response = new ApiResponse<>(false, e.getMessage(), null);
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
-    }
+//    // Approve bonus (for admin)
+//    @PatchMapping("/{bonusId}/approve")
+//    public ResponseEntity<ApiResponse<Bonus>> approveBonus(@PathVariable String bonusId) {
+//        try {
+//            Bonus approvedBonus = bonusService.approveBonus(bonusId);
+//            ApiResponse<Bonus> response = new ApiResponse<>(true, "تم الموافقة على المكافأة بنجاح", approvedBonus);
+//            return ResponseEntity.ok(response);
+//        } catch (Exception e) {
+//            ApiResponse<Bonus> response = new ApiResponse<>(false, e.getMessage(), null);
+//            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+//        }
+//    }
 
     // Reject bonus (for admin)
     @PatchMapping("/{bonusId}/reject")
@@ -219,19 +218,17 @@ public class BonusController {
         }
     }
 
-    // Pay bonus (for admin)
     @PatchMapping("/{bonusId}/pay")
     public ResponseEntity<ApiResponse<Bonus>> payBonus(@PathVariable String bonusId) {
         try {
             Bonus paidBonus = bonusService.payBonus(bonusId);
-            ApiResponse<Bonus> response = new ApiResponse<>(true, "تم دفع المكافأة بنجاح", paidBonus);
+            ApiResponse<Bonus> response = new ApiResponse<>(true, "Bonus paid successfully", paidBonus);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             ApiResponse<Bonus> response = new ApiResponse<>(false, e.getMessage(), null);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
     }
-
     // Cancel bonus
     @PatchMapping("/{bonusId}/cancel")
     public ResponseEntity<ApiResponse<Bonus>> cancelBonus(@PathVariable String bonusId) {
@@ -417,36 +414,7 @@ public class BonusController {
     // =============================================================================
 
     // Bulk approve bonuses
-    @PostMapping("/bulk/approve")
-    public ResponseEntity<Map<String, Object>> bulkApproveBonuses(@RequestBody Map<String, List<String>> requestBody) {
-        try {
-            List<String> bonusIds = requestBody.get("bonusIds");
-            if (bonusIds == null || bonusIds.isEmpty()) {
-                Map<String, Object> response = new HashMap<>();
-                response.put("success", false);
-                response.put("message", "يجب تحديد معرفات المكافآت");
-                response.put("processedCount", 0);
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-            }
 
-            int processedCount = bonusService.bulkApproveBonuses(bonusIds);
-
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", true);
-            response.put("message", "تم الموافقة على المكافآت بنجاح");
-            response.put("processedCount", processedCount);
-            response.put("totalRequested", bonusIds.size());
-
-            return ResponseEntity.ok(response);
-        } catch (Exception e) {
-            Map<String, Object> response = new HashMap<>();
-            response.put("success", false);
-            response.put("message", e.getMessage());
-            response.put("processedCount", 0);
-
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
-        }
-    }
 
     // Bulk pay bonuses (NEW)
     @PostMapping("/bulk/pay")
@@ -565,23 +533,20 @@ public class BonusController {
         }
     }
 
-    // Get bonus summary
     @GetMapping("/summary")
     public ResponseEntity<Map<String, Object>> getBonusSummary() {
         try {
             Map<String, Object> summary = bonusService.getBonusSummary();
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
-            response.put("message", "تم جلب الملخص بنجاح");
+            response.put("message", "Summary retrieved successfully");
             response.put("data", summary);
-
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             Map<String, Object> response = new HashMap<>();
             response.put("success", false);
             response.put("message", e.getMessage());
             response.put("data", null);
-
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }
@@ -673,6 +638,123 @@ public class BonusController {
             response.put("data", new ArrayList<>());
 
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+
+    // =============================================================================
+    // MISSION PROGRESS AND MILESTONE TRACKING
+    // =============================================================================
+
+    /**
+     * Get mission progress toward bonus milestones
+     */
+    @GetMapping("/delivery-person/{deliveryPersonId}/mission-progress")
+    public ResponseEntity<Map<String, Object>> getMissionProgress(@PathVariable String deliveryPersonId) {
+        try {
+            // This would need to be implemented in BonusService to work with MissionRepository
+            Map<String, Object> progress = bonusService.getMissionProgressTowardBonus(deliveryPersonId);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Mission progress retrieved successfully");
+            response.put("data", progress);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            response.put("data", null);
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Check milestone eligibility
+     */
+    @GetMapping("/delivery-person/{deliveryPersonId}/milestone-check")
+    public ResponseEntity<Map<String, Object>> checkMilestoneEligibility(@PathVariable String deliveryPersonId) {
+        try {
+            Map<String, Object> eligibility = bonusService.checkMilestoneEligibility(deliveryPersonId);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Milestone eligibility checked");
+            response.put("data", eligibility);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            response.put("data", null);
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Get comprehensive delivery person statistics
+     */
+    @GetMapping("/delivery-person/{deliveryPersonId}/statistics")
+    public ResponseEntity<Map<String, Object>> getDeliveryPersonStatistics(@PathVariable String deliveryPersonId) {
+        try {
+            Map<String, Object> statistics = bonusService.getComprehensiveDeliveryPersonStats(deliveryPersonId);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Statistics retrieved successfully");
+            response.put("data", statistics);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            response.put("data", null);
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Get milestone bonus history
+     */
+    @GetMapping("/delivery-person/{deliveryPersonId}/milestones")
+    public ResponseEntity<ApiListResponse<Bonus>> getMilestoneBonuses(@PathVariable String deliveryPersonId) {
+        try {
+            List<Bonus> milestoneBonuses = bonusService.getMilestoneBonuses(deliveryPersonId);
+            ApiListResponse<Bonus> response = new ApiListResponse<>(true, "Milestone bonuses retrieved successfully", milestoneBonuses);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            ApiListResponse<Bonus> response = new ApiListResponse<>(false, e.getMessage(), null);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    /**
+     * Manually trigger milestone check (admin only)
+     */
+    @PostMapping("/delivery-person/{deliveryPersonId}/check-milestone")
+    public ResponseEntity<Map<String, Object>> manualMilestoneCheck(@PathVariable String deliveryPersonId) {
+        try {
+            Map<String, Object> result = bonusService.performManualMilestoneCheck(deliveryPersonId);
+
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", true);
+            response.put("message", "Manual milestone check completed");
+            response.put("data", result);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            Map<String, Object> response = new HashMap<>();
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            response.put("data", null);
+
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
         }
     }
 }

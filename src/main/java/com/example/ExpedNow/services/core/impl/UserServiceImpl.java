@@ -51,7 +51,8 @@ public class UserServiceImpl implements UserServiceInterface {
     private final JavaMailSender mailSender;
     private final VehicleRepository vehicleRepository;
     private final MongoTemplate mongoTemplate; // Add this
-
+    @Autowired
+    private EmailService emailService; // AJOUTE cette ligne
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     @Value("${spring.mail.enabled:false}")
     private boolean emailEnabled;
@@ -721,45 +722,33 @@ public class UserServiceImpl implements UserServiceInterface {
     }
 
     public void sendPasswordResetEmail(User user, String token) {
-        String resetLink = "http://localhost:4200/reset-password?token=" + token;
-
-        if (emailEnabled && mailSender != null) {
-            try {
-                SimpleMailMessage message = new SimpleMailMessage();
-                message.setTo(user.getEmail());
-                message.setSubject("Password Reset Request");
-                message.setText("To reset your password, please click here: " + resetLink);
-                mailSender.send(message);
-            } catch (Exception e) {
-                logger.error("Failed to send email", e);
-            }
+        try {
+            emailService.sendPasswordResetEmail(user, token);
+        } catch (Exception e) {
+            logger.error("Failed to send password reset email", e);
+            // Fallback pour dev
+            String resetLink = "http://localhost:4200/reset-password?token=" + token;
+            System.out.println("\n=== DEV MODE: Password reset link ===");
+            System.out.println("Email: " + user.getEmail());
+            System.out.println("Link: " + resetLink);
+            System.out.println("==============================\n");
         }
-
-        // Always log the reset link for development
-        logger.info("Password reset link for {}: {}", user.getEmail(), resetLink);
-        System.out.println("\n=== DEV MODE: Password reset link ===");
-        System.out.println("Email: " + user.getEmail());
-        System.out.println("Link: " + resetLink);
-        System.out.println("==============================\n");
     }
     private void sendApprovalEmail(User user) {
-        SimpleMailMessage mailMessage = new SimpleMailMessage();
-        mailMessage.setTo(user.getEmail());
-        mailMessage.setSubject("Account Approved");
-        mailMessage.setText("Your account has been approved. You can now login at: "
-                + "http://localhost:4200/login");
-        mailSender.send(mailMessage);
+        try {
+            emailService.sendAccountApprovalEmail(user);
+        } catch (Exception e) {
+            logger.error("Failed to send approval email", e);
+        }
     }
 
     private void sendRejectionEmail(User user) {
-        SimpleMailMessage mailMessage = new SimpleMailMessage();
-        mailMessage.setTo(user.getEmail());
-        mailMessage.setSubject("Account Rejected");
-        mailMessage.setText("Your account registration has been rejected. "
-                + "Please contact support if you believe this is an error.");
-        mailSender.send(mailMessage);
+        try {
+            emailService.sendAccountRejectionEmail(user, "Your account did not meet our requirements.");
+        } catch (Exception e) {
+            logger.error("Failed to send rejection email", e);
+        }
     }
-
     // Dans UserServiceImpl.java
     @Override
     public long countActiveUsers() {

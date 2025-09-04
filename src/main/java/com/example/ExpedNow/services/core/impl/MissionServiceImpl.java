@@ -1,6 +1,7 @@
 package com.example.ExpedNow.services.core.impl;
 
 import com.example.ExpedNow.models.*;
+import com.example.ExpedNow.models.enums.BonusStatus;
 import com.example.ExpedNow.models.enums.PackageType;
 import com.example.ExpedNow.repositories.*;
 import com.example.ExpedNow.services.core.DeliveryAssignmentServiceInterface;
@@ -22,15 +23,18 @@ public class MissionServiceImpl implements MissionServiceInterface {
     private final DeliveryReqRepository deliveryReqRepository;
     private final UserRepository userRepository;
     private final DeliveryAssignmentServiceInterface deliveryAssignmentService;
+    private final BonusService bonusService; // Add this dependency
 
     public MissionServiceImpl(MissionRepository missionRepository,
                               DeliveryReqRepository deliveryReqRepository,
                               UserRepository userRepository,
-                              DeliveryAssignmentServiceInterface deliveryAssignmentService) {
+                              DeliveryAssignmentServiceInterface deliveryAssignmentService,
+                              BonusService bonusService) { // Add bonusService parameter
         this.missionRepository = missionRepository;
         this.deliveryReqRepository = deliveryReqRepository;
         this.userRepository = userRepository;
         this.deliveryAssignmentService = deliveryAssignmentService;
+        this.bonusService = bonusService;
     }
 
     @Override
@@ -103,12 +107,19 @@ public class MissionServiceImpl implements MissionServiceInterface {
 
         Mission savedMission = missionRepository.save(mission);
 
+        String deliveryPersonId = mission.getDeliveryPerson().getId();
+
+        // Check for milestone bonus after completing mission
+        try {
+            checkAndCreateMilestoneBonus(deliveryPersonId);
+        } catch (Exception e) {
+            logger.error("Failed to check milestone bonus for delivery person {}: {}", deliveryPersonId, e.getMessage(), e);
+        }
+
         // Automatically assign a NEW pending delivery to the same delivery person
         try {
-            String deliveryPersonId = mission.getDeliveryPerson().getId();
             logger.info("Mission completed. Attempting to assign new pending delivery to delivery person: {}", deliveryPersonId);
 
-            // Use the assignPendingDeliveriesToUser method to assign new deliveries
             List<DeliveryRequest> assignedDeliveries = deliveryAssignmentService.assignPendingDeliveriesToUser(deliveryPersonId);
 
             if (!assignedDeliveries.isEmpty()) {
@@ -122,6 +133,56 @@ public class MissionServiceImpl implements MissionServiceInterface {
         }
 
         return savedMission;
+    }
+
+    /**
+     * Check if delivery person has completed milestones and create bonus
+     */
+    private void checkAndCreateMilestoneBonus(String deliveryPersonId) {
+        try {
+            // Count completed missions for this delivery person
+            long completedMissions = missionRepository.countByDeliveryPersonIdAndStatus(deliveryPersonId, "COMPLETED");
+
+            logger.info("Delivery person {} has completed {} missions", deliveryPersonId, completedMissions);
+
+            // Check for 10-mission milestone
+            if (completedMissions > 0 && completedMissions % 10 == 0) {
+
+                // Check if we already gave a bonus for this milestone
+                String milestoneReason = "10 Mission Milestone Bonus - " + completedMissions + " missions completed";
+
+                // Get user details for bonus
+                User deliveryPerson = userRepository.findById(deliveryPersonId)
+                        .orElseThrow(() -> new RuntimeException("Delivery person not found"));
+
+                // Create milestone bonus
+                Bonus milestoneBonus = new Bonus();
+                milestoneBonus.setDeliveryPersonId(deliveryPersonId);
+                milestoneBonus.setAmount(100.0); // $100 for 10 missions milestone
+                milestoneBonus.setReason(milestoneReason);
+                milestoneBonus.setDescription("Congratulations! You have completed " + completedMissions + " missions successfully!");
+                milestoneBonus.setCriteria("Complete 10 missions");
+                milestoneBonus.setBonusType("MILESTONE");
+                milestoneBonus.setType("MILESTONE");
+                milestoneBonus.setStatus(BonusStatus.CREATED); // Ready for admin to pay
+                milestoneBonus.setCreatedBy("SYSTEM");
+                milestoneBonus.setDeliveryPersonName(deliveryPerson.getFullName());
+                milestoneBonus.setDeliveryPersonEmail(deliveryPerson.getEmail());
+                milestoneBonus.setCreatedAt(LocalDateTime.now());
+
+                bonusService.createBonus(milestoneBonus);
+
+                logger.info("Created milestone bonus for delivery person {} after {} completed missions",
+                        deliveryPersonId, completedMissions);
+
+            } else {
+                logger.debug("No milestone reached. Delivery person {} has {} completed missions",
+                        deliveryPersonId, completedMissions);
+            }
+
+        } catch (Exception e) {
+            logger.error("Error checking milestone bonus for delivery person {}: {}", deliveryPersonId, e.getMessage(), e);
+        }
     }
 
     @Override
@@ -172,6 +233,14 @@ public class MissionServiceImpl implements MissionServiceInterface {
             // تحديث حالة الطلب المرتبط إذا لزم الأمر
             if ("COMPLETED".equals(status)) {
                 updateDeliveryStatus(mission.getDeliveryRequest(), DeliveryRequest.DeliveryReqStatus.DELIVERED);
+
+                // Check for milestone bonus when mission is completed via status update
+                try {
+                    String deliveryPersonId = mission.getDeliveryPerson().getId();
+                    checkAndCreateMilestoneBonus(deliveryPersonId);
+                } catch (Exception e) {
+                    logger.error("Failed to check milestone bonus after status update: {}", e.getMessage(), e);
+                }
 
                 // Auto-assign new deliveries when mission is completed via status update
                 try {

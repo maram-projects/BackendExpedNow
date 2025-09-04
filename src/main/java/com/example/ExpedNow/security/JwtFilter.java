@@ -91,6 +91,8 @@ public class JwtFilter extends OncePerRequestFilter {
         return requestPath.startsWith("/api/auth/register") ||
                 requestPath.startsWith("/api/auth/login") ||
                 requestPath.startsWith("/api/auth/confirm-account") ||
+                requestPath.startsWith("/api/auth/forgot-password") ||  // Add this
+                requestPath.startsWith("/api/auth/reset-password") ||   // Add this
                 requestPath.startsWith("/oauth2/") ||
                 requestPath.startsWith("/api/ai/health") || // Health endpoint
                 requestPath.startsWith("/v3/api-docs") || // Swagger

@@ -4,7 +4,10 @@ import com.example.ExpedNow.models.*;
 import com.example.ExpedNow.models.enums.BonusStatus;
 import com.example.ExpedNow.repositories.BonusRepository;
 import com.example.ExpedNow.repositories.DeliveryReqRepository;
+import com.example.ExpedNow.repositories.MissionRepository;
 import com.example.ExpedNow.repositories.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -12,6 +15,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.DayOfWeek;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -21,6 +25,8 @@ import java.util.Map;
 
 @Service
 public class BonusService {
+
+    private static final Logger logger = LoggerFactory.getLogger(BonusService.class);
 
     @Autowired
     private BonusRepository bonusRepository;
@@ -34,18 +40,17 @@ public class BonusService {
     @Autowired
     private NotificationService notificationService;
 
-    // مهمة مجدولة لحساب المكافآت الأسبوعية
-    @Scheduled(cron = "0 0 0 ? * MON") // كل يوم اثنين
+    @Autowired
+    private MissionRepository missionRepository;
+
+    @Scheduled(cron = "0 0 0 ? * MON")
     public void calculateWeeklyBonuses() {
         LocalDateTime startOfLastWeek = LocalDateTime.now().minusWeeks(1).with(DayOfWeek.MONDAY).withHour(0).withMinute(0).withSecond(0);
         LocalDateTime endOfLastWeek = startOfLastWeek.plusDays(6).withHour(23).withMinute(59).withSecond(59);
 
-        // الحصول على جميع الموصلين
         List<User> deliveryPersons = userRepository.findByRole("DELIVERY_PERSON");
 
         for (User dp : deliveryPersons) {
-            // حساب عدد التوصيلات المكتملة الأسبوع الماضي
-            // Note: Make sure your DeliveryReqRepository has this method or modify accordingly
             int completedDeliveries = deliveryReqRepository.countByDeliveryPersonIdAndStatusAndCompletedAtBetween(
                     dp.getId(),
                     DeliveryRequest.DeliveryReqStatus.DELIVERED,
@@ -53,7 +58,6 @@ public class BonusService {
                     endOfLastWeek
             );
 
-            // إذا أكمل أكثر من 20 توصيل
             if (completedDeliveries >= 20) {
                 Bonus bonus = new Bonus();
                 bonus.setDeliveryPersonId(dp.getId());
@@ -61,15 +65,14 @@ public class BonusService {
                 bonus.setDeliveryCount(completedDeliveries);
                 bonus.setStartDate(startOfLastWeek);
                 bonus.setEndDate(endOfLastWeek);
-                bonus.setStatus(BonusStatus.PENDING);
+                bonus.setStatus(BonusStatus.CREATED);
                 bonus.setCreatedAt(LocalDateTime.now());
 
                 bonusRepository.save(bonus);
 
-                // إرسال إشعار للموصل
                 notificationService.sendBonusNotification(dp.getId(),
-                        "تهانينا! لقد أكملت " + completedDeliveries + " توصيلات الأسبوع الماضي وحصلت على مكافأة بقيمة " +
-                                bonus.getAmount() + " د.ت. سيتم إضافتها إلى رصيدك.");
+                        "Congratulations! You completed " + completedDeliveries + " deliveries last week and earned a bonus of " +
+                                bonus.getAmount() + " TND. Admin can now pay it.");
             }
         }
     }
@@ -96,17 +99,8 @@ public class BonusService {
         return bonusRepository.findByDeliveryPersonId(deliveryPersonId);
     }
 
-    // الموافقة على المكافأة (بواسطة المدير)
-    public Bonus approveBonus(String bonusId) {
-        Bonus bonus = bonusRepository.findById(bonusId)
-                .orElseThrow(() -> new RuntimeException("المكافأة غير موجودة"));
-
-        bonus.setStatus(BonusStatus.APPROVED);
-        bonus.setApprovedAt(LocalDateTime.now());
-        bonus.setUpdatedAt(LocalDateTime.now());
-
-        return bonusRepository.save(bonus);
-    }
+    // This method is no longer needed since we removed APPROVED status
+    // If you need approval functionality, you can modify the payBonus method to handle approval logic
 
     // رفض المكافأة مع سبب
     public Bonus rejectBonus(String bonusId, String reason) {
@@ -125,20 +119,20 @@ public class BonusService {
         return bonusRepository.save(bonus);
     }
 
-    // دفع المكافأة (بواسطة المدير)
     @Transactional
     public Bonus payBonus(String bonusId) {
         Bonus bonus = bonusRepository.findById(bonusId)
-                .orElseThrow(() -> new RuntimeException("المكافأة غير موجودة"));
+                .orElseThrow(() -> new RuntimeException("Bonus not found"));
 
-        if (bonus.getStatus() != BonusStatus.APPROVED) {
-            throw new RuntimeException("يجب الموافقة على المكافأة أولاً");
+        // Can only pay CREATED bonuses
+        if (bonus.getStatus() != BonusStatus.CREATED) {
+            throw new RuntimeException("Cannot pay this bonus. Status must be CREATED");
         }
 
         User dp = userRepository.findById(bonus.getDeliveryPersonId())
-                .orElseThrow(() -> new RuntimeException("الموصل غير موجود"));
+                .orElseThrow(() -> new RuntimeException("Delivery person not found"));
 
-        // إضافة المكافأة إلى رصيد الموصل
+        // Add bonus to delivery person's balance
         dp.setBalance(dp.getBalance() + bonus.getAmount());
         userRepository.save(dp);
 
@@ -146,7 +140,7 @@ public class BonusService {
         bonus.setPaidAt(LocalDateTime.now());
         bonus.setUpdatedAt(LocalDateTime.now());
 
-        System.out.println("تم دفع مكافأة " + bonus.getAmount() + " د.ت للموصل " + dp.getId());
+        System.out.println("Paid bonus " + bonus.getAmount() + " to delivery person " + dp.getId());
 
         return bonusRepository.save(bonus);
     }
@@ -158,7 +152,7 @@ public class BonusService {
 
     public Bonus createBonus(Bonus bonus) {
         bonus.setCreatedAt(LocalDateTime.now());
-        bonus.setStatus(BonusStatus.PENDING);
+        bonus.setStatus(BonusStatus.CREATED); // Changed from PENDING to CREATED
         return bonusRepository.save(bonus);
     }
 
@@ -228,49 +222,64 @@ public class BonusService {
         return getAllBonusesWithFilters(status, deliveryPersonId, startDate, endDate, null);
     }
 
-    @Transactional
-    public int bulkApproveBonuses(List<String> bonusIds) {
-        int count = 0;
-        for (String bonusId : bonusIds) {
-            try {
-                approveBonus(bonusId);
-                count++;
-            } catch (Exception e) {
-                System.err.println("Failed to approve bonus: " + bonusId + " - " + e.getMessage());
-            }
-        }
-        return count;
-    }
+    // Removed bulkApproveBonuses method since APPROVED status doesn't exist
+    // If you need bulk operations, you can create bulkPayBonuses or similar
 
     public Map<String, Object> getBonusStats() {
         Map<String, Object> stats = new HashMap<>();
 
-        long totalBonuses = bonusRepository.count();
-        Double totalBonusAmount = bonusRepository.sumAllAmounts();
+        try {
+            long totalBonuses = bonusRepository.count();
+            Double totalBonusAmount = bonusRepository.sumAllAmounts();
 
-        stats.put("totalBonuses", totalBonuses);
-        stats.put("totalAmount", totalBonusAmount != null ? totalBonusAmount : 0.0);
+            stats.put("totalBonuses", totalBonuses);
+            stats.put("totalAmount", totalBonusAmount != null ? totalBonusAmount : 0.0);
 
-        // Status breakdown
-        Map<String, Long> statusBreakdown = new HashMap<>();
-        statusBreakdown.put("PENDING", bonusRepository.countByStatus(BonusStatus.PENDING));
-        statusBreakdown.put("APPROVED", bonusRepository.countByStatus(BonusStatus.APPROVED));
-        statusBreakdown.put("PAID", bonusRepository.countByStatus(BonusStatus.PAID));
-        statusBreakdown.put("REJECTED", bonusRepository.countByStatus(BonusStatus.REJECTED));
+            // Status breakdown - only use existing statuses with error handling
+            Map<String, Long> statusBreakdown = new HashMap<>();
 
-        stats.put("statusBreakdown", statusBreakdown);
+            try {
+                statusBreakdown.put("CREATED", bonusRepository.countByStatus(BonusStatus.CREATED));
+            } catch (Exception e) {
+                statusBreakdown.put("CREATED", 0L);
+            }
+
+            try {
+                statusBreakdown.put("PAID", bonusRepository.countByStatus(BonusStatus.PAID));
+            } catch (Exception e) {
+                statusBreakdown.put("PAID", 0L);
+            }
+
+            try {
+                statusBreakdown.put("REJECTED", bonusRepository.countByStatus(BonusStatus.REJECTED));
+            } catch (Exception e) {
+                statusBreakdown.put("REJECTED", 0L);
+            }
+
+            stats.put("statusBreakdown", statusBreakdown);
+
+        } catch (Exception e) {
+            System.err.println("Error getting bonus stats: " + e.getMessage());
+            // Return default stats structure
+            stats.put("totalBonuses", 0L);
+            stats.put("totalAmount", 0.0);
+            Map<String, Long> statusBreakdown = new HashMap<>();
+            statusBreakdown.put("CREATED", 0L);
+            statusBreakdown.put("PAID", 0L);
+            statusBreakdown.put("REJECTED", 0L);
+            stats.put("statusBreakdown", statusBreakdown);
+        }
+
         stats.put("monthlyBreakdown", new HashMap<>());
         stats.put("deliveryPersonBreakdown", new HashMap<>());
 
         return stats;
     }
-
     public Map<String, Object> getBonusSummary() {
         Map<String, Object> summary = new HashMap<>();
 
         summary.put("totalBonuses", bonusRepository.count());
-        summary.put("pendingBonuses", bonusRepository.countByStatus(BonusStatus.PENDING));
-        summary.put("approvedBonuses", bonusRepository.countByStatus(BonusStatus.APPROVED));
+        summary.put("createdBonuses", bonusRepository.countByStatus(BonusStatus.CREATED));
         summary.put("paidBonuses", bonusRepository.countByStatus(BonusStatus.PAID));
         summary.put("rejectedBonuses", bonusRepository.countByStatus(BonusStatus.REJECTED));
 
@@ -291,6 +300,34 @@ public class BonusService {
         return count;
     }
 
+    /**
+     * Get all bonuses with error handling for old status values
+     */
+    public List<Bonus> getAllBonusesWithErrorHandling() {
+        try {
+            return bonusRepository.findAll();
+        } catch (Exception e) {
+            System.err.println("Error fetching bonuses, possibly due to old status values: " + e.getMessage());
+
+            // Try to get bonuses individually and filter out problematic ones
+            List<Bonus> validBonuses = new ArrayList<>();
+
+            // Get by each valid status
+            try {
+                validBonuses.addAll(bonusRepository.findByStatus(BonusStatus.CREATED));
+            } catch (Exception ex) { /* ignore */ }
+
+            try {
+                validBonuses.addAll(bonusRepository.findByStatus(BonusStatus.PAID));
+            } catch (Exception ex) { /* ignore */ }
+
+            try {
+                validBonuses.addAll(bonusRepository.findByStatus(BonusStatus.REJECTED));
+            } catch (Exception ex) { /* ignore */ }
+
+            return validBonuses;
+        }
+    }
     @Transactional
     public int bulkRejectBonuses(List<String> bonusIds, String reason) {
         int count = 0;
@@ -357,10 +394,9 @@ public class BonusService {
         stats.put("totalBonuses", totalBonuses);
         stats.put("totalAmount", totalAmountSum != null ? totalAmountSum : 0.0);
 
-        // Status breakdown
+        // Status breakdown - only use existing statuses
         Map<String, Long> statusBreakdown = new HashMap<>();
-        statusBreakdown.put("PENDING", bonusRepository.countByStatus(BonusStatus.PENDING));
-        statusBreakdown.put("APPROVED", bonusRepository.countByStatus(BonusStatus.APPROVED));
+        statusBreakdown.put("CREATED", bonusRepository.countByStatus(BonusStatus.CREATED));
         statusBreakdown.put("PAID", bonusRepository.countByStatus(BonusStatus.PAID));
         statusBreakdown.put("REJECTED", bonusRepository.countByStatus(BonusStatus.REJECTED));
 
@@ -427,33 +463,29 @@ public class BonusService {
         List<Bonus> paidBonuses = bonusRepository.findByDeliveryPersonIdAndStatus(deliveryPersonId, BonusStatus.PAID);
         double totalEarnings = paidBonuses.stream().mapToDouble(Bonus::getAmount).sum();
 
-        // Get bonus counts
-        long pendingBonuses = bonusRepository.countByDeliveryPersonIdAndStatus(deliveryPersonId, BonusStatus.PENDING);
+        // Get bonus counts - only use existing statuses
+        long createdBonuses = bonusRepository.countByDeliveryPersonIdAndStatus(deliveryPersonId, BonusStatus.CREATED);
         long totalBonuses = bonusRepository.countByDeliveryPersonId(deliveryPersonId);
         long paidBonusCount = bonusRepository.countByDeliveryPersonIdAndStatus(deliveryPersonId, BonusStatus.PAID);
-        long approvedBonuses = bonusRepository.countByDeliveryPersonIdAndStatus(deliveryPersonId, BonusStatus.APPROVED);
         long rejectedBonuses = bonusRepository.countByDeliveryPersonIdAndStatus(deliveryPersonId, BonusStatus.REJECTED);
 
         stats.put("weeklyDeliveries", weeklyDeliveries);
         stats.put("monthlyDeliveries", monthlyDeliveries);
         stats.put("totalEarnings", totalEarnings);
-        stats.put("pendingBonuses", pendingBonuses);
+        stats.put("createdBonuses", createdBonuses); // Changed from pendingBonuses
         stats.put("totalBonuses", totalBonuses);
         stats.put("paidBonuses", paidBonusCount);
-        stats.put("approvedBonuses", approvedBonuses);
         stats.put("rejectedBonuses", rejectedBonuses);
 
         return stats;
     }
 
-    // BonusService.java
     public Map<String, Object> getDeliveryPersonSummary(String deliveryPersonId) {
         Map<String, Object> summary = new HashMap<>();
 
-        // Get counts per status
+        // Get counts per status - only use existing statuses
         summary.put("totalBonuses", bonusRepository.countByDeliveryPersonId(deliveryPersonId));
-        summary.put("pendingBonuses", bonusRepository.countByDeliveryPersonIdAndStatus(deliveryPersonId, BonusStatus.PENDING));
-        summary.put("approvedBonuses", bonusRepository.countByDeliveryPersonIdAndStatus(deliveryPersonId, BonusStatus.APPROVED));
+        summary.put("createdBonuses", bonusRepository.countByDeliveryPersonIdAndStatus(deliveryPersonId, BonusStatus.CREATED));
         summary.put("paidBonuses", bonusRepository.countByDeliveryPersonIdAndStatus(deliveryPersonId, BonusStatus.PAID));
         summary.put("rejectedBonuses", bonusRepository.countByDeliveryPersonIdAndStatus(deliveryPersonId, BonusStatus.REJECTED));
 
@@ -465,5 +497,215 @@ public class BonusService {
         summary.put("paidAmount", paidAmount != null ? paidAmount : 0.0);
 
         return summary;
+    }
+
+    /**
+     * Get mission progress toward bonus milestones
+     */
+    public Map<String, Object> getMissionProgressTowardBonus(String deliveryPersonId) {
+        Map<String, Object> progress = new HashMap<>();
+
+        try {
+            // Get completed missions count
+            long completedMissions = missionRepository.countByDeliveryPersonIdAndStatus(deliveryPersonId, "COMPLETED");
+
+            // Calculate progress toward next milestone
+            long progressToNextBonus = completedMissions % 10;
+            long nextMilestoneTarget = ((completedMissions / 10) + 1) * 10;
+
+            // Calculate potential earnings
+            long milestonesEarned = completedMissions / 10;
+            double totalEarningsPotential = milestonesEarned * 100.0; // $100 per milestone
+
+            progress.put("completedMissions", completedMissions);
+            progress.put("progressToNextBonus", progressToNextBonus);
+            progress.put("nextBonusTarget", nextMilestoneTarget);
+            progress.put("totalEarningsPotential", totalEarningsPotential);
+            progress.put("milestonesReached", milestonesEarned);
+
+        } catch (Exception e) {
+            logger.error("Error getting mission progress for delivery person {}: {}", deliveryPersonId, e.getMessage());
+            progress.put("completedMissions", 0);
+            progress.put("progressToNextBonus", 0);
+            progress.put("nextBonusTarget", 10);
+            progress.put("totalEarningsPotential", 0.0);
+            progress.put("milestonesReached", 0);
+        }
+
+        return progress;
+    }
+
+    /**
+     * Check milestone eligibility
+     */
+    public Map<String, Object> checkMilestoneEligibility(String deliveryPersonId) {
+        Map<String, Object> eligibility = new HashMap<>();
+
+        try {
+            long completedMissions = missionRepository.countByDeliveryPersonIdAndStatus(deliveryPersonId, "COMPLETED");
+            long currentMilestone = completedMissions / 10;
+            boolean isEligible = completedMissions > 0 && completedMissions % 10 == 0;
+
+            // Check if bonus already exists for this milestone
+            if (isEligible) {
+                String milestoneReason = "10 Mission Milestone Bonus - " + completedMissions + " missions completed";
+                List<Bonus> existingBonuses = bonusRepository.findByDeliveryPersonIdAndReason(deliveryPersonId, milestoneReason);
+                if (!existingBonuses.isEmpty()) {
+                    isEligible = false; // Already has bonus for this milestone
+                }
+            }
+
+            eligibility.put("isEligible", isEligible);
+            eligibility.put("completedMissions", completedMissions);
+            eligibility.put("milestoneReached", currentMilestone);
+            eligibility.put("bonusAmount", isEligible ? 100.0 : 0.0);
+            eligibility.put("nextMilestoneAt", (currentMilestone + 1) * 10);
+
+        } catch (Exception e) {
+            logger.error("Error checking milestone eligibility for delivery person {}: {}", deliveryPersonId, e.getMessage());
+            eligibility.put("isEligible", false);
+            eligibility.put("completedMissions", 0);
+            eligibility.put("milestoneReached", 0);
+            eligibility.put("bonusAmount", 0.0);
+            eligibility.put("nextMilestoneAt", 10);
+        }
+
+        return eligibility;
+    }
+
+    /**
+     * Get comprehensive delivery person statistics
+     */
+    public Map<String, Object> getComprehensiveDeliveryPersonStats(String deliveryPersonId) {
+        Map<String, Object> stats = new HashMap<>();
+
+        try {
+            // Mission statistics
+            long totalMissions = missionRepository.countByDeliveryPersonId(deliveryPersonId);
+            long completedMissions = missionRepository.countByDeliveryPersonIdAndStatus(deliveryPersonId, "COMPLETED");
+            long pendingMissions = missionRepository.countByDeliveryPersonIdAndStatus(deliveryPersonId, "PENDING");
+            long inProgressMissions = missionRepository.countByDeliveryPersonIdAndStatus(deliveryPersonId, "IN_PROGRESS");
+
+            // Bonus statistics
+            long totalBonuses = bonusRepository.countByDeliveryPersonId(deliveryPersonId);
+            long createdBonuses = bonusRepository.countByDeliveryPersonIdAndStatus(deliveryPersonId, BonusStatus.CREATED);
+            long paidBonuses = bonusRepository.countByDeliveryPersonIdAndStatus(deliveryPersonId, BonusStatus.PAID);
+
+            Double totalEarnings = bonusRepository.sumAmountByDeliveryPersonIdAndStatus(deliveryPersonId, BonusStatus.PAID);
+            if (totalEarnings == null) totalEarnings = 0.0;
+
+            // Milestone calculations
+            long milestonesReached = completedMissions / 10;
+            long nextMilestoneProgress = completedMissions % 10;
+            long nextMilestoneTarget = (milestonesReached + 1) * 10;
+
+            // Milestone bonuses specifically
+            long milestoneBonuses = bonusRepository.countByDeliveryPersonIdAndBonusType(deliveryPersonId, "MILESTONE");
+
+            stats.put("totalMissions", totalMissions);
+            stats.put("completedMissions", completedMissions);
+            stats.put("pendingMissions", pendingMissions);
+            stats.put("inProgressMissions", inProgressMissions);
+            stats.put("totalBonuses", totalBonuses);
+            stats.put("createdBonuses", createdBonuses);
+            stats.put("paidBonuses", paidBonuses);
+            stats.put("totalEarnings", totalEarnings);
+            stats.put("milestonesReached", milestonesReached);
+            stats.put("nextMilestoneProgress", nextMilestoneProgress);
+            stats.put("nextMilestoneTarget", nextMilestoneTarget);
+            stats.put("milestoneBonuses", milestoneBonuses);
+
+        } catch (Exception e) {
+            logger.error("Error getting comprehensive stats for delivery person {}: {}", deliveryPersonId, e.getMessage());
+            // Return default values
+            stats.put("totalMissions", 0);
+            stats.put("completedMissions", 0);
+            stats.put("pendingMissions", 0);
+            stats.put("inProgressMissions", 0);
+            stats.put("totalBonuses", 0);
+            stats.put("createdBonuses", 0);
+            stats.put("paidBonuses", 0);
+            stats.put("totalEarnings", 0.0);
+            stats.put("milestonesReached", 0);
+            stats.put("nextMilestoneProgress", 0);
+            stats.put("nextMilestoneTarget", 10);
+            stats.put("milestoneBonuses", 0);
+        }
+
+        return stats;
+    }
+
+    /**
+     * Get milestone bonuses for delivery person
+     */
+    public List<Bonus> getMilestoneBonuses(String deliveryPersonId) {
+        try {
+            return bonusRepository.findByDeliveryPersonIdAndBonusType(deliveryPersonId, "MILESTONE");
+        } catch (Exception e) {
+            logger.error("Error getting milestone bonuses for delivery person {}: {}", deliveryPersonId, e.getMessage());
+            return new ArrayList<>();
+        }
+    }
+
+    /**
+     * Perform manual milestone check (for admin use)
+     */
+    public Map<String, Object> performManualMilestoneCheck(String deliveryPersonId) {
+        Map<String, Object> result = new HashMap<>();
+
+        try {
+            long completedMissions = missionRepository.countByDeliveryPersonIdAndStatus(deliveryPersonId, "COMPLETED");
+
+            if (completedMissions > 0 && completedMissions % 10 == 0) {
+                // Check if bonus already exists
+                String milestoneReason = "10 Mission Milestone Bonus - " + completedMissions + " missions completed";
+                List<Bonus> existingBonuses = bonusRepository.findByDeliveryPersonIdAndReason(deliveryPersonId, milestoneReason);
+
+                if (existingBonuses.isEmpty()) {
+                    // Get user details
+                    User deliveryPerson = userRepository.findById(deliveryPersonId)
+                            .orElseThrow(() -> new RuntimeException("Delivery person not found"));
+
+                    // Create milestone bonus
+                    Bonus milestoneBonus = new Bonus();
+                    milestoneBonus.setDeliveryPersonId(deliveryPersonId);
+                    milestoneBonus.setAmount(100.0);
+                    milestoneBonus.setReason(milestoneReason);
+                    milestoneBonus.setDescription("Manual milestone bonus for completing " + completedMissions + " missions");
+                    milestoneBonus.setCriteria("Complete 10 missions");
+                    milestoneBonus.setBonusType("MILESTONE");
+                    milestoneBonus.setType("MILESTONE");
+                    milestoneBonus.setStatus(BonusStatus.CREATED);
+                    milestoneBonus.setCreatedBy("ADMIN_MANUAL");
+                    milestoneBonus.setDeliveryPersonName(deliveryPerson.getFullName());
+                    milestoneBonus.setDeliveryPersonEmail(deliveryPerson.getEmail());
+                    milestoneBonus.setCreatedAt(LocalDateTime.now());
+
+                    Bonus createdBonus = bonusRepository.save(milestoneBonus);
+
+                    result.put("bonusCreated", true);
+                    result.put("bonus", createdBonus);
+                    result.put("message", "Milestone bonus created successfully");
+                } else {
+                    result.put("bonusCreated", false);
+                    result.put("message", "Milestone bonus already exists for this level");
+                    result.put("existingBonus", existingBonuses.get(0));
+                }
+            } else {
+                result.put("bonusCreated", false);
+                result.put("message", "No milestone reached or missions not divisible by 10");
+            }
+
+            result.put("completedMissions", completedMissions);
+            result.put("success", true);
+
+        } catch (Exception e) {
+            logger.error("Error performing manual milestone check for delivery person {}: {}", deliveryPersonId, e.getMessage());
+            result.put("success", false);
+            result.put("bonusCreated", false);
+            result.put("message", "Error: " + e.getMessage());
+        }
+
+        return result;
     }
 }

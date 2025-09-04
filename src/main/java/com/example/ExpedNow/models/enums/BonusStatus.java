@@ -1,9 +1,8 @@
+// BonusStatus.java
 package com.example.ExpedNow.models.enums;
 
 public enum BonusStatus {
-    PENDING,
-    APPROVED,
-    PAID,
-    REJECTED,
-    CANCELLED  // Add this
+    CREATED,    // Bonus created by admin, ready for payment
+    PAID,       // Bonus has been paid to delivery person
+    REJECTED    // Bonus has been rejected/cancelled
 }

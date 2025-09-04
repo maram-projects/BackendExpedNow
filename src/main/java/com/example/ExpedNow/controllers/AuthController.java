@@ -8,8 +8,10 @@ import com.example.ExpedNow.models.User;
 import com.example.ExpedNow.repositories.UserRepository;
 import com.example.ExpedNow.security.CustomUserDetailsService;
 import com.example.ExpedNow.security.JwtUtil;
+import com.example.ExpedNow.services.core.impl.EmailService;
 import com.example.ExpedNow.services.core.impl.UserServiceImpl;
 import com.example.ExpedNow.services.core.impl.VehicleServiceImpl;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -45,6 +47,9 @@ public class AuthController {
     private final PasswordEncoder passwordEncoder;
     private final JavaMailSender mailSender;
 
+    @Autowired
+    private EmailService emailService; // ADD THIS
+
     @Value("${spring.mail.username}")
     private String fromEmail;
 
@@ -53,8 +58,6 @@ public class AuthController {
 
     @Autowired
     private VehicleServiceImpl vehicleService;
-
-    // Inject authentication manager directly instead of through SecurityConfig
 
     public AuthController(AuthenticationManager authenticationManager,
                           UserServiceImpl userService,
@@ -108,26 +111,30 @@ public class AuthController {
                     break;
                 case "admin":
                     roles.add(Role.ADMIN);
-                    // Auto-verify and auto-approve admin accounts
                     user.setVerified(true);
                     user.setApproved(true);
                     user.setEnabled(true);
                     break;
-
                 default:
                     return ResponseEntity.badRequest().body(Map.of("message", "Invalid user type"));
             }
 
-            // Set approved status - only admins are auto-approved
             boolean isAdmin = roles.contains(Role.ADMIN);
             user.setApproved(isAdmin);
             user.setEnabled(isAdmin);
 
             User registeredUser = userService.registerUser(user, roles);
 
-            // For non-admin users, don't generate token yet
+            // SEND WELCOME EMAIL HERE
+            try {
+                emailService.sendWelcomeEmail(registeredUser);
+            } catch (Exception emailError) {
+                System.err.println("Failed to send welcome email: " + emailError.getMessage());
+                // Continue with registration even if email fails
+            }
+
             Map<String, Object> response = new HashMap<>();
-            response.put("message", isAdmin ? "Registration successful" : "Registration successful. Waiting for admin approval.");
+            response.put("message", isAdmin ? "Registration successful! Welcome to ExpedeNow." : "Registration successful! Welcome email sent. Waiting for admin approval.");
 
             if (isAdmin) {
                 String token = jwtUtil.generateToken(registeredUser.getId());
@@ -146,49 +153,49 @@ public class AuthController {
         }
     }
 
-
-    // Add these new endpoints for password reset
+    // IMPROVED FORGOT PASSWORD ENDPOINT
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody Map<String, String> request) {
         String email = request.get("email");
-        if (email == null || email.isEmpty()) {
+        if (email == null || email.trim().isEmpty()) {
             return ResponseEntity.badRequest().body(Map.of("error", "Email is required"));
         }
+
+        email = email.toLowerCase().trim();
 
         try {
             Optional<User> userOptional = userRepository.findByEmail(email);
             if (userOptional.isEmpty()) {
-                // For security reasons, don't reveal if the email exists or not
-                return ResponseEntity.ok(Map.of("message", "If an account exists, a password reset email has been sent"));
+                // For security, always return success message
+                return ResponseEntity.ok(Map.of("message", "If an account exists with this email, password reset instructions have been sent"));
             }
 
             User user = userOptional.get();
 
-            // Generate token
+            // Generate secure token
             String resetToken = UUID.randomUUID().toString();
             user.setResetToken(resetToken);
-            user.setTokenExpiryDate(LocalDateTime.now().plusHours(1)); // Token valid for 1 hour
+            user.setTokenExpiryDate(LocalDateTime.now().plusHours(1)); // 1 hour expiry
             userRepository.save(user);
 
-            // Send email
-            String resetLink = frontendUrl + "/reset-password?token=" + resetToken;
+            // SEND BEAUTIFUL EMAIL INSTEAD OF PLAIN TEXT
+            try {
+                emailService.sendPasswordResetEmail(user, resetToken);
+                return ResponseEntity.ok(Map.of("message", "Password reset instructions have been sent to your email"));
+            } catch (Exception emailError) {
+                System.err.println("Failed to send password reset email: " + emailError.getMessage());
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(Map.of("error", "Failed to send reset email. Please try again later"));
+            }
 
-            SimpleMailMessage message = new SimpleMailMessage();
-            message.setFrom(fromEmail);
-            message.setTo(user.getEmail());
-            message.setSubject("Password Reset Request");
-            message.setText("To reset your password, click the link below:\n" + resetLink +
-                    "\n\nThis link will expire in 1 hour." +
-                    "\n\nIf you didn't request a password reset, please ignore this email.");
-
-            mailSender.send(message);
-
-            return ResponseEntity.ok(Map.of("message", "Password reset email sent if account exists"));
         } catch (Exception e) {
+            System.err.println("Password reset error: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to process password reset: " + e.getMessage()));
+                    .body(Map.of("error", "Failed to process password reset request"));
         }
     }
+
+    // IMPROVED RESET PASSWORD ENDPOINT
     @PostMapping("/reset-password")
     public ResponseEntity<?> resetPassword(@RequestBody Map<String, String> request) {
         try {
@@ -196,51 +203,108 @@ public class AuthController {
             String newPassword = request.get("newPassword");
             String confirmPassword = request.get("confirmPassword");
 
-            if (token == null || token.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Reset token is required"));
+            // Enhanced validation
+            if (token == null || token.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid reset token"));
             }
 
-            if (newPassword == null || newPassword.isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "New password is required"));
+            if (newPassword == null || newPassword.length() < 8) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Password must be at least 8 characters long"));
             }
 
             if (!newPassword.equals(confirmPassword)) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Passwords do not match"));
             }
 
-            Optional<User> userOptional = userRepository.findByResetToken(token);
+            // Additional password strength validation
+            if (!isPasswordStrong(newPassword)) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character"));
+            }
+
+            Optional<User> userOptional = userRepository.findByResetToken(token.trim());
             if (userOptional.isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Invalid or expired reset token"));
             }
 
             User user = userOptional.get();
 
-            // Check if token is expired
+            // Check token expiry
             if (user.getTokenExpiryDate() == null || user.getTokenExpiryDate().isBefore(LocalDateTime.now())) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Reset token has expired"));
+                return ResponseEntity.badRequest().body(Map.of("error", "Reset token has expired. Please request a new password reset"));
             }
 
             // Update password
             user.setPassword(passwordEncoder.encode(newPassword));
             user.setResetToken(null);
             user.setTokenExpiryDate(null);
+            // Reset failed login attempts
+            user.setFailedLoginAttempts(0);
+            user.setLockTime(null);
             userRepository.save(user);
 
-            return ResponseEntity.ok(Map.of("message", "Password reset successfully"));
+            // SEND SUCCESS EMAIL
+            try {
+                emailService.sendPasswordSuccessEmail(user);
+            } catch (Exception emailError) {
+                System.err.println("Failed to send password success email: " + emailError.getMessage());
+                // Continue even if email fails
+            }
+
+            return ResponseEntity.ok(Map.of("message", "Password reset successfully! You can now login with your new password"));
+
         } catch (Exception e) {
+            System.err.println("Reset password error: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Failed to reset password: " + e.getMessage()));
+                    .body(Map.of("error", "Failed to reset password. Please try again"));
         }
     }
 
-    // Add these new endpoints for admin approval
+    // ADD TOKEN VALIDATION ENDPOINT
+    @PostMapping("/validate-reset-token")
+    public ResponseEntity<?> validateResetToken(@RequestBody Map<String, String> request) {
+        String token = request.get("token");
+
+        if (token == null || token.trim().isEmpty()) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Token is required"));
+        }
+
+        try {
+            Optional<User> userOptional = userRepository.findByResetToken(token.trim());
+            if (userOptional.isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid reset token"));
+            }
+
+            User user = userOptional.get();
+            if (user.getTokenExpiryDate() == null || user.getTokenExpiryDate().isBefore(LocalDateTime.now())) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Reset token has expired"));
+            }
+
+            return ResponseEntity.ok(Map.of("message", "Token is valid", "email", user.getEmail()));
+
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Token validation failed"));
+        }
+    }
+
+    // UTILITY METHOD FOR PASSWORD VALIDATION
+    private boolean isPasswordStrong(String password) {
+        if (password.length() < 8) return false;
+
+        boolean hasUppercase = password.chars().anyMatch(Character::isUpperCase);
+        boolean hasLowercase = password.chars().anyMatch(Character::isLowerCase);
+        boolean hasDigit = password.chars().anyMatch(Character::isDigit);
+        boolean hasSpecialChar = password.matches(".*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>\\/?].*");
+
+        return hasUppercase && hasLowercase && hasDigit && hasSpecialChar;
+    }
+
+    // REST OF YOUR EXISTING METHODS STAY THE SAME...
+
     @PreAuthorize("hasAuthority('ADMIN')")
     @GetMapping("/pending-approvals")
     public ResponseEntity<List<User>> getPendingApprovals() {
         return ResponseEntity.ok(userService.findByApprovedFalse());
     }
-
-
 
     @PreAuthorize("hasAuthority('ADMIN')")
     @PostMapping("/reject-user/{userId}")
@@ -252,6 +316,7 @@ public class AuthController {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
     }
+
     @GetMapping("/confirm-account")
     public ResponseEntity<?> confirmAccount(@RequestParam String token) {
         try {
@@ -312,7 +377,6 @@ public class AuthController {
 
     @ControllerAdvice
     public class GlobalExceptionHandler {
-
         @ExceptionHandler(ResourceNotFoundException.class)
         public ResponseEntity<?> handleResourceNotFound(ResourceNotFoundException ex) {
             return ResponseEntity.status(HttpStatus.NOT_FOUND)
@@ -325,6 +389,7 @@ public class AuthController {
                     .body(Map.of("error", "An unexpected error occurred"));
         }
     }
+
     private void handleFailedLoginAttempt(String email) {
         userRepository.findByEmail(email).ifPresent(user -> {
             user.incrementFailedAttempts();
@@ -380,7 +445,7 @@ public class AuthController {
     @PutMapping("/profile")
     public ResponseEntity<?> updateProfile(@RequestBody User updatedUser, Principal principal) {
         try {
-            String email = principal.getName(); // Get the current user's email from the security context
+            String email = principal.getName();
             User user = userService.updateProfile(email, updatedUser);
             return ResponseEntity.ok(user);
         } catch (Exception e) {
