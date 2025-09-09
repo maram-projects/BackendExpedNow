@@ -5,6 +5,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.data.mongodb.repository.Update;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
@@ -70,4 +71,24 @@ public interface DeliveryReqRepository extends MongoRepository<DeliveryRequest, 
     @Query(value = "{ 'deliveryPersonId': ?0, 'status': 'COMPLETED' }",
             sort = "{ 'completedAt': -1 }")
     List<DeliveryRequest> findLastCompletedDeliveryByUser(String userId);
+
+
+    // Add these methods to your DeliveryReqRepository interface
+
+    @Query("{ 'deliveryPersonId': ?0, 'status': ?1, 'createdAt': { $gt: ?2 } }")
+    List<DeliveryRequest> findByDeliveryPersonIdAndStatusAndRatedAtAfter(
+            String deliveryPersonId,
+            DeliveryRequest.DeliveryReqStatus status,
+            LocalDateTime ratedAt
+    );
+    @Query("{ 'status': ?0, 'createdAt': { $gt: ?1 } }")
+    List<DeliveryRequest> findByStatusAndRatedAtAfter(
+            DeliveryRequest.DeliveryReqStatus status,
+            LocalDateTime ratedAt
+    );
+
+    @Query(value = "{ 'clientId': ?0, 'rated': ?1 }", sort = "{ 'createdAt': -1 }")
+    List<DeliveryRequest> findByClientIdAndRatedOrderByCreatedAtDesc(String clientId, boolean rated);
+
+
 }

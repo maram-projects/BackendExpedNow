@@ -2,7 +2,9 @@ package com.example.ExpedNow.controllers;
 
 import com.example.ExpedNow.dto.UserDTO;
 import com.example.ExpedNow.models.User;
+import com.example.ExpedNow.models.Vehicle;
 import com.example.ExpedNow.models.enums.Role;
+import com.example.ExpedNow.repositories.VehicleRepository;
 import com.example.ExpedNow.services.core.impl.UserServiceImpl;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -21,11 +23,14 @@ import java.util.stream.Collectors;
 @RequestMapping("/api/users")
 @CrossOrigin(origins = "http://localhost:4200")
 public class UserController {
+    private final VehicleRepository vehicleRepository; // Add this
+
 
     private final UserServiceImpl userService;
 
     @Autowired
-    public UserController(UserServiceImpl userService) {
+    public UserController(VehicleRepository vehicleRepository, UserServiceImpl userService) {
+        this.vehicleRepository = vehicleRepository;
         this.userService = userService;
     }
 
@@ -93,8 +98,13 @@ public class UserController {
         return ResponseEntity.ok(updatedUser);
     }
     @GetMapping("/{id}")
-    public ResponseEntity<User> getUserById(@PathVariable String id) {
-        return ResponseEntity.ok(userService.findById(id));
+    public ResponseEntity<UserDTO> getUserById(@PathVariable String id) {
+        User user = userService.findById(id);
+        UserDTO userDTO = convertToDTO(user);
+        userDTO.setUserType(determineUserType(user.getRoles()));
+        userDTO.setApproved(user.isApproved());
+        userDTO.setEnabled(user.isEnabled());
+        return ResponseEntity.ok(userDTO);
     }
     @PutMapping("/{id}")
     public ResponseEntity<User> updateUser(@PathVariable String id, @RequestBody User updatedUser) {
@@ -123,9 +133,15 @@ public class UserController {
     @GetMapping("/me")
     public ResponseEntity<User> getCurrentUser(Principal principal) {
         User user = userService.findByEmail(principal.getName());
+
+        // Make sure all fields are loaded
+        if (user.getAssignedVehicleId() != null) {
+            Vehicle vehicle = vehicleRepository.findById(user.getAssignedVehicleId()).orElse(null);
+            user.setAssignedVehicle(vehicle);
+        }
+
         return ResponseEntity.ok(user);
     }
-
     @GetMapping("/search/clients")
     public ResponseEntity<List<User>> searchClients(@RequestParam String query) {
         // Search by name, email, or company name

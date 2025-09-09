@@ -1,9 +1,6 @@
 package com.example.ExpedNow.services.core.impl;
 
-import com.example.ExpedNow.dto.DeliveryResponseDTO;
-import com.example.ExpedNow.dto.ImageAnalysisResponse;
-import com.example.ExpedNow.dto.UserDTO;
-import com.example.ExpedNow.dto.VehicleDTO;
+import com.example.ExpedNow.dto.*;
 import com.example.ExpedNow.models.ChatRoom;
 import com.example.ExpedNow.models.DeliveryRequest;
 import com.example.ExpedNow.models.Mission;
@@ -27,10 +24,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDateTime;
 import java.time.ZoneId;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.List;
-import java.util.Optional;
+import java.util.*;
 import java.util.stream.Collectors;
 
 
@@ -705,6 +699,281 @@ public class DeliveryServiceImpl implements DeliveryServiceInterface {
             userService.save(deliveryPerson);
         }
     }
+
+
+    // Ajoutez ces méthodes dans votre DeliveryServiceImpl
+
+    /**
+     * Soumet une évaluation détaillée pour une livraison
+     */
+    public DetailedRatingResponse submitDetailedRating(String deliveryId, DetailedRatingRequest ratingRequest, String clientId) {
+        DeliveryRequest delivery = getDeliveryById(deliveryId);
+
+        // Vérifications de sécurité
+        if (!delivery.getClientId().equals(clientId)) {
+            throw new IllegalArgumentException("Not authorized to rate this delivery");
+        }
+
+        if (delivery.getStatus() != DeliveryRequest.DeliveryReqStatus.DELIVERED) {
+            throw new IllegalStateException("Delivery not completed yet");
+        }
+
+        if (delivery.isRated()) {
+            throw new IllegalStateException("Delivery already rated");
+        }
+
+        // Valider la note
+        if (ratingRequest.rating() < 1 || ratingRequest.rating() > 5) {
+            throw new IllegalArgumentException("Rating must be between 1 and 5");
+        }
+
+        try {
+            // Créer l'objet d'évaluation détaillée à stocker en JSON
+            Map<String, Object> detailedRating = new HashMap<>();
+            detailedRating.put("id", UUID.randomUUID().toString());
+            detailedRating.put("deliveryId", deliveryId);
+            detailedRating.put("clientId", clientId);
+            detailedRating.put("overallRating", ratingRequest.rating());
+            detailedRating.put("comment", ratingRequest.comment());
+            detailedRating.put("categories", ratingRequest.categories());
+            detailedRating.put("ratingType", ratingRequest.ratingType());
+            detailedRating.put("punctualityRating", ratingRequest.punctualityRating());
+            detailedRating.put("professionalismRating", ratingRequest.professionalismRating());
+            detailedRating.put("packageConditionRating", ratingRequest.packageConditionRating());
+            detailedRating.put("communicationRating", ratingRequest.communicationRating());
+            detailedRating.put("deliveryPersonFeedback", ratingRequest.deliveryPersonFeedback());
+            detailedRating.put("wouldRecommend", ratingRequest.wouldRecommend());
+            detailedRating.put("improvements", ratingRequest.improvements());
+            detailedRating.put("ratedAt", LocalDateTime.now().toString());
+
+            // Stocker l'évaluation détaillée comme JSON dans le champ existant ou créer un nouveau champ
+            String detailedRatingJson = objectMapper.writeValueAsString(detailedRating);
+
+            // Mettre à jour la livraison
+            delivery.setRating(ratingRequest.rating());
+            delivery.setRated(true);
+            delivery.setStatus(DeliveryRequest.DeliveryReqStatus.RATED);
+
+            // Si vous avez un champ pour stocker l'évaluation détaillée, utilisez-le
+            // Sinon, vous pouvez l'ajouter dans additionalInstructions ou créer un nouveau champ
+            if (delivery.getAdditionalInstructions() == null) {
+                delivery.setAdditionalInstructions("DETAILED_RATING:" + detailedRatingJson);
+            } else {
+                delivery.setAdditionalInstructions(
+                        delivery.getAdditionalInstructions() + "\nDETAILED_RATING:" + detailedRatingJson
+                );
+            }
+
+            deliveryRepository.save(delivery);
+
+            // Mettre à jour les stats du livreur
+            if (delivery.getDeliveryPersonId() != null) {
+                updateDeliveryPersonRating(delivery.getDeliveryPersonId(), ratingRequest.rating());
+            }
+
+            // Créer la réponse
+            return createDetailedRatingResponse(detailedRating, delivery);
+
+        } catch (Exception e) {
+            logger.error("Error submitting detailed rating: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to submit rating", e);
+        }
+    }
+
+
+    /**
+     * Met à jour la note du livreur
+     */
+    private void updateDeliveryPersonRating(String deliveryPersonId, double rating) {
+        try {
+            User deliveryPerson = userService.findById(deliveryPersonId);
+            deliveryPerson.updateRating(rating);
+            deliveryPerson.setTotalDeliveries(deliveryPerson.getTotalDeliveries() + 1);
+            userService.save(deliveryPerson);
+            logger.info("Updated delivery person {} rating with {}", deliveryPersonId, rating);
+        } catch (Exception e) {
+            logger.error("Failed to update delivery person {} rating: {}", deliveryPersonId, e.getMessage());
+        }
+    }
+    /**
+     * Récupère une évaluation détaillée
+     */
+    public DetailedRatingResponse getDetailedRating(String deliveryId) {
+        DeliveryRequest delivery = getDeliveryById(deliveryId);
+
+        if (!delivery.isRated()) {
+            throw new IllegalStateException("No rating found for this delivery");
+        }
+
+        try {
+            // Extract detailed rating from additionalInstructions field
+            String additionalInstructions = delivery.getAdditionalInstructions();
+            if (additionalInstructions != null && additionalInstructions.contains("DETAILED_RATING:")) {
+                String[] parts = additionalInstructions.split("DETAILED_RATING:");
+                if (parts.length > 1) {
+                    String ratingJson = parts[1].split("\n")[0]; // Take the first line after DETAILED_RATING:
+
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> ratingData = objectMapper.readValue(ratingJson, Map.class);
+                    return createDetailedRatingResponse(ratingData, delivery);
+                }
+            }
+
+            // Fallback: create basic response if no detailed rating stored
+            Map<String, Object> basicRating = new HashMap<>();
+            basicRating.put("id", UUID.randomUUID().toString());
+            basicRating.put("deliveryId", deliveryId);
+            basicRating.put("clientId", delivery.getClientId());
+            basicRating.put("overallRating", delivery.getRating());
+            basicRating.put("comment", "");
+            basicRating.put("categories", new ArrayList<>());
+            basicRating.put("ratingType", "BASIC");
+            basicRating.put("ratedAt", delivery.getCreatedAt() != null ? delivery.getCreatedAt().toString() : LocalDateTime.now().toString());
+
+            return createDetailedRatingResponse(basicRating, delivery);
+
+        } catch (Exception e) {
+            logger.error("Error retrieving detailed rating for delivery {}: {}", deliveryId, e.getMessage(), e);
+            throw new RuntimeException("Failed to retrieve detailed rating", e);
+        }
+    }
+    public RatingStatistics getRatingStatistics(String deliveryPersonId, int days) {
+        try {
+            LocalDateTime startDate = LocalDateTime.now().minusDays(days);
+
+            List<DeliveryRequest> deliveries;
+            if (deliveryPersonId != null && !deliveryPersonId.isEmpty()) {
+                // Get deliveries for specific delivery person
+                deliveries = deliveryRepository.findByDeliveryPersonIdAndStatusAndRatedAtAfter(
+                        deliveryPersonId, DeliveryRequest.DeliveryReqStatus.RATED, startDate
+                );
+            } else {
+                // Get all rated deliveries in the period
+                deliveries = deliveryRepository.findByStatusAndRatedAtAfter(
+                        DeliveryRequest.DeliveryReqStatus.RATED, startDate
+                );
+            }
+
+            if (deliveries.isEmpty()) {
+                return new RatingStatistics(0, 0.0, 0, 0, 0, 0, 0);
+            }
+
+            int totalRatings = deliveries.size();
+            double averageRating = deliveries.stream()
+                    .mapToDouble(DeliveryRequest::getRating)
+                    .average()
+                    .orElse(0.0);
+
+            // Count ratings by value
+            int fiveStars = (int) deliveries.stream().filter(d -> d.getRating() == 5.0).count();
+            int fourStars = (int) deliveries.stream().filter(d -> d.getRating() == 4.0).count();
+            int threeStars = (int) deliveries.stream().filter(d -> d.getRating() == 3.0).count();
+            int twoStars = (int) deliveries.stream().filter(d -> d.getRating() == 2.0).count();
+            int oneStar = (int) deliveries.stream().filter(d -> d.getRating() == 1.0).count();
+
+            return new RatingStatistics(totalRatings, averageRating, fiveStars, fourStars, threeStars, twoStars, oneStar);
+
+        } catch (Exception e) {
+            logger.error("Error getting rating statistics: {}", e.getMessage(), e);
+            return new RatingStatistics(0, 0.0, 0, 0, 0, 0, 0);
+        }
+    }
+
+
+    public List<DetailedRatingResponse> getClientRatingHistory(String clientId) {
+        try {
+            List<DeliveryRequest> ratedDeliveries = deliveryRepository.findByClientIdAndRatedOrderByCreatedAtDesc(clientId, true);
+
+            return ratedDeliveries.stream()
+                    .map(delivery -> {
+                        try {
+                            return getDetailedRating(delivery.getId());
+                        } catch (Exception e) {
+                            logger.warn("Failed to get detailed rating for delivery {}: {}", delivery.getId(), e.getMessage());
+                            // Return basic rating if detailed rating fails
+                            Map<String, Object> basicRating = new HashMap<>();
+                            basicRating.put("id", UUID.randomUUID().toString());
+                            basicRating.put("deliveryId", delivery.getId());
+                            basicRating.put("clientId", clientId);
+                            basicRating.put("overallRating", delivery.getRating());
+                            basicRating.put("comment", "");
+                            basicRating.put("categories", new ArrayList<>());
+                            basicRating.put("ratingType", "BASIC");
+                            basicRating.put("punctualityRating", 0.0);
+                            basicRating.put("professionalismRating", 0.0);
+                            basicRating.put("packageConditionRating", 0.0);
+                            basicRating.put("communicationRating", 0.0);
+                            basicRating.put("deliveryPersonFeedback", "");
+                            basicRating.put("wouldRecommend", false);
+                            basicRating.put("improvements", new ArrayList<>());
+                            basicRating.put("ratedAt", delivery.getCreatedAt() != null ? delivery.getCreatedAt().toString() : LocalDateTime.now().toString());
+
+                            return createDetailedRatingResponse(basicRating, delivery);
+                        }
+                    })
+                    .collect(Collectors.toList());
+
+        } catch (Exception e) {
+            logger.error("Error getting client rating history for {}: {}", clientId, e.getMessage(), e);
+            return new ArrayList<>();
+        }
+    }
+
+
+
+
+    /**
+     * Crée une réponse DetailedRatingResponse à partir des données
+     */
+    private DetailedRatingResponse createDetailedRatingResponse(Map<String, Object> ratingData, DeliveryRequest delivery) {
+        // Parse the ratedAt string to LocalDateTime
+        LocalDateTime ratedAt = null;
+        try {
+            String ratedAtString = (String) ratingData.get("ratedAt");
+            if (ratedAtString != null) {
+                ratedAt = LocalDateTime.parse(ratedAtString);
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to parse ratedAt date: {}", e.getMessage());
+            ratedAt = LocalDateTime.now(); // fallback
+        }
+
+        // Get delivery person name
+        String deliveryPersonName = "Unknown";
+        if (delivery.getDeliveryPersonId() != null) {
+            try {
+                User deliveryPerson = userService.findById(delivery.getDeliveryPersonId());
+                deliveryPersonName = deliveryPerson.getFirstName() + " " + deliveryPerson.getLastName();
+            } catch (Exception e) {
+                logger.warn("Failed to get delivery person name: {}", e.getMessage());
+            }
+        }
+
+        return new DetailedRatingResponse(
+                (String) ratingData.get("id"),
+                (String) ratingData.get("deliveryId"),
+                (String) ratingData.get("clientId"),
+                (Double) ratingData.getOrDefault("overallRating", 0.0),
+                (String) ratingData.getOrDefault("comment", ""),
+                (List<String>) ratingData.getOrDefault("categories", new ArrayList<>()),
+                (String) ratingData.getOrDefault("ratingType", "BASIC"),
+                (Double) ratingData.getOrDefault("punctualityRating", 0.0),
+                (Double) ratingData.getOrDefault("professionalismRating", 0.0),
+                (Double) ratingData.getOrDefault("packageConditionRating", 0.0),
+                (Double) ratingData.getOrDefault("communicationRating", 0.0),
+                (String) ratingData.getOrDefault("deliveryPersonFeedback", ""),
+                (Boolean) ratingData.getOrDefault("wouldRecommend", false),
+                (List<String>) ratingData.getOrDefault("improvements", new ArrayList<>()),
+                ratedAt, // LocalDateTime instead of String
+                deliveryPersonName, // Delivery person name
+                delivery.getDeliveryAddress(), // Delivery address
+                delivery.getCompletedAt() // LocalDateTime deliveryCompletedAt
+        );
+    }
+
+
+
+
 
     @Override
     public DeliveryResponseDTO getDeliveryWithDetails(String deliveryId) {

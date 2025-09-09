@@ -74,10 +74,12 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .csrf(AbstractHttpConfigurer::disable)
                 .authorizeHttpRequests(auth -> auth
+                        // Static resources - MUST BE FIRST
+                        .requestMatchers("/uploads/**").permitAll()
+                        .requestMatchers("/uploads/vehicle-photos/**").permitAll()
+
                         // Public endpoints
                         .requestMatchers(
-                                "/uploads/**",
-                                "/uploads/vehicle-photos/**",
                                 "/api/auth/**",
                                 "/oauth2/**",
                                 "/ws/**",
@@ -94,9 +96,9 @@ public class SecurityConfig {
                         .requestMatchers("/api/pricing/**").permitAll()
 
                         // AI Chatbot endpoints
-                        .requestMatchers(HttpMethod.GET, "/api/ai/health").permitAll()  // Health check public
+                        .requestMatchers(HttpMethod.GET, "/api/ai/health").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/ai/chat/public").permitAll()
-                        .requestMatchers("/api/ai/**").hasAnyAuthority(  // All other AI endpoints require auth
+                        .requestMatchers("/api/ai/**").hasAnyAuthority(
                                 "CLIENT", "INDIVIDUAL", "ENTERPRISE",
                                 "DELIVERY_PERSON", "PROFESSIONAL", "TEMPORARY", "ADMIN"
                         )
@@ -114,63 +116,21 @@ public class SecurityConfig {
                         // Discounts endpoints
                         .requestMatchers("/api/discounts/**").hasAnyAuthority("CLIENT", "ENTERPRISE", "ADMIN")
 
-                                // Payment endpoints
-                                .requestMatchers(HttpMethod.GET, "/api/payments/all").hasAuthority("ADMIN")
-                                .requestMatchers(HttpMethod.GET, "/api/payments/stats").hasAuthority("ADMIN")
-                                .requestMatchers(HttpMethod.PUT, "/api/payments/*/status").hasAuthority("ADMIN")
-                                .requestMatchers(HttpMethod.POST, "/api/payments/*/refund").hasAuthority("ADMIN")
-                                .requestMatchers(HttpMethod.POST, "/api/payments/*/release-to-delivery").hasAuthority("ADMIN")
+                        // Payment endpoints - Admin only
+                        .requestMatchers(HttpMethod.GET, "/api/payments/all").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.GET, "/api/payments/stats").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/payments/*/status").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/payments/*/refund").hasAuthority("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/payments/*/release-to-delivery").hasAuthority("ADMIN")
 
-// Delivery person payment endpoints - UPDATED
-                                .requestMatchers(HttpMethod.GET, "/api/payments/delivery-person/**").hasAnyAuthority(
-                                        "DELIVERY_PERSON", "PROFESSIONAL", "TEMPORARY", "ADMIN"
-                                )
-                                .requestMatchers(HttpMethod.GET, "/api/payments/delivery-person/*/summary").hasAnyAuthority(
-                                        "DELIVERY_PERSON", "PROFESSIONAL", "TEMPORARY", "ADMIN"
-                                )
+                        // Delivery person payment endpoints
+                        .requestMatchers(HttpMethod.GET, "/api/payments/delivery-person/**").hasAnyAuthority(
+                                "DELIVERY_PERSON", "PROFESSIONAL", "TEMPORARY", "ADMIN"
+                        )
+                        .requestMatchers(HttpMethod.GET, "/api/payments/delivery-person/*/summary").hasAnyAuthority(
+                                "DELIVERY_PERSON", "PROFESSIONAL", "TEMPORARY", "ADMIN"
+                        )
 
-// Client payment endpoints
-                                .requestMatchers(HttpMethod.GET, "/api/payments/client/**").hasAnyAuthority(
-                                        "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
-                                )
-                                .requestMatchers(HttpMethod.GET, "/api/payments/delivery/**").hasAnyAuthority(
-                                        "CLIENT", "INDIVIDUAL", "ENTERPRISE",
-                                        "DELIVERY_PERSON", "PROFESSIONAL", "TEMPORARY", "ADMIN"
-                                )
-                                .requestMatchers(HttpMethod.GET, "/api/payments/methods/*/supported").hasAnyAuthority(
-                                        "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
-                                )
-                                .requestMatchers(HttpMethod.GET, "/api/payments/*/client-secret").hasAnyAuthority(
-                                        "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
-                                )
-                                .requestMatchers(HttpMethod.GET, "/api/payments/*/status").hasAnyAuthority(
-                                        "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
-                                )
-                                .requestMatchers(HttpMethod.GET, "/api/payments/*").hasAnyAuthority(
-                                        "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
-                                )
-                                .requestMatchers(HttpMethod.GET, "/api/payments").hasAuthority("ADMIN")
-
-// Payment POST endpoints
-                                .requestMatchers(HttpMethod.POST, "/api/payments").hasAnyAuthority(
-                                        "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
-                                )
-                                .requestMatchers(HttpMethod.POST, "/api/payments/confirm").hasAnyAuthority(
-                                        "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
-                                )
-                                .requestMatchers(HttpMethod.POST, "/api/payments/fail").hasAnyAuthority(
-                                        "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
-                                )
-                                .requestMatchers(HttpMethod.POST, "/api/payments/*/process").hasAnyAuthority(
-                                        "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
-                                )
-                                .requestMatchers(HttpMethod.POST, "/api/payments/*/process/**").hasAnyAuthority(
-                                        "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
-                                )
-                                .requestMatchers(HttpMethod.POST, "/api/payments/*/cancel").hasAnyAuthority(
-                                        "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
-                                )
-                                .requestMatchers("/api/payments/**").hasAuthority("ADMIN")  // Catch-all
                         // Client payment endpoints
                         .requestMatchers(HttpMethod.GET, "/api/payments/client/**").hasAnyAuthority(
                                 "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
@@ -212,7 +172,7 @@ public class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/payments/*/cancel").hasAnyAuthority(
                                 "CLIENT", "INDIVIDUAL", "ENTERPRISE", "ADMIN"
                         )
-                        .requestMatchers("/api/payments/**").hasAuthority("ADMIN")  // Catch-all
+                        .requestMatchers("/api/payments/**").hasAuthority("ADMIN")
 
                         // Bonus endpoints
                         .requestMatchers(HttpMethod.GET, "/api/bonuses/delivery-person/**").hasAnyAuthority(

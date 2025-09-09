@@ -41,9 +41,11 @@ public class JwtFilter extends OncePerRequestFilter {
             throws ServletException, IOException {
 
         final String requestPath = request.getRequestURI();
+        logger.debug("Processing request path: {}", requestPath);
 
-        // Skip filter for public endpoints - including health check
+        // Skip filter for public endpoints - including uploads and health check
         if (isPublicEndpoint(requestPath)) {
+            logger.debug("Skipping JWT filter for public endpoint: {}", requestPath);
             filterChain.doFilter(request, response);
             return;
         }
@@ -51,13 +53,10 @@ public class JwtFilter extends OncePerRequestFilter {
         String authHeader = request.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             // For protected endpoints, return 401 if no token is provided
-            if (!isPublicEndpoint(requestPath)) {
-                response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                response.setContentType("application/json");
-                response.getWriter().write("{\"error\":\"Unauthorized\",\"message\":\"Missing or invalid token\"}");
-                return;
-            }
-            filterChain.doFilter(request, response);
+            logger.debug("No valid Authorization header found for protected endpoint: {}", requestPath);
+            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+            response.setContentType("application/json");
+            response.getWriter().write("{\"error\":\"Unauthorized\",\"message\":\"Missing or invalid token\"}");
             return;
         }
 
@@ -72,6 +71,7 @@ public class JwtFilter extends OncePerRequestFilter {
                             new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
                     authToken.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
                     SecurityContextHolder.getContext().setAuthentication(authToken);
+                    logger.debug("Successfully authenticated user: {}", email);
                 } else {
                     logger.warn("Invalid JWT token for email: {}", email);
                 }
@@ -88,16 +88,60 @@ public class JwtFilter extends OncePerRequestFilter {
     }
 
     private boolean isPublicEndpoint(String requestPath) {
-        return requestPath.startsWith("/api/auth/register") ||
+        // Static resources
+        if (requestPath.startsWith("/uploads/")) {
+            return true;
+        }
+
+        // Auth endpoints
+        if (requestPath.startsWith("/api/auth/register") ||
                 requestPath.startsWith("/api/auth/login") ||
                 requestPath.startsWith("/api/auth/confirm-account") ||
-                requestPath.startsWith("/api/auth/forgot-password") ||  // Add this
-                requestPath.startsWith("/api/auth/reset-password") ||   // Add this
-                requestPath.startsWith("/oauth2/") ||
-                requestPath.startsWith("/api/ai/health") || // Health endpoint
-                requestPath.startsWith("/v3/api-docs") || // Swagger
-                requestPath.startsWith("/swagger-ui") || // Swagger UI
-                requestPath.startsWith("/ws/"); // WebSocket
+                requestPath.startsWith("/api/auth/forgot-password") ||
+                requestPath.startsWith("/api/auth/reset-password")) {
+            return true;
+        }
+
+        // OAuth2 endpoints
+        if (requestPath.startsWith("/oauth2/")) {
+            return true;
+        }
+
+        // API documentation
+        if (requestPath.startsWith("/v3/api-docs") ||
+                requestPath.startsWith("/swagger-ui")) {
+            return true;
+        }
+
+        // WebSocket
+        if (requestPath.startsWith("/ws/")) {
+            return true;
+        }
+
+        // AI health check
+        if (requestPath.equals("/api/ai/health")) {
+            return true;
+        }
+
+        // Pricing endpoints
+        if (requestPath.startsWith("/api/pricing/")) {
+            return true;
+        }
+
+        // Public AI chat
+        if (requestPath.equals("/api/ai/chat/public")) {
+            return true;
+        }
+
+        // WebSocket related paths
+        if (requestPath.startsWith("/topic/") ||
+                requestPath.startsWith("/app/") ||
+                requestPath.startsWith("/user/") ||
+                requestPath.startsWith("/queue/")) {
+            return true;
+        }
+
+        return false;
     }
 
     private Collection<GrantedAuthority> getAuthoritiesFromJwt(Claims claims) {

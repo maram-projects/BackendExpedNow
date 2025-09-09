@@ -580,6 +580,126 @@ public class DeliveryController {
         return deliveryService.getDeliveryWithDetails(id);
     }
 
+    @PostMapping("/{deliveryId}/detailed-rating")
+    @PreAuthorize("hasAnyRole('CLIENT','INDIVIDUAL','ENTERPRISE')")
+    public ResponseEntity<?> submitDetailedRating(
+            @PathVariable String deliveryId,
+            @Valid @RequestBody DetailedRatingRequest ratingRequest,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            String clientId = ((CustomUserDetailsService.CustomUserDetails) userDetails).getUserId();
+
+            DeliveryRequest delivery = deliveryService.getDeliveryById(deliveryId);
+
+            // Vérifications de sécurité
+            if (!delivery.getClientId().equals(clientId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Not authorized to rate this delivery"));
+            }
+
+            if (delivery.getStatus() != DeliveryRequest.DeliveryReqStatus.DELIVERED) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Delivery not completed yet"));
+            }
+
+            if (delivery.isRated()) {
+                return ResponseEntity.badRequest()
+                        .body(Map.of("error", "Delivery already rated"));
+            }
+
+            // Création de l'évaluation détaillée
+            DetailedRatingResponse rating = deliveryService.submitDetailedRating(
+                    deliveryId, ratingRequest, clientId
+            );
+
+            return ResponseEntity.ok(Map.of(
+                    "success", true,
+                    "message", "Rating submitted successfully",
+                    "rating", rating
+            ));
+
+        } catch (Exception e) {
+            logger.error("Error submitting detailed rating: {}", e.getMessage(), e);
+            return ResponseEntity.badRequest()
+                    .body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/rating-statistics")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<?> getRatingStatistics(
+            @RequestParam(required = false) String deliveryPersonId,
+            @RequestParam(required = false, defaultValue = "30") int days) {
+        try {
+            RatingStatistics stats = deliveryService.getRatingStatistics(deliveryPersonId, days);
+            return ResponseEntity.ok(stats);
+        } catch (Exception e) {
+            logger.error("Error getting rating statistics: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error retrieving statistics"));
+        }
+    }
+
+    @GetMapping("/client/{clientId}/rating-history")
+    @PreAuthorize("hasAnyRole('CLIENT','INDIVIDUAL','ENTERPRISE','ADMIN')")
+    public ResponseEntity<?> getClientRatingHistory(
+            @PathVariable String clientId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            String userId = ((CustomUserDetailsService.CustomUserDetails) userDetails).getUserId();
+            boolean isAdmin = userDetails.getAuthorities().stream()
+                    .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
+
+            if (!isAdmin && !clientId.equals(userId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Not authorized to view this rating history"));
+            }
+
+            List<DetailedRatingResponse> ratings = deliveryService.getClientRatingHistory(clientId);
+            return ResponseEntity.ok(ratings);
+
+        } catch (Exception e) {
+            logger.error("Error getting client rating history: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error retrieving rating history"));
+        }
+    }
+    @GetMapping("/{deliveryId}/detailed-rating")
+    @PreAuthorize("hasAnyRole('CLIENT','INDIVIDUAL','ENTERPRISE','ADMIN','DELIVERY_PERSON')")
+    public ResponseEntity<?> getDetailedRating(
+            @PathVariable String deliveryId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        try {
+            String userId = ((CustomUserDetailsService.CustomUserDetails) userDetails).getUserId();
+            DeliveryRequest delivery = deliveryService.getDeliveryById(deliveryId);
+
+            // Vérification des autorisations
+            boolean isAdmin = userDetails.getAuthorities().stream()
+                    .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
+            boolean isClient = delivery.getClientId().equals(userId);
+            boolean isDeliveryPerson = delivery.getDeliveryPersonId() != null &&
+                    delivery.getDeliveryPersonId().equals(userId);
+
+            if (!isAdmin && !isClient && !isDeliveryPerson) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Not authorized to view this rating"));
+            }
+
+            if (!delivery.isRated()) {
+                return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                        .body(Map.of("error", "No rating found for this delivery"));
+            }
+
+            DetailedRatingResponse rating = deliveryService.getDetailedRating(deliveryId);
+            return ResponseEntity.ok(rating);
+
+        } catch (Exception e) {
+            logger.error("Error getting detailed rating: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Error retrieving rating"));
+        }
+    }
+
     @GetMapping("/today-completed")
     @PreAuthorize("hasRole('DELIVERY_PERSON')")
     public ResponseEntity<Integer> getTodayCompletedDeliveries(

@@ -95,15 +95,30 @@ public class PaymentController {
         }
     }
 
-    // GET PAYMENT BY ID
     @GetMapping("/{paymentId}")
     public ResponseEntity<Map<String, Object>> getPaymentById(@PathVariable String paymentId) {
         try {
             Payment payment = paymentService.getPaymentById(paymentId);
 
+            // Ensure status and method are properly serialized
+            Map<String, Object> paymentData = new HashMap<>();
+            paymentData.put("id", payment.getId());
+            paymentData.put("deliveryId", payment.getDeliveryId());
+            paymentData.put("clientId", payment.getClientId());
+            paymentData.put("amount", payment.getAmount());
+            paymentData.put("finalAmountAfterDiscount", payment.getFinalAmountAfterDiscount());
+            paymentData.put("status", payment.getStatus() != null ? payment.getStatus().toString() : "PENDING");
+            paymentData.put("method", payment.getMethod() != null ? payment.getMethod().toString() : null);
+            paymentData.put("paymentDate", payment.getPaymentDate());
+            paymentData.put("createdAt", payment.getCreatedAt());
+            paymentData.put("updatedAt", payment.getUpdatedAt());
+            paymentData.put("discountAmount", payment.getDiscountAmount());
+            paymentData.put("discountCode", payment.getDiscountCode());
+            paymentData.put("transactionId", payment.getTransactionId());
+
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
-            response.put("data", payment);
+            response.put("data", paymentData);
 
             return ResponseEntity.ok(response);
         } catch (IllegalArgumentException e) {
@@ -290,56 +305,58 @@ public class PaymentController {
     }
 
     // GET PAYMENTS BY CLIENT - with additional security
-    // GET PAYMENTS BY CLIENT - with debugging
     @GetMapping("/client/{clientId}")
     public ResponseEntity<Map<String, Object>> getPaymentsByClient(@PathVariable String clientId) {
-        logger.info("=== DEBUG: getPaymentsByClient called ===");
-        logger.info("Client ID: {}", clientId);
+        logger.info("Fetching payments for client: {}", clientId);
 
         try {
-            // Check if clientId is valid
             if (clientId == null || clientId.trim().isEmpty()) {
-                logger.error("Client ID is null or empty");
                 throw new IllegalArgumentException("Client ID cannot be null or empty");
             }
 
-            logger.info("Calling paymentService.getPaymentsByClient with clientId: {}", clientId);
-
-            // Check if paymentService is injected properly
-            if (paymentService == null) {
-                logger.error("PaymentService is null!");
-                throw new RuntimeException("PaymentService not properly injected");
-            }
-
             List<Payment> payments = paymentService.getPaymentsByClient(clientId);
+
+            // Enrich payments with additional data
+            payments = payments.stream()
+                    .map(this::enrichPayment)
+                    .collect(Collectors.toList());
+
             logger.info("Successfully retrieved {} payments for client {}",
-                    payments != null ? payments.size() : 0, clientId);
+                    payments.size(), clientId);
 
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("data", payments);
-            response.put("count", payments != null ? payments.size() : 0);
+            response.put("payments", payments); // Add this for compatibility
+            response.put("count", payments.size());
 
-            logger.info("Returning successful response");
             return ResponseEntity.ok(response);
-
-        } catch (IllegalArgumentException e) {
-            logger.error("Invalid client ID: {}", e.getMessage(), e);
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("success", false);
-            errorResponse.put("message", e.getMessage());
-            return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
 
         } catch (Exception e) {
             logger.error("Error retrieving payments for client: {}", e.getMessage(), e);
-            logger.error("Exception type: {}", e.getClass().getSimpleName());
-            logger.error("Full stack trace: ", e);
-
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);
             errorResponse.put("message", "Failed to retrieve client payments: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(errorResponse);
         }
+    }
+
+    private Payment enrichPayment(Payment payment) {
+        // Ensure all required fields are properly set
+        if (payment.getStatus() == null) {
+            payment.setStatus(PaymentStatus.PENDING);
+        }
+
+        if (payment.getMethod() == null) {
+            payment.setMethod(PaymentMethod.CASH); // or appropriate default
+        }
+
+        // Ensure dates are properly formatted
+        if (payment.getPaymentDate() == null && payment.getCreatedAt() != null) {
+            payment.setPaymentDate(payment.getCreatedAt());
+        }
+
+        return payment;
     }
     // GET PAYMENTS BY DELIVERY
     @GetMapping("/delivery/{deliveryId}")
