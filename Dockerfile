@@ -1,14 +1,13 @@
-# نستعمل Java 17
-FROM openjdk:17-jdk-slim
-
-# نحطو المجلد اللي بش نخدم فيه
+# Build stage - نبنيو المشروع
+FROM maven:3.8.4-openjdk-17 AS build
 WORKDIR /app
+COPY pom.xml .
+COPY src ./src
+RUN mvn clean package -DskipTests
 
-# ننسخو ملف JAR متاع application متاعنا
-COPY target/*.jar app.jar
-
-# نفتحو port 8080
+# Runtime stage - نشغلو التطبيق
+FROM openjdk:17-jdk-slim
+WORKDIR /app
+COPY --from=build /app/target/*.jar app.jar
 EXPOSE 8080
-
-# كيفاش نشغلو application
 ENTRYPOINT ["java", "-jar", "app.jar"]
