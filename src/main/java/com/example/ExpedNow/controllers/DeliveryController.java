@@ -14,9 +14,12 @@ import com.example.ExpedNow.services.core.UserServiceInterface;
 import com.example.ExpedNow.services.core.impl.DeliveryServiceImpl;
 import com.example.ExpedNow.services.core.impl.ImageAnalysisService;
 import jakarta.validation.Valid;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,11 +40,12 @@ public class DeliveryController {
     private final DeliveryServiceImpl deliveryService;
     private final MissionServiceInterface missionService;
     private final UserServiceInterface userService;
-    private final ImageAnalysisService imageAnalysisService; // Add this line
-
+    private final ImageAnalysisService imageAnalysisService;
 
     public DeliveryController(DeliveryServiceImpl deliveryService,
-                              MissionServiceInterface missionService, UserServiceInterface userService, ImageAnalysisService imageAnalysisService) {
+                              MissionServiceInterface missionService,
+                              UserServiceInterface userService,
+                              ImageAnalysisService imageAnalysisService) {
         this.deliveryService = deliveryService;
         this.missionService = missionService;
         this.userService = userService;
@@ -91,7 +95,7 @@ public class DeliveryController {
         }
     }
 
-    // NEW: Re-analyze image for existing delivery
+    // Re-analyze image for existing delivery
     @PostMapping("/{deliveryId}/reanalyze-image")
     @PreAuthorize("hasRole('CLIENT') or hasRole('INDIVIDUAL') or hasRole('ENTERPRISE')")
     public ResponseEntity<?> reanalyzeImage(
@@ -138,7 +142,7 @@ public class DeliveryController {
         }
     }
 
-    // NEW: Get image analysis results
+    // Get image analysis results
     @GetMapping("/{deliveryId}/image-analysis")
     @PreAuthorize("hasRole('CLIENT') or hasRole('INDIVIDUAL') or hasRole('ENTERPRISE') or hasRole('ADMIN')")
     public ResponseEntity<?> getImageAnalysis(
@@ -172,62 +176,6 @@ public class DeliveryController {
                     .body(Map.of("error", "Error retrieving image analysis: " + e.getMessage()));
         }
     }
-
-    // Helper method to create DeliveryRequest from DTO
-    private DeliveryRequest createDeliveryFromDTO(DeliveryRequestDTO requestDTO, String clientId) {
-        DeliveryRequest delivery = new DeliveryRequest();
-        delivery.setPickupAddress(requestDTO.pickupAddress());
-        delivery.setDeliveryAddress(requestDTO.deliveryAddress());
-        delivery.setPackageDescription(requestDTO.packageDescription());
-        delivery.setPackageWeight(requestDTO.packageWeight());
-        delivery.setClientId(requestDTO.clientId() != null ? requestDTO.clientId() : clientId);
-
-        // Handle package type safely
-        if (requestDTO.packageType() != null && !requestDTO.packageType().isEmpty()) {
-            try {
-                PackageType packageType = PackageType.valueOf(requestDTO.packageType());
-                delivery.setPackageType(packageType);
-            } catch (IllegalArgumentException e) {
-                logger.warn("Invalid package type: {}", requestDTO.packageType());
-            }
-        }
-
-        // Optional vehicle ID
-        if (requestDTO.vehicleId() != null && !requestDTO.vehicleId().isEmpty()) {
-            delivery.setVehicleId(requestDTO.vehicleId());
-        }
-
-        // Handle scheduled date
-        Date scheduledDateFromDTO = requestDTO.scheduledDate();
-        if (scheduledDateFromDTO != null) {
-            delivery.setScheduledDate(scheduledDateFromDTO.toInstant()
-                    .atZone(ZoneId.systemDefault())
-                    .toLocalDateTime());
-        }
-
-        delivery.setAdditionalInstructions(requestDTO.additionalInstructions());
-
-        // Set coordinates if present
-        if (requestDTO.pickupLatitude() != null) {
-            delivery.setPickupLatitude(requestDTO.pickupLatitude());
-        }
-        if (requestDTO.pickupLongitude() != null) {
-            delivery.setPickupLongitude(requestDTO.pickupLongitude());
-        }
-        if (requestDTO.deliveryLatitude() != null) {
-            delivery.setDeliveryLatitude(requestDTO.deliveryLatitude());
-        }
-        if (requestDTO.deliveryLongitude() != null) {
-            delivery.setDeliveryLongitude(requestDTO.deliveryLongitude());
-        }
-
-        delivery.setStatus(DeliveryRequest.DeliveryReqStatus.PENDING);
-        delivery.setCreatedAt(LocalDateTime.now());
-
-        return delivery;
-    }
-
-    // Keep all your existing methods...
 
     @GetMapping("/{deliveryId}/with-assigned")
     public ResponseEntity<Map<String, Object>> getDeliveryWithAssignedPerson(@PathVariable String deliveryId) {
@@ -575,6 +523,7 @@ public class DeliveryController {
                     .body(Map.of("error", "Error analyzing image: " + e.getMessage()));
         }
     }
+
     @GetMapping("/{id}/with-details")
     public DeliveryResponseDTO getDeliveryWithDetails(@PathVariable String id) {
         return deliveryService.getDeliveryWithDetails(id);
@@ -625,6 +574,16 @@ public class DeliveryController {
         }
     }
 
+    @GetMapping("/delivery-person/{deliveryPersonId}/ratings")
+    @PreAuthorize("hasRole('DELIVERY_PERSON') or hasRole('ADMIN')")
+    public ResponseEntity<List<DetailedRatingResponse>> getDeliveryPersonRatings(
+            @PathVariable String deliveryPersonId) {
+
+        // Implementation to get ratings for a specific delivery person
+        List<DetailedRatingResponse> ratings = deliveryService.getDeliveryPersonRatings(deliveryPersonId);
+        return ResponseEntity.ok(ratings);
+    }
+
     @GetMapping("/rating-statistics")
     @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<?> getRatingStatistics(
@@ -637,6 +596,65 @@ public class DeliveryController {
             logger.error("Error getting rating statistics: {}", e.getMessage(), e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("error", "Error retrieving statistics"));
+        }
+    }
+
+    @GetMapping("/ratings/all")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<DetailedRatingResponse>> getAllRatings() {
+        try {
+            List<DetailedRatingResponse> ratings = deliveryService.getAllRatings();
+            return ResponseEntity.ok(ratings);
+        } catch (Exception e) {
+            logger.error("Error getting all ratings: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
+    @GetMapping("/performance/stats")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<List<DeliveryPersonPerformanceDTO>> getDeliveryPersonPerformanceStats() {
+        try {
+            List<DeliveryPersonPerformanceDTO> performanceStats = deliveryService.getDeliveryPersonPerformanceStats();
+            return ResponseEntity.ok(performanceStats);
+        } catch (Exception e) {
+            logger.error("Error getting performance stats: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(null);
+        }
+    }
+
+    @GetMapping("/{deliveryId}/receipt")
+    @PreAuthorize("hasAnyRole('CLIENT','INDIVIDUAL','ENTERPRISE','ADMIN')")
+    public ResponseEntity<byte[]> downloadReceipt(
+            @PathVariable String deliveryId,
+            @AuthenticationPrincipal UserDetails userDetails) {
+
+        try {
+            String userId = ((CustomUserDetailsService.CustomUserDetails) userDetails).getUserId();
+            DeliveryRequest delivery = deliveryService.getDeliveryById(deliveryId);
+
+            // Check authorization
+            boolean isAdmin = userDetails.getAuthorities().stream()
+                    .anyMatch(auth -> auth.getAuthority().equals("ROLE_ADMIN"));
+
+            if (!isAdmin && !delivery.getClientId().equals(userId)) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+            }
+
+            // Generate receipt (you'll need to implement this service)
+            byte[] receiptPdf = generateReceiptPdf(delivery);
+
+            HttpHeaders headers = new HttpHeaders();
+            headers.setContentType(MediaType.APPLICATION_PDF);
+            headers.setContentDispositionFormData("attachment", "receipt-" + deliveryId + ".pdf");
+
+            return ResponseEntity.ok()
+                    .headers(headers)
+                    .body(receiptPdf);
+
+        } catch (Exception e) {
+            logger.error("Error generating receipt: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 
@@ -664,6 +682,7 @@ public class DeliveryController {
                     .body(Map.of("error", "Error retrieving rating history"));
         }
     }
+
     @GetMapping("/{deliveryId}/detailed-rating")
     @PreAuthorize("hasAnyRole('CLIENT','INDIVIDUAL','ENTERPRISE','ADMIN','DELIVERY_PERSON')")
     public ResponseEntity<?> getDetailedRating(
@@ -710,6 +729,60 @@ public class DeliveryController {
         return ResponseEntity.ok(count);
     }
 
+    // Helper method to create DeliveryRequest from DTO
+    private DeliveryRequest createDeliveryFromDTO(DeliveryRequestDTO requestDTO, String clientId) {
+        DeliveryRequest delivery = new DeliveryRequest();
+        delivery.setPickupAddress(requestDTO.pickupAddress());
+        delivery.setDeliveryAddress(requestDTO.deliveryAddress());
+        delivery.setPackageDescription(requestDTO.packageDescription());
+        delivery.setPackageWeight(requestDTO.packageWeight());
+        delivery.setClientId(requestDTO.clientId() != null ? requestDTO.clientId() : clientId);
+
+        // Handle package type safely
+        if (requestDTO.packageType() != null && !requestDTO.packageType().isEmpty()) {
+            try {
+                PackageType packageType = PackageType.valueOf(requestDTO.packageType());
+                delivery.setPackageType(packageType);
+            } catch (IllegalArgumentException e) {
+                logger.warn("Invalid package type: {}", requestDTO.packageType());
+            }
+        }
+
+        // Optional vehicle ID
+        if (requestDTO.vehicleId() != null && !requestDTO.vehicleId().isEmpty()) {
+            delivery.setVehicleId(requestDTO.vehicleId());
+        }
+
+        // Handle scheduled date
+        Date scheduledDateFromDTO = requestDTO.scheduledDate();
+        if (scheduledDateFromDTO != null) {
+            delivery.setScheduledDate(scheduledDateFromDTO.toInstant()
+                    .atZone(ZoneId.systemDefault())
+                    .toLocalDateTime());
+        }
+
+        delivery.setAdditionalInstructions(requestDTO.additionalInstructions());
+
+        // Set coordinates if present
+        if (requestDTO.pickupLatitude() != null) {
+            delivery.setPickupLatitude(requestDTO.pickupLatitude());
+        }
+        if (requestDTO.pickupLongitude() != null) {
+            delivery.setPickupLongitude(requestDTO.pickupLongitude());
+        }
+        if (requestDTO.deliveryLatitude() != null) {
+            delivery.setDeliveryLatitude(requestDTO.deliveryLatitude());
+        }
+        if (requestDTO.deliveryLongitude() != null) {
+            delivery.setDeliveryLongitude(requestDTO.deliveryLongitude());
+        }
+
+        delivery.setStatus(DeliveryRequest.DeliveryReqStatus.PENDING);
+        delivery.setCreatedAt(LocalDateTime.now());
+
+        return delivery;
+    }
+
     // Helper method to map Entity to DTO
     private DeliveryResponseDTO convertToDto(DeliveryRequest delivery) {
         Date scheduledDate = delivery.getScheduledDate() != null ?
@@ -750,5 +823,12 @@ public class DeliveryController {
                 null,
                 null
         );
+    }
+
+    private byte[] generateReceiptPdf(DeliveryRequest delivery) {
+        // Implement PDF generation logic here
+        // You can use libraries like iText or Apache PDFBox
+        // For now, return empty byte array
+        return new byte[0];
     }
 }

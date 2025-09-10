@@ -1,82 +1,80 @@
 package com.example.ExpedNow.dto;
-
 public class RatingStatistics {
     private int totalRatings;
     private double averageRating;
-    private int fiveStars;
-    private int fourStars;
-    private int threeStars;
-    private int twoStars;
-    private int oneStar;
+    private int fiveStarCount;
+    private int fourStarCount;
+    private int threeStarCount;
+    private int twoStarCount;
+    private int oneStarCount;
 
+    // Constructors, getters, and setters
     public RatingStatistics() {}
 
-    public RatingStatistics(int totalRatings, double averageRating, int fiveStars,
-                            int fourStars, int threeStars, int twoStars, int oneStar) {
+    public RatingStatistics(int totalRatings, double averageRating, int fiveStarCount,
+                            int fourStarCount, int threeStarCount, int twoStarCount, int oneStarCount) {
         this.totalRatings = totalRatings;
         this.averageRating = averageRating;
-        this.fiveStars = fiveStars;
-        this.fourStars = fourStars;
-        this.threeStars = threeStars;
-        this.twoStars = twoStars;
-        this.oneStar = oneStar;
+        this.fiveStarCount = fiveStarCount;
+        this.fourStarCount = fourStarCount;
+        this.threeStarCount = threeStarCount;
+        this.twoStarCount = twoStarCount;
+        this.oneStarCount = oneStarCount;
     }
 
-    // Getters
     public int getTotalRatings() {
         return totalRatings;
+    }
+
+    public void setTotalRatings(int totalRatings) {
+        this.totalRatings = totalRatings;
     }
 
     public double getAverageRating() {
         return averageRating;
     }
 
-    public int getFiveStars() {
-        return fiveStars;
-    }
-
-    public int getFourStars() {
-        return fourStars;
-    }
-
-    public int getThreeStars() {
-        return threeStars;
-    }
-
-    public int getTwoStars() {
-        return twoStars;
-    }
-
-    public int getOneStar() {
-        return oneStar;
-    }
-
-    // Setters
-    public void setTotalRatings(int totalRatings) {
-        this.totalRatings = totalRatings;
-    }
-
     public void setAverageRating(double averageRating) {
         this.averageRating = averageRating;
     }
 
-    public void setFiveStars(int fiveStars) {
-        this.fiveStars = fiveStars;
+    public int getFiveStarCount() {
+        return fiveStarCount;
     }
 
-    public void setFourStars(int fourStars) {
-        this.fourStars = fourStars;
+    public void setFiveStarCount(int fiveStarCount) {
+        this.fiveStarCount = fiveStarCount;
     }
 
-    public void setThreeStars(int threeStars) {
-        this.threeStars = threeStars;
+    public int getFourStarCount() {
+        return fourStarCount;
     }
 
-    public void setTwoStars(int twoStars) {
-        this.twoStars = twoStars;
+    public void setFourStarCount(int fourStarCount) {
+        this.fourStarCount = fourStarCount;
     }
 
-    public void setOneStar(int oneStar) {
-        this.oneStar = oneStar;
+    public int getThreeStarCount() {
+        return threeStarCount;
+    }
+
+    public void setThreeStarCount(int threeStarCount) {
+        this.threeStarCount = threeStarCount;
+    }
+
+    public int getTwoStarCount() {
+        return twoStarCount;
+    }
+
+    public void setTwoStarCount(int twoStarCount) {
+        this.twoStarCount = twoStarCount;
+    }
+
+    public int getOneStarCount() {
+        return oneStarCount;
+    }
+
+    public void setOneStarCount(int oneStarCount) {
+        this.oneStarCount = oneStarCount;
     }
 }

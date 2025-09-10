@@ -2,6 +2,7 @@ package com.example.ExpedNow.repositories;
 
 import com.example.ExpedNow.models.DeliveryRequest;
 import org.springframework.data.domain.Sort;
+import org.springframework.data.mongodb.repository.Aggregation;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.data.mongodb.repository.Query;
 import org.springframework.data.mongodb.repository.Update;
@@ -72,15 +73,14 @@ public interface DeliveryReqRepository extends MongoRepository<DeliveryRequest, 
             sort = "{ 'completedAt': -1 }")
     List<DeliveryRequest> findLastCompletedDeliveryByUser(String userId);
 
-
-    // Add these methods to your DeliveryReqRepository interface
-
+    // Add these methods for rating functionality
     @Query("{ 'deliveryPersonId': ?0, 'status': ?1, 'createdAt': { $gt: ?2 } }")
     List<DeliveryRequest> findByDeliveryPersonIdAndStatusAndRatedAtAfter(
             String deliveryPersonId,
             DeliveryRequest.DeliveryReqStatus status,
             LocalDateTime ratedAt
     );
+
     @Query("{ 'status': ?0, 'createdAt': { $gt: ?1 } }")
     List<DeliveryRequest> findByStatusAndRatedAtAfter(
             DeliveryRequest.DeliveryReqStatus status,
@@ -90,5 +90,65 @@ public interface DeliveryReqRepository extends MongoRepository<DeliveryRequest, 
     @Query(value = "{ 'clientId': ?0, 'rated': ?1 }", sort = "{ 'createdAt': -1 }")
     List<DeliveryRequest> findByClientIdAndRatedOrderByCreatedAtDesc(String clientId, boolean rated);
 
+    List<DeliveryRequest> findByDeliveryPersonIdAndRated(String deliveryPersonId, boolean rated);
+    List<DeliveryRequest> findByRated(boolean rated);
 
+    /**
+     * Find deliveries by delivery person and status
+     */
+    List<DeliveryRequest> findByDeliveryPersonIdAndStatus(
+            String deliveryPersonId,
+            DeliveryRequest.DeliveryReqStatus status
+    );
+
+    /**
+     * Find deliveries by delivery person and rated status, ordered by completion date
+     */
+    List<DeliveryRequest> findByDeliveryPersonIdAndRatedOrderByCompletedAtDesc(
+            String deliveryPersonId,
+            boolean rated
+    );
+
+    /**
+     * Count total deliveries by delivery person
+     */
+    @Query(value = "{ 'deliveryPersonId': ?0 }", count = true)
+    long countByDeliveryPersonId(String deliveryPersonId);
+
+    /**
+     * Find recent deliveries for performance analysis
+     */
+    @Query("{ 'deliveryPersonId': ?0, 'completedAt': { $gte: ?1 } }")
+    List<DeliveryRequest> findRecentDeliveriesByDeliveryPerson(
+            String deliveryPersonId,
+            LocalDateTime since
+    );
+
+    /**
+     * Get delivery statistics for a specific delivery person
+     */
+    @Aggregation(pipeline = {
+            "{ $match: { 'deliveryPersonId': ?0, 'rated': true } }",
+            "{ $group: { " +
+                    "'_id': '$deliveryPersonId', " +
+                    "'totalRatings': { $sum: 1 }, " +
+                    "'averageRating': { $avg: '$rating' }, " +
+                    "'minRating': { $min: '$rating' }, " +
+                    "'maxRating': { $max: '$rating' }, " +
+                    "'ratingsAbove4': { $sum: { $cond: [{ $gte: ['$rating', 4] }, 1, 0] } }, " +
+                    "'ratingsBelow3': { $sum: { $cond: [{ $lt: ['$rating', 3] }, 1, 0] } } " +
+                    "} }"
+    })
+    AggregationResult getDeliveryPersonRatingStats(String deliveryPersonId);
+
+    // Interface for aggregation result
+    interface AggregationResult {
+        String getId();
+        int getTotalRatings();
+        double getAverageRating();
+        double getMinRating();
+        double getMaxRating();
+        int getRatingsAbove4();
+        int getRatingsBelow3();
+    }
 }

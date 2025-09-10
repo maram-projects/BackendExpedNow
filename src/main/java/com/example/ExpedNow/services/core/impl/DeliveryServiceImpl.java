@@ -7,6 +7,7 @@ import com.example.ExpedNow.models.Mission;
 import com.example.ExpedNow.models.User;
 import com.example.ExpedNow.models.Vehicle;
 import com.example.ExpedNow.models.enums.PaymentStatus;
+import com.example.ExpedNow.models.enums.Role;
 import com.example.ExpedNow.repositories.DeliveryReqRepository;
 import com.example.ExpedNow.repositories.MissionRepository;
 import com.example.ExpedNow.services.core.*;
@@ -27,6 +28,7 @@ import java.time.ZoneId;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import com.example.ExpedNow.dto.DeliveryPersonPerformanceDTO;
 
 @Service
 @Primary
@@ -921,6 +923,33 @@ public class DeliveryServiceImpl implements DeliveryServiceInterface {
 
 
 
+    @Override
+    public List<DeliveryRequest> findByStatusAndRatedAtAfter(DeliveryRequest.DeliveryReqStatus status, LocalDateTime date) {
+        return deliveryRepository.findByStatusAndRatedAtAfter(status, date);
+    }
+
+    @Override
+    public List<DeliveryRequest> findByDeliveryPersonIdAndStatusAndRatedAtAfter(
+            String deliveryPersonId,
+            DeliveryRequest.DeliveryReqStatus status,
+            LocalDateTime date) {
+        return deliveryRepository.findByDeliveryPersonIdAndStatusAndRatedAtAfter(deliveryPersonId, status, date);
+    }
+
+    @Override
+    public List<DeliveryRequest> findByClientIdAndRatedOrderByCreatedAtDesc(String clientId, boolean rated) {
+        return deliveryRepository.findByClientIdAndRatedOrderByCreatedAtDesc(clientId, rated);
+    }
+
+    @Override
+    public List<DeliveryRequest> findByRated(boolean rated) {
+        return deliveryRepository.findByRated(rated);
+    }
+
+    @Override
+    public List<DeliveryRequest> findByDeliveryPersonIdAndRated(String deliveryPersonId, boolean rated) {
+        return deliveryRepository.findByDeliveryPersonIdAndRated(deliveryPersonId, rated);
+    }
 
     /**
      * Crée une réponse DetailedRatingResponse à partir des données
@@ -973,6 +1002,57 @@ public class DeliveryServiceImpl implements DeliveryServiceInterface {
 
 
 
+    @Override
+    public List<DetailedRatingResponse> getAllRatings() {
+        try {
+            List<DeliveryRequest> ratedDeliveries = deliveryRepository.findByRated(true);
+
+            return ratedDeliveries.stream()
+                    .map(delivery -> {
+                        try {
+                            return getDetailedRating(delivery.getId());
+                        } catch (Exception e) {
+                            logger.warn("Failed to get detailed rating for delivery {}: {}",
+                                    delivery.getId(), e.getMessage());
+                            return null;
+                        }
+                    })
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            logger.error("Error getting all ratings: {}", e.getMessage(), e);
+            return new ArrayList<>();
+        }
+    }
+
+   
+
+    @Override
+    public List<DetailedRatingResponse> getDeliveryPersonRatings(String deliveryPersonId) {
+        try {
+            List<DeliveryRequest> ratedDeliveries = deliveryRepository.findByDeliveryPersonIdAndRated(
+                    deliveryPersonId,
+                    true
+            );
+
+            return ratedDeliveries.stream()
+                    .map(delivery -> {
+                        try {
+                            return getDetailedRating(delivery.getId());
+                        } catch (Exception e) {
+                            logger.warn("Failed to get detailed rating for delivery {}: {}",
+                                    delivery.getId(), e.getMessage());
+                            return null;
+                        }
+                    })
+                    .filter(Objects::nonNull)
+                    .collect(Collectors.toList());
+        } catch (Exception e) {
+            logger.error("Error getting delivery person ratings for {}: {}",
+                    deliveryPersonId, e.getMessage(), e);
+            return new ArrayList<>();
+        }
+    }
 
 
     @Override
@@ -1056,4 +1136,200 @@ public class DeliveryServiceImpl implements DeliveryServiceInterface {
                 endOfDay
         );
     }
+
+
+    // Add these methods to your DeliveryServiceImpl class
+
+    /**
+     * Get performance statistics for all delivery persons
+     */
+    @Override
+    public List<DeliveryPersonPerformanceDTO> getDeliveryPersonPerformanceStats() {
+        try {
+            // Get all users with delivery person role
+            List<User> deliveryPersons = userService.getAllDeliveryPersons();
+            return deliveryPersons.stream()
+                    .map(this::calculateDeliveryPersonPerformance)
+                    .filter(Objects::nonNull)
+                    .sorted((a, b) -> Double.compare(b.getAverageRating(), a.getAverageRating()))
+                    .collect(Collectors.toList());
+
+        } catch (Exception e) {
+            logger.error("Error getting delivery person performance stats: {}", e.getMessage(), e);
+            return new ArrayList<>();
+        }
+    }
+
+    @Override
+    public List<User> findByRoles(Role role) {
+        return userService.findByRoles(role);
+    }
+    /**
+     * Calculate performance metrics for a single delivery person
+     */
+    private DeliveryPersonPerformanceDTO calculateDeliveryPersonPerformance(User deliveryPerson) {
+        try {
+            String deliveryPersonId = deliveryPerson.getId();
+
+            // Get all rated deliveries for this person
+            List<DeliveryRequest> ratedDeliveries = deliveryRepository.findByDeliveryPersonIdAndRated(deliveryPersonId, true);
+
+            // Get all completed deliveries for this person
+            List<DeliveryRequest> completedDeliveries = deliveryRepository.findByDeliveryPersonIdAndStatus(
+                    deliveryPersonId, DeliveryRequest.DeliveryReqStatus.DELIVERED
+            );
+
+            // Calculate basic metrics
+            int totalRatings = ratedDeliveries.size();
+            int completedCount = completedDeliveries.size();
+            double averageRating = deliveryPerson.getRating();
+
+            // Calculate positive/negative ratings
+            long positiveRatings = ratedDeliveries.stream()
+                    .filter(d -> d.getRating() >= 4.0)
+                    .count();
+            long negativeRatings = ratedDeliveries.stream()
+                    .filter(d -> d.getRating() < 3.0)
+                    .count();
+
+            // Calculate monthly stats
+            LocalDateTime thisMonthStart = LocalDateTime.now().withDayOfMonth(1).withHour(0).withMinute(0).withSecond(0);
+            LocalDateTime lastMonthStart = thisMonthStart.minusMonths(1);
+
+            long thisMonthRatings = ratedDeliveries.stream()
+                    .filter(d -> d.getCompletedAt() != null && d.getCompletedAt().isAfter(thisMonthStart))
+                    .count();
+
+            long lastMonthRatings = ratedDeliveries.stream()
+                    .filter(d -> d.getCompletedAt() != null &&
+                            d.getCompletedAt().isAfter(lastMonthStart) &&
+                            d.getCompletedAt().isBefore(thisMonthStart))
+                    .count();
+
+            // Calculate category averages (if you have detailed ratings)
+            double punctualityAverage = calculateCategoryAverage(ratedDeliveries, "punctuality");
+            double professionalismAverage = calculateCategoryAverage(ratedDeliveries, "professionalism");
+            double packageConditionAverage = calculateCategoryAverage(ratedDeliveries, "packageCondition");
+            double communicationAverage = calculateCategoryAverage(ratedDeliveries, "communication");
+
+            // Calculate recommendation rate
+            long recommendations = ratedDeliveries.stream()
+                    .filter(d -> extractWouldRecommend(d))
+                    .count();
+            double recommendationRate = totalRatings > 0 ? (recommendations * 100.0 / totalRatings) : 0.0;
+
+            return DeliveryPersonPerformanceDTO.builder()
+                    .id(deliveryPersonId)
+                    .name(deliveryPerson.getFirstName() + " " + deliveryPerson.getLastName())
+                    .email(deliveryPerson.getEmail())
+                    .totalRatings(totalRatings)
+                    .averageRating(Math.round(averageRating * 10.0) / 10.0)
+                    .completedDeliveries(completedCount)
+                    .positiveRatings((int) positiveRatings)
+                    .negativeRatings((int) negativeRatings)
+                    .punctualityAverage(Math.round(punctualityAverage * 10.0) / 10.0)
+                    .professionalismAverage(Math.round(professionalismAverage * 10.0) / 10.0)
+                    .packageConditionAverage(Math.round(packageConditionAverage * 10.0) / 10.0)
+                    .communicationAverage(Math.round(communicationAverage * 10.0) / 10.0)
+                    .recommendationRate(Math.round(recommendationRate * 10.0) / 10.0)
+                    .thisMonthRatings((int) thisMonthRatings)
+                    .lastMonthRatings((int) lastMonthRatings)
+                    .performanceStatus(determinePerformanceStatus(averageRating, totalRatings))
+                    .lastActive(deliveryPerson.getLastActive())
+                    .available(deliveryPerson.isAvailable())
+                    .successScore(deliveryPerson.getSuccessScore())
+                    .totalDeliveries(deliveryPerson.getTotalDeliveries())
+                    .build();
+
+        } catch (Exception e) {
+            logger.error("Error calculating performance for delivery person {}: {}",
+                    deliveryPerson.getId(), e.getMessage(), e);
+            return null;
+        }
+    }
+
+    /**
+     * Calculate average for a specific category from detailed ratings
+     */
+    private double calculateCategoryAverage(List<DeliveryRequest> deliveries, String category) {
+        try {
+            return deliveries.stream()
+                    .mapToDouble(delivery -> extractCategoryRating(delivery, category))
+                    .filter(rating -> rating > 0)
+                    .average()
+                    .orElse(0.0);
+        } catch (Exception e) {
+            logger.warn("Error calculating category average for {}: {}", category, e.getMessage());
+            return 0.0;
+        }
+    }
+
+    /**
+     * Extract category rating from delivery's detailed rating JSON
+     */
+    private double extractCategoryRating(DeliveryRequest delivery, String category) {
+        try {
+            String additionalInstructions = delivery.getAdditionalInstructions();
+            if (additionalInstructions != null && additionalInstructions.contains("DETAILED_RATING:")) {
+                String[] parts = additionalInstructions.split("DETAILED_RATING:");
+                if (parts.length > 1) {
+                    String ratingJson = parts[1].split("\n")[0];
+
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> ratingData = objectMapper.readValue(ratingJson, Map.class);
+
+                    String ratingKey = category + "Rating";
+                    Object value = ratingData.get(ratingKey);
+
+                    if (value instanceof Number) {
+                        return ((Number) value).doubleValue();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.debug("Could not extract {} rating from delivery {}: {}",
+                    category, delivery.getId(), e.getMessage());
+        }
+        return 0.0;
+    }
+
+    /**
+     * Extract recommendation flag from detailed rating
+     */
+    private boolean extractWouldRecommend(DeliveryRequest delivery) {
+        try {
+            String additionalInstructions = delivery.getAdditionalInstructions();
+            if (additionalInstructions != null && additionalInstructions.contains("DETAILED_RATING:")) {
+                String[] parts = additionalInstructions.split("DETAILED_RATING:");
+                if (parts.length > 1) {
+                    String ratingJson = parts[1].split("\n")[0];
+
+                    @SuppressWarnings("unchecked")
+                    Map<String, Object> ratingData = objectMapper.readValue(ratingJson, Map.class);
+
+                    Object value = ratingData.get("wouldRecommend");
+                    if (value instanceof Boolean) {
+                        return (Boolean) value;
+                    }
+                }
+            }
+        } catch (Exception e) {
+            logger.debug("Could not extract recommendation from delivery {}: {}",
+                    delivery.getId(), e.getMessage());
+        }
+        return false;
+    }
+
+    /**
+     * Determine performance status based on rating and number of ratings
+     */
+    private String determinePerformanceStatus(double averageRating, int totalRatings) {
+        if (totalRatings < 5) return "new";
+        if (averageRating >= 4.5) return "excellent";
+        if (averageRating >= 4.0) return "good";
+        if (averageRating >= 3.0) return "average";
+        return "poor";
+    }
+
+
 }

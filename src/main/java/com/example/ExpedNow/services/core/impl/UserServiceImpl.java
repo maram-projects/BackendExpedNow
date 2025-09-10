@@ -83,6 +83,7 @@ public class UserServiceImpl implements UserServiceInterface {
         this.passwordResetTokenRepository = passwordResetTokenRepository;
     }
 
+
     @Override
     public User findByEmail(String email) {
         return userRepository.findByEmail(email)
@@ -148,6 +149,11 @@ public class UserServiceImpl implements UserServiceInterface {
             logger.error("Failed to send verification email: " + e.getMessage(), e);
             throw new RuntimeException("Failed to send verification email: " + e.getMessage(), e);
         }
+    }
+
+    @Override
+    public List<User> findByRoles(Role role) {
+        return List.of();
     }
 
     @Override

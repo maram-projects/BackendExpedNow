@@ -27,6 +27,7 @@ public interface UserServiceInterface {
 
         void sendVerificationEmail(User user, String token);
 
+        List<User> findByRoles(Role role);
         User confirmUser(String token);
 
         User processOAuth2User(String email, String name);
