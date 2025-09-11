@@ -80,6 +80,13 @@ chatbot:
     max-requests-per-day: 200
     reset-hour: 0 # Hour to reset daily count (0-23)
 
+# Sentry Configuration
+sentry:
+  dsn: https://197cfc957dc6661a89c147b280ad45f2@o4509998286372864.ingest.de.sentry.io/4509998292664400
+  environment: production
+  traces-sample-rate: 1.0
+  release: ${project.version:1.0.0}
+
 stripe:
   api-key: ${STRIPE_SECRET_KEY:}
   publishable-key: ${STRIPE_PUBLISHABLE_KEY:}
