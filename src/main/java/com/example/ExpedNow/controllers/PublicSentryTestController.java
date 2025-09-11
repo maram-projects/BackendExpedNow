@@ -38,6 +38,11 @@ public class PublicSentryTestController {
         return ResponseEntity.ok("✅ Message sent to Sentry! Check dashboard.");
     }
 
+    @GetMapping("/sentry-test")
+    public ResponseEntity<String> sentryTest() {
+        throw new RuntimeException("SENTRY TEST: " + System.currentTimeMillis());
+    }
+
     @GetMapping("/health")
     public ResponseEntity<String> health() {
         Sentry.addBreadcrumb("Public health check called");
