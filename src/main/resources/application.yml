@@ -3,7 +3,8 @@ spring:
     name: ExpedNow
   data:
     mongodb:
-      uri: mongodb://localhost:27017/expednow
+      uri: mongodb+srv://admin:Mh%3A27567644@cluster0.fkukv.mongodb.net/expednow?retryWrites=true&w=majority&appName=Cluster0
+
   mail:
     enabled: true
     host: smtp.gmail.com

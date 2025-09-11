@@ -48,7 +48,7 @@ public class AuthController {
     private final JavaMailSender mailSender;
 
     @Autowired
-    private EmailService emailService; // ADD THIS
+    private EmailService emailService;
 
     @Value("${spring.mail.username}")
     private String fromEmail;
@@ -151,6 +151,115 @@ public class AuthController {
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
                     .body(Map.of("message", "Registration failed: " + e.getMessage()));
         }
+    }
+
+    @PostMapping("/login")
+    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
+        try {
+            // First, check if user exists and account status
+            Optional<User> userOptional = userRepository.findByEmail(loginRequest.getEmail());
+            if (userOptional.isEmpty()) {
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "Invalid email or password"));
+            }
+
+            User user = userOptional.get();
+
+            // Check if account is locked
+            if (user.getLockTime() != null &&
+                    user.getLockTime().plusMinutes(LOCK_TIME_MINUTES).isAfter(LocalDateTime.now())) {
+                return ResponseEntity.status(HttpStatus.LOCKED)
+                        .body(Map.of("error", "Account is temporarily locked. Please try again later."));
+            }
+
+            // Attempt authentication
+            Authentication authentication;
+            try {
+                authentication = authenticationManager.authenticate(
+                        new UsernamePasswordAuthenticationToken(
+                                loginRequest.getEmail(),
+                                loginRequest.getPassword()
+                        )
+                );
+            } catch (BadCredentialsException e) {
+                handleFailedLoginAttempt(loginRequest.getEmail());
+                return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                        .body(Map.of("error", "Invalid email or password"));
+            } catch (CustomUserDetailsService.AccountNotVerifiedException e) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Account not verified. Please check your email."));
+            } catch (CustomUserDetailsService.AccountNotApprovedException e) {
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body(Map.of("error", "Account pending admin approval."));
+            } catch (CustomUserDetailsService.AccountLockedException e) {
+                return ResponseEntity.status(HttpStatus.LOCKED)
+                        .body(Map.of("error", "Account temporarily locked. Please try again later."));
+            }
+
+            // If authentication successful, reset failed attempts
+            user.setFailedLoginAttempts(0);
+            user.setLockTime(null);
+            userRepository.save(user);
+
+            // Generate JWT token
+            String token = jwtUtil.generateToken(user.getId());
+            String userType = determineUserType(user.getRoles());
+
+            Map<String, Object> responseMap = new HashMap<>();
+            responseMap.put("token", token);
+            responseMap.put("userId", user.getId());
+            responseMap.put("userType", userType);
+            responseMap.put("email", user.getEmail());
+            responseMap.put("firstName", user.getFirstName());
+            responseMap.put("lastName", user.getLastName());
+            responseMap.put("verified", user.isVerified());
+            responseMap.put("approved", user.isApproved());
+            responseMap.put("enabled", user.isEnabled());
+
+            if (user.getRoles().contains(Role.ROLE_DELIVERY_PERSON)) {
+                responseMap.put("vehicleType", user.getVehicleType());
+                responseMap.put("assignedVehicleId", user.getAssignedVehicleId());
+            }
+
+            return ResponseEntity.ok(responseMap);
+
+        } catch (Exception e) {
+            e.printStackTrace(); // Log the full stack trace for debugging
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "Login failed: " + e.getMessage()));
+        }
+    }
+
+    private void handleFailedLoginAttempt(String email) {
+        userRepository.findByEmail(email).ifPresent(user -> {
+            user.setFailedLoginAttempts(user.getFailedLoginAttempts() + 1);
+            if (user.getFailedLoginAttempts() >= MAX_FAILED_ATTEMPTS) {
+                user.setLockTime(LocalDateTime.now());
+            }
+            userRepository.save(user);
+        });
+    }
+
+    private String determineUserType(Set<Role> roles) {
+        if (roles.contains(Role.ADMIN)) {
+            return "admin";
+        }
+        if (roles.contains(Role.ROLE_ENTERPRISE)) {
+            return "enterprise";
+        }
+        if (roles.contains(Role.ROLE_INDIVIDUAL)) {
+            return "individual";
+        }
+        if (roles.contains(Role.ROLE_PROFESSIONAL)) {
+            return "professional";
+        }
+        if (roles.contains(Role.ROLE_TEMPORARY)) {
+            return "temporary";
+        }
+        if (roles.contains(Role.ROLE_CLIENT)) {
+            return "client";
+        }
+        return "unknown";
     }
 
     // IMPROVED FORGOT PASSWORD ENDPOINT
@@ -258,6 +367,7 @@ public class AuthController {
                     .body(Map.of("error", "Failed to reset password. Please try again"));
         }
     }
+    
 
     // ADD TOKEN VALIDATION ENDPOINT
     @PostMapping("/validate-reset-token")
@@ -298,8 +408,7 @@ public class AuthController {
         return hasUppercase && hasLowercase && hasDigit && hasSpecialChar;
     }
 
-    // REST OF YOUR EXISTING METHODS STAY THE SAME...
-
+    // OTHER ENDPOINTS
     @PreAuthorize("hasAuthority('ADMIN')")
     @GetMapping("/pending-approvals")
     public ResponseEntity<List<User>> getPendingApprovals() {
@@ -325,101 +434,6 @@ public class AuthController {
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
-    }
-
-    @PostMapping("/login")
-    public ResponseEntity<?> login(@RequestBody LoginRequest loginRequest) {
-        try {
-            Authentication authentication = authenticationManager.authenticate(
-                    new UsernamePasswordAuthenticationToken(
-                            loginRequest.getEmail(),
-                            loginRequest.getPassword()
-                    )
-            );
-
-            CustomUserDetailsService.CustomUserDetails userDetails =
-                    (CustomUserDetailsService.CustomUserDetails) authentication.getPrincipal();
-
-            User user = userRepository.findByEmail(loginRequest.getEmail())
-                    .orElseThrow(() -> new UsernameNotFoundException("User not found"));
-
-            user.resetFailedAttempts();
-            userRepository.save(user);
-
-            String token = jwtUtil.generateToken(user.getId());
-            String userType = determineUserType(user.getRoles());
-
-            Map<String, Object> responseMap = new HashMap<>();
-            responseMap.put("token", token);
-            responseMap.put("userId", user.getId());
-            responseMap.put("userType", userType);
-            responseMap.put("email", user.getEmail());
-            responseMap.put("firstName", user.getFirstName());
-            responseMap.put("lastName", user.getLastName());
-            responseMap.put("verified", user.isVerified());
-
-            if (user.getRoles().contains(Role.ROLE_DELIVERY_PERSON)) {
-                responseMap.put("vehicleType", user.getVehicleType());
-                responseMap.put("assignedVehicleId", user.getAssignedVehicleId());
-            }
-
-            return ResponseEntity.ok(responseMap);
-
-        } catch (BadCredentialsException e) {
-            handleFailedLoginAttempt(loginRequest.getEmail());
-            return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
-                    .body(Map.of("error", "Invalid email or password"));
-        } catch (Exception e) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "Login failed: " + e.getMessage()));
-        }
-    }
-
-    @ControllerAdvice
-    public class GlobalExceptionHandler {
-        @ExceptionHandler(ResourceNotFoundException.class)
-        public ResponseEntity<?> handleResourceNotFound(ResourceNotFoundException ex) {
-            return ResponseEntity.status(HttpStatus.NOT_FOUND)
-                    .body(Map.of("error", ex.getMessage()));
-        }
-
-        @ExceptionHandler(Exception.class)
-        public ResponseEntity<?> handleGlobalException(Exception ex) {
-            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
-                    .body(Map.of("error", "An unexpected error occurred"));
-        }
-    }
-
-    private void handleFailedLoginAttempt(String email) {
-        userRepository.findByEmail(email).ifPresent(user -> {
-            user.incrementFailedAttempts();
-            if (user.getFailedLoginAttempts() >= MAX_FAILED_ATTEMPTS) {
-                user.setLockTime(LocalDateTime.now());
-            }
-            userRepository.save(user);
-        });
-    }
-
-    private String determineUserType(Set<Role> roles) {
-        if (roles.contains(Role.ADMIN)) {
-            return "admin";
-        }
-        if (roles.contains(Role.ROLE_ENTERPRISE)) {
-            return "enterprise";
-        }
-        if (roles.contains(Role.ROLE_INDIVIDUAL)) {
-            return "individual";
-        }
-        if (roles.contains(Role.ROLE_PROFESSIONAL)) {
-            return "professional";
-        }
-        if (roles.contains(Role.ROLE_TEMPORARY)) {
-            return "temporary";
-        }
-        if (roles.contains(Role.ROLE_CLIENT)) {
-            return "client";
-        }
-        return "unknown";
     }
 
     @GetMapping("/oauth2-success")
@@ -450,6 +464,21 @@ public class AuthController {
             return ResponseEntity.ok(user);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @ControllerAdvice
+    public class GlobalExceptionHandler {
+        @ExceptionHandler(ResourceNotFoundException.class)
+        public ResponseEntity<?> handleResourceNotFound(ResourceNotFoundException ex) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .body(Map.of("error", ex.getMessage()));
+        }
+
+        @ExceptionHandler(Exception.class)
+        public ResponseEntity<?> handleGlobalException(Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Map.of("error", "An unexpected error occurred"));
         }
     }
 }

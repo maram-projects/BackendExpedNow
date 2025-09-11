@@ -19,7 +19,6 @@ import java.util.Collections;
 @Service("customUserDetailsService")
 public class CustomUserDetailsService implements UserDetailsService {
 
-
     private final UserRepository userRepository;
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final int LOCK_TIME_MINUTES = 30;
@@ -33,6 +32,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
 
+        // Check account status
         checkAccountStatus(user);
 
         return new CustomUserDetails(
@@ -47,10 +47,6 @@ public class CustomUserDetailsService implements UserDetailsService {
         );
     }
 
-
-
-
-    // Update your CustomUserDetailsService's getAuthorities method
     private Collection<? extends GrantedAuthority> getAuthorities(User user) {
         if (user.getRoles() == null || user.getRoles().isEmpty()) {
             return Collections.emptyList();
@@ -81,13 +77,22 @@ public class CustomUserDetailsService implements UserDetailsService {
     }
 
     private void checkAccountStatus(User user) {
-       // if (!user.isVerified()) {
-          //  throw new AccountNotVerifiedException("Account not verified. Please check your email.");
-      //  }
-
+        // Check if account is locked
         if (user.getLockTime() != null &&
                 ChronoUnit.MINUTES.between(user.getLockTime(), LocalDateTime.now()) < LOCK_TIME_MINUTES) {
             throw new AccountLockedException("Account temporarily locked. Try again later.");
+        }
+
+        // For non-admin users, check verification and approval
+        if (!user.getRoles().contains(Role.ADMIN)) {
+            if (!user.isVerified()) {
+                throw new AccountNotVerifiedException("Account not verified. Please check your email.");
+            }
+
+            // Allow login for approved users OR users who are enabled (backward compatibility)
+            if (!user.isApproved() && !user.isEnabled()) {
+                throw new AccountNotApprovedException("Account pending admin approval.");
+            }
         }
     }
 
@@ -155,6 +160,7 @@ public class CustomUserDetailsService implements UserDetailsService {
         public boolean isEnabled() {
             return enabled && verified;
         }
+
         @Override
         public String toString() {
             return "CustomUserDetails{" +
@@ -166,7 +172,6 @@ public class CustomUserDetailsService implements UserDetailsService {
     }
 
     // Custom exceptions
-    // Remove the checkAccountStatus method but keep these:
     public static class AccountNotVerifiedException extends RuntimeException {
         public AccountNotVerifiedException(String message) {
             super(message);
@@ -175,6 +180,12 @@ public class CustomUserDetailsService implements UserDetailsService {
 
     public static class AccountLockedException extends RuntimeException {
         public AccountLockedException(String message) {
+            super(message);
+        }
+    }
+
+    public static class AccountNotApprovedException extends RuntimeException {
+        public AccountNotApprovedException(String message) {
             super(message);
         }
     }

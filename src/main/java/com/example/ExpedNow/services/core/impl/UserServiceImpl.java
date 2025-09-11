@@ -50,18 +50,20 @@ public class UserServiceImpl implements UserServiceInterface {
     private final PasswordEncoder passwordEncoder;
     private final JavaMailSender mailSender;
     private final VehicleRepository vehicleRepository;
-    private final MongoTemplate mongoTemplate; // Add this
+    private final MongoTemplate mongoTemplate;
     @Autowired
-    private EmailService emailService; // AJOUTE cette ligne
+    private EmailService emailService;
     private final PasswordResetTokenRepository passwordResetTokenRepository;
     @Value("${spring.mail.enabled:false}")
     private boolean emailEnabled;
 
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final int LOCK_TIME_MINUTES = 30;
+
     public String getId() {
         return id;
     }
+
     @Value("${app.jwt.secret:G7ZPaRwhmVa8yQ+NjJv5rjMczdbNLCCHsVt0k36bH+4=}")
     private String jwtSecret;
 
@@ -73,7 +75,10 @@ public class UserServiceImpl implements UserServiceInterface {
     public UserServiceImpl(UserRepository userRepository,
                            VerificationTokenRepository verificationTokenRepository,
                            PasswordEncoder passwordEncoder,
-                           @Autowired(required = false) JavaMailSender mailSender, VehicleRepository vehicleRepository, MongoTemplate mongoTemplate, PasswordResetTokenRepository passwordResetTokenRepository) {
+                           @Autowired(required = false) JavaMailSender mailSender,
+                           VehicleRepository vehicleRepository,
+                           MongoTemplate mongoTemplate,
+                           PasswordResetTokenRepository passwordResetTokenRepository) {
         this.userRepository = userRepository;
         this.verificationTokenRepository = verificationTokenRepository;
         this.passwordEncoder = passwordEncoder;
@@ -83,14 +88,11 @@ public class UserServiceImpl implements UserServiceInterface {
         this.passwordResetTokenRepository = passwordResetTokenRepository;
     }
 
-
     @Override
     public User findByEmail(String email) {
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
     }
-
-
 
     @Override
     public Collection<GrantedAuthority> getUserAuthorities(String userId) {
@@ -99,7 +101,6 @@ public class UserServiceImpl implements UserServiceInterface {
 
         Collection<GrantedAuthority> authorities = new ArrayList<>();
 
-        // Convert user roles to Spring Security authorities
         if (user.getRoles() != null) {
             for (Role role : user.getRoles()) {
                 authorities.add(new SimpleGrantedAuthority(role.name()));
@@ -111,18 +112,15 @@ public class UserServiceImpl implements UserServiceInterface {
 
     @Override
     public User registerUser(User user, Set<Role> roles) {
-        // Check if email already exists
         if (userRepository.existsByEmail(user.getEmail())) {
             throw new RuntimeException("Email already exists");
         }
 
-        // Set user properties
         user.setPassword(passwordEncoder.encode(user.getPassword()));
         user.setRoles(roles);
-        user.setVerified(true); // Automatically mark as verified
+        user.setVerified(true);
         user.setDateOfRegistration(new Date());
 
-        // Save and return the user (no verification token creation)
         return userRepository.save(user);
     }
 
@@ -171,7 +169,7 @@ public class UserServiceImpl implements UserServiceInterface {
         User user = userRepository.findById(verificationToken.getUserId())
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        user.setVerified(true); // Mark user as verified
+        user.setVerified(true);
         userRepository.save(user);
 
         verificationTokenRepository.delete(verificationToken);
@@ -191,10 +189,9 @@ public class UserServiceImpl implements UserServiceInterface {
             User newUser = new User();
             newUser.setEmail(email);
             newUser.setFirstName(name);
-            // Generate a random password for OAuth2 users
             newUser.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
             newUser.setRoles(Set.of(Role.ROLE_CLIENT, Role.ROLE_INDIVIDUAL));
-            newUser.setVerified(true); // OAuth2 users are considered verified
+            newUser.setVerified(true);
             newUser.setDateOfRegistration(new Date());
             User savedUser = userRepository.save(newUser);
             logger.info("New OAuth2 user registered: {}", email);
@@ -215,15 +212,12 @@ public class UserServiceImpl implements UserServiceInterface {
         return userRepository.save(user);
     }
 
-    // In UserServiceImpl.java - Update getUserIdFromToken
-    // Replace the deprecated JWT parsing code in getUserIdFromToken method
     @Override
     public String getUserIdFromToken(String authHeader) {
         String token = authHeader.replace("Bearer ", "");
 
-        // Updated JWT parsing using the new API
         Claims claims = Jwts.parserBuilder()
-                .setSigningKey(jwtSecret.getBytes()) // Convert string to bytes
+                .setSigningKey(jwtSecret.getBytes())
                 .build()
                 .parseClaimsJws(token)
                 .getBody();
@@ -237,7 +231,6 @@ public class UserServiceImpl implements UserServiceInterface {
 
         return userId;
     }
-
 
     @Override
     public String getEmailFromToken(String authHeader) {
@@ -255,14 +248,12 @@ public class UserServiceImpl implements UserServiceInterface {
         return userRepository.save(user);
     }
 
-    // In UserServiceImpl.java
     @Override
     public ResponseEntity<?> assignVehicle(String userId, String vehicleId) {
         try {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-            // Check if user is a delivery person
             if (!user.getRoles().contains(Role.ROLE_DELIVERY_PERSON)) {
                 return ResponseEntity.badRequest()
                         .body(Collections.singletonMap("error", "User is not a delivery person"));
@@ -286,7 +277,7 @@ public class UserServiceImpl implements UserServiceInterface {
                     .body(Collections.singletonMap("error", "Error assigning vehicle: " + ex.getMessage()));
         }
     }
-    // In UserService.java
+
     @Override
     public List<User> getAllDeliveryPersons() {
         return userRepository.findAllByRolesContaining(Role.ROLE_DELIVERY_PERSON)
@@ -300,15 +291,14 @@ public class UserServiceImpl implements UserServiceInterface {
                 .collect(Collectors.toList());
     }
 
-    // In UserServiceImpl.java
     @Override
     public User findById(String id) {
         return userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + id));
     }
+
     @Override
     public User findByIdWithVehicle(String id) {
-        // Create query to fetch user with vehicle populated
         Query query = new Query(Criteria.where("id").is(id));
         query.fields().include("assignedVehicle");
 
@@ -318,9 +308,9 @@ public class UserServiceImpl implements UserServiceInterface {
         }
         return user;
     }
+
     @Override
     public List<UserDTO> findAvailableDrivers() {
-        // Use the Role enum instead of a string
         return userRepository.findByRolesContainingAndAssignedVehicleIdIsNull(String.valueOf(Role.ROLE_PROFESSIONAL))
                 .stream()
                 .map(this::convertToDTO)
@@ -329,7 +319,7 @@ public class UserServiceImpl implements UserServiceInterface {
 
     @Override
     public List<User> findAll() {
-        return userRepository.findAll(); // Utilise le repository pour récupérer tous les utilisateurs
+        return userRepository.findAll();
     }
 
     @Override
@@ -339,7 +329,7 @@ public class UserServiceImpl implements UserServiceInterface {
 
     @Override
     public void deleteById(String id) {
-
+        // Implementation if needed
     }
 
     @Override
@@ -348,7 +338,6 @@ public class UserServiceImpl implements UserServiceInterface {
             User user = userRepository.findById(userId)
                     .orElseThrow(() -> new ResourceNotFoundException("User not found with ID: " + userId));
 
-            // Check if user is a delivery person (support multiple role names)
             boolean isDeliveryPerson = user.getRoles().stream()
                     .anyMatch(role -> role == Role.ROLE_DELIVERY_PERSON ||
                             role == Role.ROLE_PROFESSIONAL ||
@@ -367,15 +356,12 @@ public class UserServiceImpl implements UserServiceInterface {
                         .body(Collections.singletonMap("error", "Vehicle is already assigned"));
             }
 
-            // Assign vehicle to user
             user.setAssignedVehicleId(vehicleId);
             User updatedUser = userRepository.save(user);
 
-            // Set vehicle as unavailable
             vehicle.setAvailable(false);
             Vehicle updatedVehicle = vehicleRepository.save(vehicle);
 
-            // Return both user and vehicle in consistent format
             Map<String, Object> response = new HashMap<>();
             response.put("user", convertToDTO(updatedUser));
             response.put("vehicle", convertVehicleToDTO(updatedVehicle));
@@ -395,12 +381,14 @@ public class UserServiceImpl implements UserServiceInterface {
         String searchPattern = "%" + query + "%";
         return userRepository.findByClientAttributes(searchPattern);
     }
+
     @Override
     public UserDTO getUserByVehicle(String vehicleId) {
         return userRepository.findByAssignedVehicleId(vehicleId)
                 .map(this::convertToDTO)
                 .orElseThrow(() -> new ResourceNotFoundException("No user assigned to vehicle ID: " + vehicleId));
     }
+
     @Override
     public List<UserDTO> getAvailableDrivers() {
         return userRepository.findByRolesContainingAndAssignedVehicleIdIsNull(String.valueOf(Role.ROLE_DELIVERY_PERSON))
@@ -408,12 +396,12 @@ public class UserServiceImpl implements UserServiceInterface {
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
+
     @Override
     public UserDTO findByAssignedVehicle(String vehicleId) {
         User user = userRepository.findByAssignedVehicleId(vehicleId)
                 .orElseThrow(() -> new ResourceNotFoundException("No user assigned to this vehicle"));
 
-        // Load vehicle details if needed
         if (user.getAssignedVehicleId() != null) {
             Vehicle vehicle = vehicleRepository.findById(user.getAssignedVehicleId())
                     .orElse(null);
@@ -422,6 +410,7 @@ public class UserServiceImpl implements UserServiceInterface {
 
         return convertToDTO(user);
     }
+
     @Override
     public ResponseEntity<?> unassignVehicleFromUser(String userId, String vehicleId) {
         try {
@@ -431,12 +420,10 @@ public class UserServiceImpl implements UserServiceInterface {
             Vehicle vehicle = vehicleRepository.findById(vehicleId)
                     .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found"));
 
-            // تحقق إذا كانت المركبة معينة لهذا المستخدم
             if (!vehicleId.equals(user.getAssignedVehicleId())) {
                 return ResponseEntity.badRequest().body("This vehicle is not assigned to the user");
             }
 
-            // إلغاء التعيين
             user.setAssignedVehicleId(null);
             vehicle.setAvailable(true);
 
@@ -448,6 +435,7 @@ public class UserServiceImpl implements UserServiceInterface {
             return ResponseEntity.internalServerError().body("Error unassigning vehicle: " + e.getMessage());
         }
     }
+
     public UserDTO convertToDTO(User user) {
         if (user == null) {
             return null;
@@ -455,7 +443,6 @@ public class UserServiceImpl implements UserServiceInterface {
 
         UserDTO dto = new UserDTO();
 
-        // Basic user info
         dto.setId(user.getId());
         dto.setFirstName(user.getFirstName());
         dto.setLastName(user.getLastName());
@@ -464,7 +451,6 @@ public class UserServiceImpl implements UserServiceInterface {
         dto.setAddress(user.getAddress());
         dto.setDateOfRegistration(user.getDateOfRegistration());
 
-        // Enterprise fields
         dto.setCompanyName(user.getCompanyName());
         dto.setBusinessType(user.getBusinessType());
         dto.setVatNumber(user.getVatNumber());
@@ -472,7 +458,6 @@ public class UserServiceImpl implements UserServiceInterface {
         dto.setBusinessAddress(user.getBusinessAddress());
         dto.setDeliveryRadius(user.getDeliveryRadius());
 
-        // Vehicle fields
         dto.setVehicleType(user.getVehicleType());
         dto.setVehicleBrand(user.getVehicleBrand());
         dto.setVehicleModel(user.getVehicleModel());
@@ -487,7 +472,6 @@ public class UserServiceImpl implements UserServiceInterface {
         dto.setVehicleInspectionExpiry(user.getVehicleInspectionExpiry());
         dto.setAssignedVehicleId(user.getAssignedVehicleId());
 
-        // Professional fields
         dto.setDriverLicenseNumber(user.getDriverLicenseNumber());
         dto.setDriverLicenseCategory(user.getDriverLicenseCategory());
         dto.setDriverLicenseIssueDate(user.getDriverLicenseIssueDate());
@@ -499,14 +483,11 @@ public class UserServiceImpl implements UserServiceInterface {
         dto.setAvailabilitySchedule(user.getAvailabilitySchedule());
         dto.setHasCompanyAffiliation(user.isHasCompanyAffiliation());
 
-        // Account status
         dto.setVerified(user.isVerified());
         dto.setEnabled(user.isEnabled());
         dto.setAvailable(user.isAvailable());
         dto.setApproved(user.isApproved());
-        dto.setEnabled(user.isEnabled());
 
-        // Performance metrics
         dto.setRating(user.getRating());
         dto.setCompletedDeliveries(user.getCompletedDeliveries());
         dto.setLastActive(user.getLastActive());
@@ -514,16 +495,13 @@ public class UserServiceImpl implements UserServiceInterface {
         dto.setTotalDeliveries(user.getTotalDeliveries());
         dto.setAverageDeliveryTime(user.getAverageDeliveryTime());
 
-        // Roles
         if (user.getRoles() != null) {
             Set<String> roleStrings = user.getRoles().stream()
                     .map(Role::name)
                     .collect(Collectors.toSet());
             dto.setRoles(roleStrings);
         }
-        // Password should not be set in DTO for security reasons
 
-        // Convert assigned vehicle if present
         if (user.getAssignedVehicle() != null) {
             dto.setAssignedVehicle(convertVehicleToDTO(user.getAssignedVehicle()));
         }
@@ -538,7 +516,6 @@ public class UserServiceImpl implements UserServiceInterface {
 
         User user = new User();
 
-        // Basic user info
         user.setId(dto.getId());
         user.setFirstName(dto.getFirstName());
         user.setLastName(dto.getLastName());
@@ -547,7 +524,6 @@ public class UserServiceImpl implements UserServiceInterface {
         user.setAddress(dto.getAddress());
         user.setDateOfRegistration(dto.getDateOfRegistration());
 
-        // Enterprise fields
         user.setCompanyName(dto.getCompanyName());
         user.setBusinessType(dto.getBusinessType());
         user.setVatNumber(dto.getVatNumber());
@@ -555,7 +531,6 @@ public class UserServiceImpl implements UserServiceInterface {
         user.setBusinessAddress(dto.getBusinessAddress());
         user.setDeliveryRadius(dto.getDeliveryRadius());
 
-        // Vehicle fields
         user.setVehicleType(dto.getVehicleType());
         user.setVehicleBrand(dto.getVehicleBrand());
         user.setVehicleModel(dto.getVehicleModel());
@@ -570,7 +545,6 @@ public class UserServiceImpl implements UserServiceInterface {
         user.setVehicleInspectionExpiry(dto.getVehicleInspectionExpiry());
         user.setAssignedVehicleId(dto.getAssignedVehicleId());
 
-        // Professional fields
         user.setDriverLicenseNumber(dto.getDriverLicenseNumber());
         user.setDriverLicenseCategory(dto.getDriverLicenseCategory());
         user.setDriverLicenseIssueDate(dto.getDriverLicenseIssueDate());
@@ -582,12 +556,10 @@ public class UserServiceImpl implements UserServiceInterface {
         user.setAvailabilitySchedule(dto.getAvailabilitySchedule());
         user.setHasCompanyAffiliation(dto.isHasCompanyAffiliation());
 
-        // Account status
         user.setVerified(dto.isVerified());
         user.setEnabled(dto.isEnabled());
         user.setAvailable(dto.isAvailable());
 
-        // Performance metrics
         user.setRating(dto.getRating());
         user.setCompletedDeliveries(dto.getCompletedDeliveries());
         user.setLastActive(dto.getLastActive());
@@ -595,19 +567,16 @@ public class UserServiceImpl implements UserServiceInterface {
         user.setTotalDeliveries(dto.getTotalDeliveries());
         user.setAverageDeliveryTime(dto.getAverageDeliveryTime());
 
-        // Roles
         if (dto.getRoles() != null) {
             Set<Role> roles = dto.getRoles().stream()
                     .map(Role::valueOf)
                     .collect(Collectors.toSet());
             user.setRoles(roles);
         }
-        // Password should be handled separately in a dedicated method
 
         return user;
     }
 
-    // Add this method if you need to convert Vehicle to VehicleDTO
     private VehicleDTO convertVehicleToDTO(Vehicle vehicle) {
         if (vehicle == null) {
             return null;
@@ -627,10 +596,6 @@ public class UserServiceImpl implements UserServiceInterface {
         return dto;
     }
 
-    // In UserServiceImpl.java
-
-    // Add these new methods
-
     @Override
     public void createPasswordResetToken(String email) {
         User user = userRepository.findByEmail(email)
@@ -642,9 +607,8 @@ public class UserServiceImpl implements UserServiceInterface {
         user.setResetTokenExpiry(LocalDateTime.now().plusHours(24));
 
         userRepository.save(user);
-        sendPasswordResetEmail(user, token); // Changed from email String to User object
+        sendPasswordResetEmail(user, token);
     }
-
 
     @Override
     public boolean validatePasswordResetToken(String token) {
@@ -695,14 +659,12 @@ public class UserServiceImpl implements UserServiceInterface {
         user.setEnabled(true);
         user.setVerified(true);
 
-        // Send approval email if needed
         if (mailSender != null) {
             sendApprovalEmail(user);
         }
 
         return userRepository.save(user);
     }
-
 
     @Override
     public User disableUser(String userId) {
@@ -718,12 +680,10 @@ public class UserServiceImpl implements UserServiceInterface {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found"));
 
-        // Send rejection email if needed
         if (mailSender != null) {
             sendRejectionEmail(user);
         }
 
-        // Actually delete the user
         userRepository.delete(user);
     }
 
@@ -732,7 +692,6 @@ public class UserServiceImpl implements UserServiceInterface {
             emailService.sendPasswordResetEmail(user, token);
         } catch (Exception e) {
             logger.error("Failed to send password reset email", e);
-            // Fallback pour dev
             String resetLink = "http://localhost:4200/reset-password?token=" + token;
             System.out.println("\n=== DEV MODE: Password reset link ===");
             System.out.println("Email: " + user.getEmail());
@@ -740,6 +699,7 @@ public class UserServiceImpl implements UserServiceInterface {
             System.out.println("==============================\n");
         }
     }
+
     private void sendApprovalEmail(User user) {
         try {
             emailService.sendAccountApprovalEmail(user);
@@ -755,7 +715,7 @@ public class UserServiceImpl implements UserServiceInterface {
             logger.error("Failed to send rejection email", e);
         }
     }
-    // Dans UserServiceImpl.java
+
     @Override
     public long countActiveUsers() {
         return userRepository.countByEnabledTrueAndApprovedTrue();
@@ -780,75 +740,28 @@ public class UserServiceImpl implements UserServiceInterface {
         return counts;
     }
 
-    // Update the loadUserByUsername method in CustomUserDetailsService to check for approval
-    @Override
-    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
-
-        // Skip verification/approval checks for ADMIN users
-        if (!user.getRoles().contains(Role.ADMIN)) {
-            if (!user.isVerified()) {
-                throw new CustomUserDetailsService.AccountNotVerifiedException("Account not verified. Please check your email.");
-            }
-
-            if (!user.isApproved()) {
-                throw new AccountNotApprovedException("Account not approved by admin yet");
-            }
-        }
-
-        checkAccountStatus(user);
-
-        return new CustomUserDetailsService.CustomUserDetails(
-                user.getId(),
-                user.getEmail(),
-                user.getPassword(),
-                getAuthorities(user),
-                user.isEnabled(),
-                user.isVerified(),
-                user.getFailedLoginAttempts(),
-                user.getLockTime()
-        );
-    }
-
     /**
-     * @param username
+     * @param email 
      * @return
+     * @throws UsernameNotFoundException
      */
     @Override
-    public User findByUsername(String username) {
+    public UserDetails loadUserByUsername(String email) throws UsernameNotFoundException {
         return null;
     }
 
-    private Collection<? extends GrantedAuthority> getAuthorities(User user) {
-        Collection<GrantedAuthority> authorities = new ArrayList<>();
-
-        if (user.getRoles() != null) {
-            for (Role role : user.getRoles()) {
-                authorities.add(new SimpleGrantedAuthority(role.name()));
-            }
-        }
-
-        return authorities;
+    // REMOVE THE DUPLICATE loadUserByUsername METHOD
+    // Keep only the findByUsername method which is required by the interface
+    @Override
+    public User findByUsername(String username) {
+        return userRepository.findByEmail(username)
+                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + username));
     }
-    // In UserServiceImpl.java
-    private void checkAccountStatus(User user) {
-        if (!user.isVerified()) {
-            throw new CustomUserDetailsService.AccountNotVerifiedException("Account not verified");
-        }
 
-        if (user.getLockTime() != null &&
-                ChronoUnit.MINUTES.between(user.getLockTime(), LocalDateTime.now()) < LOCK_TIME_MINUTES) {
-            throw new CustomUserDetailsService.AccountLockedException("Account temporarily locked. Try again later.");
-        }
-    }
-    // Add this exception class
+    // Custom exceptions
     public static class AccountNotApprovedException extends RuntimeException {
         public AccountNotApprovedException(String message) {
             super(message);
         }
     }
-
-
-
 }
