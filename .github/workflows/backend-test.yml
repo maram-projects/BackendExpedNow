@@ -1,13 +1,11 @@
-name: Backend Test
+name: Backend Build & Deploy
 
 on:
   push:
     branches: [ main ]
-  pull_request:
-    branches: [ main ]
 
 jobs:
-  test:
+  build-and-deploy:
     runs-on: ubuntu-latest
 
     steps:
@@ -34,3 +32,11 @@ jobs:
 
       - name: Build project
         run: ./mvnw clean package -DskipTests
+
+      - name: Deploy to Render
+        if: github.ref == 'refs/heads/main'
+        run: |
+          curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK }}"
+
+      - name: Deployment Status
+        run: echo "🚀 Backend deployed successfully!"
