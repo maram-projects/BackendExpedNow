@@ -82,7 +82,8 @@ public class SecurityConfig {
                         .requestMatchers("/public/**").permitAll()                    // ✅ SENTRY TEST ENDPOINTS
                         .requestMatchers("/api/test/**").permitAll()                  // ✅ GENERAL TEST ENDPOINTS
                         .requestMatchers("/actuator/health").permitAll()              // ✅ HEALTH CHECK
-                        .requestMatchers("/error").permitAll()                       // ✅ ERROR PAGES
+                        .requestMatchers("/error").permitAll()
+                        .requestMatchers("/test/**").permitAll()                      // أضف هذا للـ Sentry Test// ✅ ERROR PAGES
                         .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()      // ✅ CORS PREFLIGHT
 
                         // Auth & OAuth endpoints
