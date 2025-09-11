@@ -1,188 +1,189 @@
-spring:
-  application:
-    name: ExpedNow
-  data:
-    mongodb:
-      uri: mongodb+srv://admin:Mh%3A27567644@cluster0.fkukv.mongodb.net/expednow?retryWrites=true&w=majority&appName=Cluster0
-
-  mail:
-    enabled: true
-    host: smtp.gmail.com
-    port: 587
-    username: lamiahaded99@gmail.com # Replace with your actual Gmail
-    password: zznu ywvs nvdc miso     # Generate App Password from Gmail settings
-    properties:
-      mail:
-        smtp:
-          auth: true
-          starttls:
-            enable: true
-            required: true
-          connectiontimeout: 5000
-          timeout: 5000
-          writetimeout: 5000
-  thymeleaf:
-    enabled: true
-    prefix: classpath:/templates/
-    suffix: .html
-    mode: HTML
-    encoding: UTF-8
-    cache: false  # Set to true in production
-  security:
-    oauth2:
-      client:
-        registration:
-          google:
-            client-id: 382950926394-djonps75gpc1165601eqq237hs954ko4.apps.googleusercontent.com
-            client-secret: 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
-            scope:
-              - email
-              - profile
-            redirect-uri: http://localhost:4200/oauth2/callback
-          facebook:
-            client-id: YOUR_FACEBOOK_CLIENT_ID
-            client-secret: YOUR_FACEBOOK_CLIENT_SECRET
-            scope:
-              - email
-              - public_profile
-  servlet:
-    multipart:
-      max-file-size: 100MB
-      max-request-size: 100MB
-  jackson:
-    date-format: yyyy-MM-dd'T'HH:mm:ss.SSSZ
-    time-zone: UTC
-    serialization:
-      write-dates-as-timestamps: false
-  main:
-    allow-circular-references: true
-  profiles:
-    active: dev
-
-# Enhanced OpenAI Configuration with fallback settings
-openai:
-  api:
-    key: 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
-    url: https://api.openai.com/v1/chat/completions
-    timeout: 30000
-    max-tokens: 300
-    temperature: 0.7
-    model: gpt-3.5-turbo
-
-# Chatbot Configuration
-chatbot:
-  fallback:
-    enabled: true
-    priority: high # high = prefer fallback, low = prefer OpenAI
-  rate-limiting:
-    enabled: true
-    max-requests-per-hour: 50
-    max-requests-per-day: 200
-    reset-hour: 0 # Hour to reset daily count (0-23)
-
-# Sentry Configuration
-sentry:
-  dsn: https://197cfc957dc6661a89c147b280ad45f2@o4509998286372864.ingest.de.sentry.io/4509998292664400
-  environment: production
-  traces-sample-rate: 1.0
-  release: ${project.version:1.0.0}
-
-stripe:
-  api-key: ${STRIPE_SECRET_KEY:}
-  publishable-key: ${STRIPE_PUBLISHABLE_KEY:}
-  webhook:
-    secret: ${STRIPE_WEBHOOK_SECRET:}
-  currency: usd
-
-app:
-  frontend:
-    url: http://localhost:4200
-
-jwt:
-  secret: hzIOh5KpmuK48srRGTg3ip+5dqRxzCkyWTu0PxOfMGI=
-  expirationMs: 86400000
-  refreshExpirationMs: 604800000
-
-file:
-  upload-dir: C:\\pfe4\\uploads
-
-# Image Analysis Service Configuration
-image:
-  analysis:
+  spring:
+    application:
+      name: ExpedNow
+    data:
+      mongodb:
+        uri: mongodb+srv://admin:Mh%3A27567644@cluster0.fkukv.mongodb.net/expednow?retryWrites=true&w=majority&appName=Cluster0
+  
+    mail:
+      enabled: true
+      host: smtp.gmail.com
+      port: 587
+      username: lamiahaded99@gmail.com # Replace with your actual Gmail
+      password: zznu ywvs nvdc miso     # Generate App Password from Gmail settings
+      properties:
+        mail:
+          smtp:
+            auth: true
+            starttls:
+              enable: true
+              required: true
+            connectiontimeout: 5000
+            timeout: 5000
+            writetimeout: 5000
+    thymeleaf:
+      enabled: true
+      prefix: classpath:/templates/
+      suffix: .html
+      mode: HTML
+      encoding: UTF-8
+      cache: false  # Set to true in production
+    security:
+      oauth2:
+        client:
+          registration:
+            google:
+              client-id: 382950926394-djonps75gpc1165601eqq237hs954ko4.apps.googleusercontent.com
+              client-secret: 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
+              scope:
+                - email
+                - profile
+              redirect-uri: http://localhost:4200/oauth2/callback
+            facebook:
+              client-id: YOUR_FACEBOOK_CLIENT_ID
+              client-secret: YOUR_FACEBOOK_CLIENT_SECRET
+              scope:
+                - email
+                - public_profile
+    servlet:
+      multipart:
+        max-file-size: 100MB
+        max-request-size: 100MB
+    jackson:
+      date-format: yyyy-MM-dd'T'HH:mm:ss.SSSZ
+      time-zone: UTC
+      serialization:
+        write-dates-as-timestamps: false
+    main:
+      allow-circular-references: true
+    profiles:
+      active: dev
+  
+  # Enhanced OpenAI Configuration with fallback settings
+  openai:
     api:
-      url: http://localhost:5001
+      key: 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
+      url: https://api.openai.com/v1/chat/completions
       timeout: 30000
-      connection-timeout: 10000
-    enabled: true
-    fallback-on-error: true
-    max-retries: 3
-    retry-delay: 1000
-    supported-formats:
-      - jpg
-      - jpeg
-      - png
-      - gif
-      - bmp
-      - webp
-    max-file-size: 10485760
-
-pricing:
-  base: 5.0
-  distance-rate: 0.8
-  weight-rate: 0.5
-  urgency-fee: 3.0
-  peak-surcharge: 0.2
-  holiday-surcharge: 0.3
-  rules:
-    rule1: distance > 10 && weight > 5
-
-google:
-  maps:
-    api:
-      key: AIzaSyDsywwThSj5QgW0PiooUwr_QCKW15Fm2PE
-    distance-matrix:
-      url: https://maps.googleapis.com/maps/api/distancematrix/json
-    geocoding:
-      url: https://maps.googleapis.com/maps/api/geocode/json
-
-logging:
-  level:
-    org:
-      springframework:
-        mail: DEBUG
-        data:
-          convert:
-            CustomConversions: ERROR
-        security:
-          config:
-            annotation:
-              authentication:
-                configuration:
-                  InitializeUserDetailsBeanManagerConfigurer: ERROR
-        web:
-          socket: DEBUG
-        messaging:
-          simp: DEBUG
-      eclipse:
-        angus:
+      max-tokens: 300
+      temperature: 0.7
+      model: gpt-3.5-turbo
+  
+  # Chatbot Configuration
+  chatbot:
+    fallback:
+      enabled: true
+      priority: high # high = prefer fallback, low = prefer OpenAI
+    rate-limiting:
+      enabled: true
+      max-requests-per-hour: 50
+      max-requests-per-day: 200
+      reset-hour: 0 # Hour to reset daily count (0-23)
+  
+  # Sentry Configuration
+  sentry:
+    dsn: https://197cfc957dc6661a89c147b280ad45f2@o4509998286372864.ingest.de.sentry.io/4509998292664400
+    environment: development
+    traces-sample-rate: 1.0
+    release: 1.0.0
+    debug: true
+  
+  stripe:
+    api-key: ${STRIPE_SECRET_KEY:}
+    publishable-key: ${STRIPE_PUBLISHABLE_KEY:}
+    webhook:
+      secret: ${STRIPE_WEBHOOK_SECRET:}
+    currency: usd
+  
+  app:
+    frontend:
+      url: http://localhost:4200
+  
+  jwt:
+    secret: hzIOh5KpmuK48srRGTg3ip+5dqRxzCkyWTu0PxOfMGI=
+    expirationMs: 86400000
+    refreshExpirationMs: 604800000
+  
+  file:
+    upload-dir: C:\\pfe4\\uploads
+  
+  # Image Analysis Service Configuration
+  image:
+    analysis:
+      api:
+        url: http://localhost:5001
+        timeout: 30000
+        connection-timeout: 10000
+      enabled: true
+      fallback-on-error: true
+      max-retries: 3
+      retry-delay: 1000
+      supported-formats:
+        - jpg
+        - jpeg
+        - png
+        - gif
+        - bmp
+        - webp
+      max-file-size: 10485760
+  
+  pricing:
+    base: 5.0
+    distance-rate: 0.8
+    weight-rate: 0.5
+    urgency-fee: 3.0
+    peak-surcharge: 0.2
+    holiday-surcharge: 0.3
+    rules:
+      rule1: distance > 10 && weight > 5
+  
+  google:
+    maps:
+      api:
+        key: AIzaSyDsywwThSj5QgW0PiooUwr_QCKW15Fm2PE
+      distance-matrix:
+        url: https://maps.googleapis.com/maps/api/distancematrix/json
+      geocoding:
+        url: https://maps.googleapis.com/maps/api/geocode/json
+  
+  logging:
+    level:
+      org:
+        springframework:
           mail: DEBUG
-    com:
-      example:
-        ExpedNow:
-          controllers:
-            AIChatController: INFO # Reduced from DEBUG to INFO to avoid spam
-          services:
-            core:
-              ImageAnalysisService: DEBUG
-              FileStorageService: DEBUG
-    root: INFO
-
-# Management endpoints for monitoring
-management:
-  endpoints:
-    web:
-      exposure:
-        include: health,info,metrics
-  endpoint:
-    health:
-      show-details: when-authorized
+          data:
+            convert:
+              CustomConversions: ERROR
+          security:
+            config:
+              annotation:
+                authentication:
+                  configuration:
+                    InitializeUserDetailsBeanManagerConfigurer: ERROR
+          web:
+            socket: DEBUG
+          messaging:
+            simp: DEBUG
+        eclipse:
+          angus:
+            mail: DEBUG
+      com:
+        example:
+          ExpedNow:
+            controllers:
+              AIChatController: INFO # Reduced from DEBUG to INFO to avoid spam
+            services:
+              core:
+                ImageAnalysisService: DEBUG
+                FileStorageService: DEBUG
+      root: INFO
+  
+  # Management endpoints for monitoring
+  management:
+    endpoints:
+      web:
+        exposure:
+          include: health,info,metrics
+    endpoint:
+      health:
+        show-details: when-authorized
