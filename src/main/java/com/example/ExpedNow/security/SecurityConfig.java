@@ -89,7 +89,10 @@ public class SecurityConfig {
                                 "/topic/**",
                                 "/app/**",
                                 "/user/**",
-                                "/queue/**"
+                                "/queue/**",
+                                "/public/**",              // ADD THIS LINE
+                                "/api/test/**",            // ADD THIS LINE
+                                "/actuator/health"         // ADD THIS LINE
                         ).permitAll()
 
                         // Pricing endpoints
