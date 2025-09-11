@@ -78,21 +78,37 @@ public class SecurityConfig {
                         .requestMatchers("/uploads/**").permitAll()
                         .requestMatchers("/uploads/vehicle-photos/**").permitAll()
 
-                        // Public endpoints
+                        // PUBLIC ENDPOINTS - CRITICAL: MUST BE EARLY IN THE LIST
+                        .requestMatchers("/public/**").permitAll()                    // ✅ SENTRY TEST ENDPOINTS
+                        .requestMatchers("/api/test/**").permitAll()                  // ✅ GENERAL TEST ENDPOINTS
+                        .requestMatchers("/actuator/health").permitAll()              // ✅ HEALTH CHECK
+                        .requestMatchers("/error").permitAll()                       // ✅ ERROR PAGES
+                        .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()      // ✅ CORS PREFLIGHT
+
+                        // Auth & OAuth endpoints
                         .requestMatchers(
                                 "/api/auth/**",
                                 "/oauth2/**",
+                                "/login/**",
+                                "/logout/**"
+                        ).permitAll()
+
+                        // WebSocket endpoints
+                        .requestMatchers(
                                 "/ws/**",
-                                "/v3/api-docs/**",
-                                "/swagger-ui/**",
-                                "/swagger-ui.html",
                                 "/topic/**",
                                 "/app/**",
                                 "/user/**",
-                                "/queue/**",
-                                "/public/**",              // ADD THIS LINE
-                                "/api/test/**",            // ADD THIS LINE
-                                "/actuator/health"         // ADD THIS LINE
+                                "/queue/**"
+                        ).permitAll()
+
+                        // API Documentation
+                        .requestMatchers(
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html",
+                                "/swagger-resources/**",
+                                "/webjars/**"
                         ).permitAll()
 
                         // Pricing endpoints
@@ -212,14 +228,25 @@ public class SecurityConfig {
                 )
                 .exceptionHandling(ex -> ex
                         .authenticationEntryPoint((request, response, authException) -> {
+                            // تحسين الـ error response للـ debugging
                             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-                            response.setContentType("application/json");
-                            response.getWriter().write("{\"error\":\"Unauthorized\",\"message\":\"Authentication required\"}");
+                            response.setContentType("application/json; charset=utf-8");
+                            String errorResponse = String.format(
+                                    "{\"error\":\"Unauthorized\",\"message\":\"Missing or invalid token\",\"path\":\"%s\",\"timestamp\":\"%s\"}",
+                                    request.getRequestURI(),
+                                    java.time.Instant.now().toString()
+                            );
+                            response.getWriter().write(errorResponse);
                         })
                         .accessDeniedHandler((request, response, accessDeniedException) -> {
                             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                            response.setContentType("application/json");
-                            response.getWriter().write("{\"error\":\"Forbidden\",\"message\":\"Access denied\"}");
+                            response.setContentType("application/json; charset=utf-8");
+                            String errorResponse = String.format(
+                                    "{\"error\":\"Forbidden\",\"message\":\"Access denied\",\"path\":\"%s\",\"timestamp\":\"%s\"}",
+                                    request.getRequestURI(),
+                                    java.time.Instant.now().toString()
+                            );
+                            response.getWriter().write(errorResponse);
                         })
                 )
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -254,7 +281,7 @@ public class SecurityConfig {
 
         // Use allowedOriginPatterns for wildcard support
         configuration.setAllowedOriginPatterns(Arrays.asList(
-                "http://localhost:4200",
+                "http://localhost:*",
                 "https://your-production-domain.com"
         ));
 
