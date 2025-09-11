@@ -6,6 +6,7 @@ import com.example.ExpedNow.exception.InvalidRequestException;
 import com.example.ExpedNow.models.DeliveryRequest;
 import com.example.ExpedNow.models.enums.PackageType;
 import com.example.ExpedNow.services.core.DeliveryPricingService;
+import io.sentry.Sentry;
 import jakarta.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -28,6 +29,35 @@ public class PricingController {
 
     @Autowired
     private DeliveryPricingService pricingService;
+
+    // ADD THESE SENTRY TEST METHODS
+    @GetMapping("/sentry-test")
+    public ResponseEntity<String> testSentry() {
+        logger.info("Testing Sentry integration via pricing endpoint...");
+
+        try {
+            throw new RuntimeException("SENTRY TEST ERROR from pricing endpoint: " + System.currentTimeMillis());
+        } catch (Exception e) {
+            logger.error("Pricing Sentry test error", e);
+            Sentry.captureException(e);
+            return ResponseEntity.status(500).body("✅ Error sent to Sentry successfully! Check dashboard.");
+        }
+    }
+
+    @GetMapping("/sentry-message")
+    public ResponseEntity<String> testSentryMessage() {
+        logger.info("Testing Sentry message via pricing endpoint...");
+
+        Sentry.captureMessage("📨 PRICING SENTRY MESSAGE TEST: " + System.currentTimeMillis());
+        return ResponseEntity.ok("✅ Message sent to Sentry successfully! Check dashboard.");
+    }
+
+    @GetMapping("/health")
+    public ResponseEntity<String> health() {
+        Sentry.addBreadcrumb("Pricing health check called");
+        return ResponseEntity.ok("🔧 Pricing Health: ✅ ACTIVE - Sentry Ready!");
+    }
+    // END SENTRY TEST METHODS
 
     @PostMapping("/calculate")
     public ResponseEntity<?> calculatePrice(
