@@ -151,4 +151,9 @@ public interface DeliveryReqRepository extends MongoRepository<DeliveryRequest, 
         int getRatingsAbove4();
         int getRatingsBelow3();
     }
+
+
+    // Add this method to your DeliveryReqRepository interface
+
+
 }

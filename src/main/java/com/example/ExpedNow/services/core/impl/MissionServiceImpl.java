@@ -2,16 +2,19 @@ package com.example.ExpedNow.services.core.impl;
 
 import com.example.ExpedNow.models.*;
 import com.example.ExpedNow.models.enums.BonusStatus;
-import com.example.ExpedNow.models.enums.PackageType;
 import com.example.ExpedNow.repositories.*;
 import com.example.ExpedNow.services.core.DeliveryAssignmentServiceInterface;
 import com.example.ExpedNow.services.core.MissionServiceInterface;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
@@ -203,15 +206,175 @@ public class MissionServiceImpl implements MissionServiceInterface {
         return missionRepository.findByDeliveryPersonId(deliveryPersonId);
     }
 
+
+
+
+
+
+
+    // Add this method to your MissionServiceImpl class
+
+    /**
+     * Enhanced method to get all missions with client information
+     */
     @Override
-    public List<Mission> getActiveMissions() {
-        return missionRepository.findByStatusIn(List.of("PENDING", "IN_PROGRESS"));
+    public List<Mission> getAllMissions() {
+        List<Mission> missions = missionRepository.findAll();
+
+        // Enhance missions with client information
+        for (Mission mission : missions) {
+            if (mission.getDeliveryRequest() != null &&
+                    mission.getDeliveryRequest().getClientId() != null) {
+
+                try {
+                    // Fetch client information
+                    Optional<User> clientOpt = userRepository.findById(mission.getDeliveryRequest().getClientId());
+
+                    if (clientOpt.isPresent()) {
+                        User client = clientOpt.get();
+
+                        // Since DeliveryRequest doesn't have setClient method,
+                        // you have two options:
+
+                        // Option 1: Add client info to mission notes or description
+                        String clientInfo = "Client: " + client.getFullName() + " (" + client.getEmail() + ")";
+                        String currentNotes = mission.getNotes();
+                        if (currentNotes == null) {
+                            mission.setNotes(clientInfo);
+                        } else if (!currentNotes.contains("Client:")) {
+                            mission.setNotes(currentNotes + " | " + clientInfo);
+                        }
+
+                        // Option 2: Store client in a transient field (see DeliveryRequest entity fix below)
+                        // mission.getDeliveryRequest().setClient(client);
+                    }
+                } catch (Exception e) {
+                    logger.warn("Failed to fetch client info for mission {}: {}",
+                            mission.getId(), e.getMessage());
+                }
+            }
+        }
+
+        return missions;
     }
 
+    /**
+     * Get all missions with complete client information populated
+     */
+    @Override
+    public List<Mission> getAllMissionsWithClientInfo() {
+        return List.of();
+    }
+
+    /**
+     * Get missions by status (alternative to filtering in controller)
+     *
+     * @param status
+     */
+    @Override
+    public List<Mission> getMissionsByStatus(String status) {
+        return List.of();
+    }
+
+    /**
+     * Get missions with pagination support
+     *
+     * @param pageable
+     */
+    @Override
+    public Page<Mission> getAllMissionsPaginated(Pageable pageable) {
+        return null;
+    }
+
+    /**
+     * Get missions by date range
+     *
+     * @param startDate
+     * @param endDate
+     */
+    @Override
+    public List<Mission> getMissionsByDateRange(LocalDateTime startDate, LocalDateTime endDate) {
+        return List.of();
+    }
+
+    /**
+     * Get missions count by status for statistics
+     */
+    @Override
+    public Map<String, Long> getMissionStatisticsByStatus() {
+        return Map.of();
+    }
+
+    /**
+     * Enhanced method to get active missions with client information
+     */
+    @Override
+    public List<Mission> getActiveMissions() {
+        List<Mission> missions = missionRepository.findByStatusIn(List.of("PENDING", "IN_PROGRESS"));
+
+        // Enhance missions with client information
+        for (Mission mission : missions) {
+            if (mission.getDeliveryRequest() != null &&
+                    mission.getDeliveryRequest().getClientId() != null) {
+
+                try {
+                    Optional<User> clientOpt = userRepository.findById(mission.getDeliveryRequest().getClientId());
+
+                    if (clientOpt.isPresent()) {
+                        User client = clientOpt.get();
+
+                        // Add client info to mission notes
+                        String clientInfo = "Client: " + client.getFullName() + " (" + client.getEmail() + ")";
+                        String currentNotes = mission.getNotes();
+                        if (currentNotes == null) {
+                            mission.setNotes(clientInfo);
+                        } else if (!currentNotes.contains("Client:")) {
+                            mission.setNotes(currentNotes + " | " + clientInfo);
+                        }
+                    }
+                } catch (Exception e) {
+                    logger.warn("Failed to fetch client info for active mission {}: {}",
+                            mission.getId(), e.getMessage());
+                }
+            }
+        }
+
+        return missions;
+    }
+
+    /**
+     * Enhanced method to get mission by ID with client information
+     */
     @Override
     public Mission getMissionById(String missionId) {
-        return missionRepository.findById(missionId)
+        Mission mission = missionRepository.findById(missionId)
                 .orElseThrow(() -> new RuntimeException("Mission not found with id: " + missionId));
+
+        // Add client information
+        if (mission.getDeliveryRequest() != null &&
+                mission.getDeliveryRequest().getClientId() != null) {
+
+            try {
+                Optional<User> clientOpt = userRepository.findById(mission.getDeliveryRequest().getClientId());
+
+                if (clientOpt.isPresent()) {
+                    User client = clientOpt.get();
+
+                    // Add client info to mission notes
+                    String clientInfo = "Client: " + client.getFullName() + " (" + client.getEmail() + ")";
+                    String currentNotes = mission.getNotes();
+                    if (currentNotes == null) {
+                        mission.setNotes(clientInfo);
+                    } else if (!currentNotes.contains("Client:")) {
+                        mission.setNotes(currentNotes + " | " + clientInfo);
+                    }
+                }
+            } catch (Exception e) {
+                logger.warn("Failed to fetch client info for mission {}: {}", missionId, e.getMessage());
+            }
+        }
+
+        return mission;
     }
 
     @Override

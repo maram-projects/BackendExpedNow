@@ -202,12 +202,19 @@ public class ChatService {
             log.info("Getting or creating chat room for delivery: {} between users: {} and {}",
                     deliveryId, senderId, receiverId);
 
-            // Look for existing room
+            // Look for existing room - check both participant orders
             Optional<ChatRoom> existingRoom = chatRoomRepository.findByDeliveryIdAndParticipants(
                     deliveryId, senderId, receiverId);
 
+            // If not found, try reverse order
+            if (!existingRoom.isPresent()) {
+                existingRoom = chatRoomRepository.findByDeliveryIdAndParticipants(
+                        deliveryId, receiverId, senderId);
+            }
+
             if (existingRoom.isPresent()) {
                 ChatRoom room = existingRoom.get();
+                log.info("Found existing chat room: {}", room.getId());
 
                 // Reactivate if inactive
                 if (!room.isActive()) {
@@ -217,7 +224,6 @@ public class ChatService {
                     log.info("Reactivated chat room: {}", room.getId());
                 }
 
-                log.info("Using existing chat room: {}", room.getId());
                 return room;
             }
 
@@ -230,6 +236,7 @@ public class ChatService {
         }
     }
 
+
     // Private helper methods
 
     private CustomUserDetailsService.CustomUserDetails getUserDetails(Authentication authentication) {
@@ -240,14 +247,51 @@ public class ChatService {
     }
 
     private ChatRoom createNewChatRoom(String deliveryId, String senderId, String receiverId) {
-        log.info("Creating new chat room for delivery: {}", deliveryId);
+        log.info("Creating new chat room for delivery: {} between {} and {}", deliveryId, senderId, receiverId);
 
-        // Determine user roles
-        String clientId = isClient(senderId) ? senderId : receiverId;
-        String deliveryPersonId = isDeliveryPerson(senderId) ? senderId : receiverId;
+        // Get both users to determine their roles
+        User sender = userRepository.findById(senderId)
+                .orElseThrow(() -> new RuntimeException("Sender not found with ID: " + senderId));
+        User receiver = userRepository.findById(receiverId)
+                .orElseThrow(() -> new RuntimeException("Receiver not found with ID: " + receiverId));
+
+        // Determine roles more reliably
+        String clientId = null;
+        String deliveryPersonId = null;
+
+        // Check sender's role
+        if (isClientRole(sender)) {
+            clientId = senderId;
+            deliveryPersonId = receiverId;
+        } else if (isDeliveryPersonRole(sender)) {
+            deliveryPersonId = senderId;
+            clientId = receiverId;
+        }
+
+        // Verify with receiver's role
+        if (clientId == null && isClientRole(receiver)) {
+            clientId = receiverId;
+            deliveryPersonId = senderId;
+        } else if (deliveryPersonId == null && isDeliveryPersonRole(receiver)) {
+            deliveryPersonId = receiverId;
+            clientId = senderId;
+        }
+
+        // Final validation
+        if (clientId == null || deliveryPersonId == null) {
+            log.error("Unable to determine client and delivery person roles. Sender: {} (roles: {}), Receiver: {} (roles: {})",
+                    senderId, sender.getRoles(), receiverId, receiver.getRoles());
+
+            // Fallback: Assume first user is client, second is delivery person
+            log.warn("Using fallback role assignment for chat room creation");
+            clientId = senderId;
+            deliveryPersonId = receiverId;
+        }
+
+        log.info("Determined roles - Client: {}, Delivery Person: {}", clientId, deliveryPersonId);
 
         // Create participants list
-        List<String> participants = Arrays.asList(senderId, receiverId);
+        List<String> participants = Arrays.asList(clientId, deliveryPersonId);
 
         // Build new chat room
         ChatRoom newRoom = ChatRoom.builder()
@@ -262,9 +306,55 @@ public class ChatService {
                 .build();
 
         ChatRoom savedRoom = chatRoomRepository.save(newRoom);
-        log.info("Created new chat room: {}", savedRoom.getId());
+        log.info("Created new chat room: {} with Client: {} and Delivery Person: {}",
+                savedRoom.getId(), clientId, deliveryPersonId);
         return savedRoom;
     }
+
+    private boolean isDeliveryPersonRole(User user) {
+        if (user == null || user.getRoles() == null) {
+            log.warn("User or roles is null for user: {}", user != null ? user.getId() : "null");
+            return false;
+        }
+
+        boolean isDeliveryPerson = user.getRoles().stream()
+                .anyMatch(role -> {
+                    String roleName = role.name().toUpperCase();
+                    return "ROLE_DELIVERY_PERSON".equals(roleName) ||
+                            "ROLE_PROFESSIONAL".equals(roleName) ||
+                            "ROLE_TEMPORARY".equals(roleName) ||
+                            "DELIVERY_PERSON".equals(roleName) ||
+                            "PROFESSIONAL".equals(roleName) ||
+                            "TEMPORARY".equals(roleName);
+                });
+
+        log.debug("User {} is delivery person: {}, roles: {}", user.getId(), isDeliveryPerson, user.getRoles());
+        return isDeliveryPerson;
+    }
+    private boolean isClientRole(User user) {
+        if (user == null || user.getRoles() == null) {
+            log.warn("User or roles is null for user: {}", user != null ? user.getId() : "null");
+            return false;
+        }
+
+        boolean isClient = user.getRoles().stream()
+                .anyMatch(role -> {
+                    String roleName = role.name().toUpperCase();
+                    return "ROLE_CLIENT".equals(roleName) ||
+                            "ROLE_INDIVIDUAL".equals(roleName) ||
+                            "ROLE_ENTERPRISE".equals(roleName) ||
+                            "CLIENT".equals(roleName) ||
+                            "INDIVIDUAL".equals(roleName) ||
+                            "ENTERPRISE".equals(roleName);
+                });
+
+        log.debug("User {} is client: {}, roles: {}", user.getId(), isClient, user.getRoles());
+        return isClient;
+    }
+
+
+
+
 
     private void updateChatRoomLastMessage(ChatRoom chatRoom, Message message) {
         chatRoom.setLastMessageAt(message.getTimestamp());
@@ -335,32 +425,25 @@ public class ChatService {
 
     private boolean isClient(String userId) {
         try {
-            return userRepository.findById(userId)
-                    .map(user -> user.getRoles().stream()
-                            .anyMatch(role -> {
-                                String roleName = role.name().toUpperCase();
-                                return "CLIENT".equals(roleName) ||
-                                        "INDIVIDUAL".equals(roleName) ||
-                                        "ENTERPRISE".equals(roleName);
-                            }))
-                    .orElse(false);
+            Optional<User> userOpt = userRepository.findById(userId);
+            if (!userOpt.isPresent()) {
+                log.warn("User not found for role check: {}", userId);
+                return false;
+            }
+            return isClientRole(userOpt.get());
         } catch (Exception e) {
             log.error("Error checking if user {} is client: {}", userId, e.getMessage(), e);
             return false;
         }
     }
-
     private boolean isDeliveryPerson(String userId) {
         try {
-            return userRepository.findById(userId)
-                    .map(user -> user.getRoles().stream()
-                            .anyMatch(role -> {
-                                String roleName = role.name().toUpperCase();
-                                return "DELIVERY_PERSON".equals(roleName) ||
-                                        "PROFESSIONAL".equals(roleName) ||
-                                        "TEMPORARY".equals(roleName);
-                            }))
-                    .orElse(false);
+            Optional<User> userOpt = userRepository.findById(userId);
+            if (!userOpt.isPresent()) {
+                log.warn("User not found for role check: {}", userId);
+                return false;
+            }
+            return isDeliveryPersonRole(userOpt.get());
         } catch (Exception e) {
             log.error("Error checking if user {} is delivery person: {}", userId, e.getMessage(), e);
             return false;
@@ -389,6 +472,7 @@ public class ChatService {
         }
     }
 
+
     private ChatRoomDTO convertToChatRoomDTO(ChatRoom room, String currentUserId) {
         try {
             if (room == null) {
@@ -406,12 +490,30 @@ public class ChatService {
             dto.setLastMessageContent(room.getLastMessageContent());
             dto.setActive(room.isActive());
 
+            // Enhanced participant identification
+            if (currentUserId.equals(room.getClientId())) {
+                // Current user is client, other user is delivery person
+                dto.setOtherUserId(room.getDeliveryPersonId());
+                dto.setOtherUserName(getUserName(room.getDeliveryPersonId()).orElse("Delivery Person"));
+            } else if (currentUserId.equals(room.getDeliveryPersonId())) {
+                // Current user is delivery person, other user is client
+                dto.setOtherUserId(room.getClientId());
+                dto.setOtherUserName(getUserName(room.getClientId()).orElse("Client"));
+            } else {
+                log.error("Current user {} is not a participant in room {}. ClientId: {}, DeliveryPersonId: {}",
+                        currentUserId, room.getId(), room.getClientId(), room.getDeliveryPersonId());
+                return null;
+            }
+
             // Set user names safely
             dto.setClientName(getUserName(room.getClientId()).orElse("Unknown Client"));
             dto.setDeliveryPersonName(getUserName(room.getDeliveryPersonId()).orElse("Unknown Delivery Person"));
 
             // Set unread count
             dto.setUnreadCount(getUnreadCountForRoom(room.getDeliveryId(), currentUserId));
+
+            log.debug("Converted room {} for user {} - other user: {}",
+                    room.getId(), currentUserId, dto.getOtherUserId());
 
             return dto;
         } catch (Exception e) {

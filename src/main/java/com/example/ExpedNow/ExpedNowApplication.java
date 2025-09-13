@@ -8,7 +8,7 @@ import org.springframework.boot.context.properties.EnableConfigurationProperties
 
 
 @SpringBootApplication(scanBasePackages = {"com.example.ExpedNow"})
-public class ExpedNowApplication {
+public class 	ExpedNowApplication {
 
 	public static void main(String[] args) {
 		SpringApplication.run(ExpedNowApplication.class, args);

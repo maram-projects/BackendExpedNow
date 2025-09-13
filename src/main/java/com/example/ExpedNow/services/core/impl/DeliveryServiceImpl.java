@@ -1264,6 +1264,8 @@ public class DeliveryServiceImpl implements DeliveryServiceInterface {
         }
     }
 
+
+
     /**
      * Extract category rating from delivery's detailed rating JSON
      */
