@@ -411,31 +411,55 @@ public class UserServiceImpl implements UserServiceInterface {
         return convertToDTO(user);
     }
 
+    private User unassignVehicleFromUserInternal(String userId) {
+        // Your existing unassign logic here
+        return null;
+    }
     @Override
     public ResponseEntity<?> unassignVehicleFromUser(String userId, String vehicleId) {
         try {
-            User user = userRepository.findById(userId)
-                    .orElseThrow(() -> new ResourceNotFoundException("User not found"));
-
-            Vehicle vehicle = vehicleRepository.findById(vehicleId)
-                    .orElseThrow(() -> new ResourceNotFoundException("Vehicle not found"));
-
-            if (!vehicleId.equals(user.getAssignedVehicleId())) {
-                return ResponseEntity.badRequest().body("This vehicle is not assigned to the user");
-            }
-
-            user.setAssignedVehicleId(null);
-            vehicle.setAvailable(true);
-
-            userRepository.save(user);
-            vehicleRepository.save(vehicle);
-
-            return ResponseEntity.ok().body("Vehicle unassigned successfully");
-        } catch (Exception e) {
-            return ResponseEntity.internalServerError().body("Error unassigning vehicle: " + e.getMessage());
+            User user = unassignVehicleFromUser(userId); // Call your existing logic
+            return ResponseEntity.ok().body(Collections.singletonMap("message", "Vehicle unassigned successfully"));
+        } catch (Exception ex) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(Collections.singletonMap("error", "Failed to unassign vehicle: " + ex.getMessage()));
         }
     }
 
+    // Replace your unassignVehicleFromUser method in UserServiceImpl with this:
+
+    public User unassignVehicleFromUser(String userId) {
+        // Find the user
+        User user = findById(userId);
+        if (user == null) {
+            throw new RuntimeException("User not found with id: " + userId);
+        }
+
+        // Get the assigned vehicle ID before clearing it
+        String assignedVehicleId = user.getAssignedVehicleId();
+
+        // Clear the vehicle assignment from user
+        user.setAssignedVehicleId(null);
+        user.setAssignedVehicle(null);
+
+        // If there was an assigned vehicle, make it available again
+        if (assignedVehicleId != null) {
+            try {
+                Optional<Vehicle> vehicleOptional = vehicleRepository.findById(assignedVehicleId);
+                if (vehicleOptional.isPresent()) {
+                    Vehicle vehicle = vehicleOptional.get();
+                    vehicle.setAvailable(true);
+                    vehicleRepository.save(vehicle); // Use vehicleRepository instead of vehicleService
+                }
+            } catch (Exception e) {
+                // Log the error but don't fail the user update
+                logger.error("Failed to update vehicle availability: " + e.getMessage(), e);
+            }
+        }
+
+        // Save and return the updated user
+        return save(user);
+    }
     public UserDTO convertToDTO(User user) {
         if (user == null) {
             return null;

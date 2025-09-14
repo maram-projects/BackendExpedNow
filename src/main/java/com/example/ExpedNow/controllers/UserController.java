@@ -197,14 +197,14 @@ public class UserController {
     }
 
     @PatchMapping("/{userId}/unassign-vehicle")
-    public ResponseEntity<?> unassignVehicleFromUser(
-            @PathVariable String userId,
-            @RequestBody Map<String, String> request) {
-        if (!request.containsKey("vehicleId")) {
-            return ResponseEntity.badRequest().body("Missing vehicleId in request");
+    public ResponseEntity<?> unassignVehicleFromUser(@PathVariable String userId) {
+        try {
+            // The service method should handle finding the user and their vehicle
+            User updatedUser = userService.unassignVehicleFromUser(userId);
+            return ResponseEntity.ok(updatedUser);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }
-        String vehicleId = request.get("vehicleId");
-        return userService.unassignVehicleFromUser(userId, vehicleId);
     }
 
     @GetMapping("/delivery-personnel")
