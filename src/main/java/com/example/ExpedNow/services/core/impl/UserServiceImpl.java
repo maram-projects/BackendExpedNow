@@ -396,7 +396,7 @@ public class UserServiceImpl implements UserServiceInterface {
                 .map(this::convertToDTO)
                 .collect(Collectors.toList());
     }
-
+    //hey
     @Override
     public UserDTO findByAssignedVehicle(String vehicleId) {
         User user = userRepository.findByAssignedVehicleId(vehicleId)
