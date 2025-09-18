@@ -34,4 +34,5 @@ public class WebConfig implements WebMvcConfigurer {
                 .addResourceLocations("file:" + uploadDir + "/")
                 .setCachePeriod(3600);
     }
+    //hey
 }
